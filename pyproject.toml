@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "syncrain"
+# The packaging metadata field holds the build number, read from BUILD_NUMBER: one fact, one place.
+dynamic = ["version"]
+description = "Never-repeating, clock-synchronised code-rain live wallpaper (GTK4 + OpenGL; Wayland layer-shell and X11)"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = ["PyGObject", "PyOpenGL", "Pillow"]
+
+[project.scripts]
+syncrain = "syncrain.app:main"
+
+[tool.setuptools]
+packages = ["syncrain"]
+
+[tool.setuptools.dynamic]
+version = { file = "BUILD_NUMBER" }
+
+[tool.setuptools.package-data]
+syncrain = ["data/*.png", "data/*.json", "data/shaders/*"]
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+addopts = "--strict-markers -p no:cacheprovider"
+testpaths = ["tests/unit", "tests/contract", "tests/render", "tests/wayland", "tests/kwin", "tests/browser", "tests/nix"]
+pythonpath = ["."]

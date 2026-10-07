@@ -1,0 +1,12 @@
+# Host state and build products: never tracked, never in a release (tools/package_release.py agrees)
+result
+result-*
+__pycache__/
+*.pyc
+*.egg-info/
+build/
+dist/
+var/
+.pytest_cache/
+.venv/
+venv/

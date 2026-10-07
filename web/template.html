@@ -1,0 +1,412 @@
+<!--@HEAD-->
+<title>Syncrain</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+  /* Layout: the rain fills the viewport; one quiet control strip floats bottom-left and fades when idle.
+     Single dark look by design (it is a night-sky wallpaper), so every colour is set explicitly here. */
+  :root {
+    --bg: #04070d;
+    --panel: rgba(5, 10, 19, 0.74);
+    --edge: rgba(126, 186, 228, 0.22);
+    --fg: #dce9f8;
+    --dim: #8ea5c3;
+    --accent: #7ebae4;            /* NixOS light blue */
+    --accent-ink: #04101d;
+    --mono: "JetBrains Mono", ui-monospace, "DejaVu Sans Mono", Menlo, monospace;
+    --sans: "IBM Plex Sans", system-ui, "Segoe UI", sans-serif;
+    color-scheme: dark;
+  }
+  :root[data-rain="matrix"] { --accent: #62f08c; --accent-ink: #021208; --edge: rgba(98, 240, 140, 0.22); }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; margin: 0; overflow: hidden; background: var(--bg); color: var(--fg); }
+  #c { position: fixed; inset: 0; width: 100%; height: 100%; display: block; background: var(--bg); }
+  #panel {
+    position: fixed; left: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    max-width: min(560px, calc(100% - 32px)); box-sizing: border-box;
+    display: grid; gap: 10px; padding: 12px 14px 12px;
+    background: var(--panel); border: 1px solid var(--edge); border-radius: 10px;
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    font: 13px/1.45 var(--sans); color: var(--fg);
+    transition: opacity 0.6s ease, transform 0.6s ease;
+  }
+  #panel.idle { opacity: 0; transform: translateY(6px); pointer-events: none; }
+  .top { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .name { font: 600 14px/1 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+  .clock { font: 400 13px/1 var(--mono); font-variant-numeric: tabular-nums; color: var(--fg); }
+  .clock span { color: var(--dim); }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: center; }
+  .seg { display: inline-flex; border: 1px solid var(--edge); border-radius: 7px; overflow: hidden; }
+  .seg button, .btn {
+    font: 500 12px/1 var(--sans); color: var(--fg); background: transparent; border: 0;
+    padding: 8px 10px; cursor: pointer;
+  }
+  .seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+  .btn { border: 1px solid var(--edge); border-radius: 7px; }
+  .chan { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+  .chan label { font: 500 11px/1 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--dim); }
+  .chan input {
+    font: 400 13px/1 var(--mono); color: var(--fg); background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--edge); border-radius: 7px; padding: 7px 8px; width: 11ch; min-width: 0;
+  }
+  button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .note { margin: 0; color: var(--dim); max-width: 60ch; }
+  .credit { margin: 0; font-size: 11px; color: var(--dim); opacity: 0.8; }
+  .credit a { color: inherit; text-underline-offset: 2px; }
+  #msg { position: fixed; inset: 0; display: grid; place-items: center; padding: 16px; text-align: center; font: 15px/1.5 var(--sans); color: var(--fg); }
+  @media (prefers-reduced-motion: reduce) { #panel { transition: none; } }
+</style>
+<!--@/HEAD-->
+<!--@BODY-->
+<canvas id="c" aria-label="Clock-synchronised code rain"></canvas>
+<div id="panel" class="idle" hidden>
+  <div class="top">
+    <span class="name">Syncrain</span>
+    <span class="clock" id="clock">--:--:--.- <span>UTC</span></span>
+  </div>
+  <div class="controls">
+    <div class="seg" role="group" aria-label="Theme">
+      <button type="button" id="th-nixos" aria-pressed="true">NixOS snow</button>
+      <button type="button" id="th-matrix" aria-pressed="false">Matrix green</button>
+    </div>
+    <div class="seg" role="group" aria-label="Colour cycling">
+      <button type="button" id="rb-logo" aria-pressed="true" title="The logo turns and cycles through the rainbow">Rainbow logo</button>
+      <button type="button" id="rb-all" aria-pressed="false" title="The rain cycles through the rainbow too">Rainbow all</button>
+      <button type="button" id="rb-off" aria-pressed="false" title="Theme colours; the logo still turns">Theme</button>
+    </div>
+    <span class="chan"><label for="channel">Channel</label><input id="channel" value="public" maxlength="40" spellcheck="false" autocomplete="off"></span>
+    <button type="button" class="btn" id="play" hidden>Play animation</button>
+    <button type="button" class="btn" id="fs">Full screen</button>
+  </div>
+  <p class="note">Every frame is computed from the UTC clock and the channel name. Open this on two devices with the same channel and they show the same rain at the same moment. It never repeats.</p>
+  <p class="credit"><span id="ident">Build @BUILD@ · stream @STREAM@</span>: the same stream and channel draw the same frame. NixOS snowflake by Simon Frankau and Tim Cuthbertson, <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>.</p>
+</div>
+<div id="msg" hidden></div>
+<script>
+'use strict';
+// syncrain web runner: the same shaders as the native wallpaper, driven by Date.now() (UTC).
+// As a wallpaper page, URL parameters (when the host passes them):
+//   theme=nixos|matrix  channel=<name>  fps=30  logo=white|colours|none  hud=0  scale=1  t=<unix seconds, frozen>
+//   rainbow=logo|all|off  spin=<seconds per logo turn, 0 = still>  drift=<screen heights, 0 = fixed>
+const META = /*@META@*/null;
+const BUILD = /*@BUILD@*/0, STREAM = '/*@STREAM@*/';   // written by tools/build_web.py
+const SRC = /*@SHADERS@*/null;
+const IMAGES = /*@IMAGES@*/null;
+
+const P = new URLSearchParams(location.search);
+const store = {
+  get(k) { try { return localStorage.getItem('syncrain.' + k); } catch (e) { return null; } },
+  set(k, v) { try { localStorage.setItem('syncrain.' + k, v); } catch (e) { /* storage unavailable */ } },
+};
+const hashTheme = location.hash.replace('#', '');
+const initialTheme = [P.get('theme'), hashTheme, store.get('theme')].find(t => t && META.themes[t]) || 'nixos';
+const initialChannel = P.get('channel') || store.get('channel') || 'public';
+const logoParam = ['white', 'colours', 'none'].includes(P.get('logo')) ? P.get('logo') : null;
+const fpsCap = Math.max(1, Math.min(240, Number(P.get('fps')) || 30));
+const spinParam = P.has('spin') ? Number(P.get('spin')) : null;        // seconds per logo revolution, 0 = still
+const driftParam = P.has('drift') ? Number(P.get('drift')) : null;     // screen heights, 0 = fixed
+let rainbowMode = ['logo', 'all', 'off'].includes(P.get('rainbow')) ? P.get('rainbow')
+  : (['logo', 'all', 'off'].includes(store.get('rainbow')) ? store.get('rainbow') : null);
+// whole cycles per hour, so every periodic motion is seamless at the hour boundary
+const cph = s => (!s || s <= 0) ? 0 : Math.max(1, Math.round(3600 / s));
+function motion() {                          // same as engine.motion() in the native app
+  const mode = rainbowMode || TH.rain.rainbow || 'logo';
+  return {
+    uSpinCph: cph(spinParam === null ? TH.logo.spin : spinParam),
+    uLogoHueCph: (mode === 'logo' || mode === 'all') ? cph(TH.logo.hueCycle) : 0,
+    uRainHueCph: mode === 'all' ? cph(TH.rain.allHueCycle) : 0,
+    uDrift: driftParam === null ? (TH.logo.drift || 0) : driftParam,
+  };
+}
+const fixedT = P.has('t') ? Number(P.get('t')) : null;
+const showHud = P.get('hud') !== '0';
+const renderScale = P.has('scale') ? Math.max(0.25, Math.min(3, Number(P.get('scale')) || 1)) : Math.min(window.devicePixelRatio || 1, 2);
+const reduceMotion = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+const COLS = META.cols;
+
+function fnv1a(s) {
+  let h = 0x811c9dc5;
+  for (const b of new TextEncoder().encode(s)) { h ^= b; h = Math.imul(h, 0x01000193) >>> 0; }
+  return h >>> 0;
+}
+
+const canvas = document.getElementById('c');
+const gl = canvas.getContext('webgl2', { antialias: false, alpha: false, depth: false, stencil: false,
+  preserveDrawingBuffer: P.get('capture') === '1', powerPreference: 'low-power' });
+function fail(text) {
+  const m = document.getElementById('msg');
+  m.textContent = text; m.hidden = false;
+  throw new Error(text);
+}
+if (!gl) fail('This page needs WebGL2, which this browser or device does not provide.');
+
+const HEADER = '#version 300 es\nprecision highp float;\nprecision highp int;\nprecision highp sampler2D;\n';
+const assemble = name => HEADER + SRC[name].replace(/^\/\/#include (\w+)\s*$/mg, (_, n) => SRC[n]);
+function shader(type, name, src) {
+  const s = gl.createShader(type);
+  gl.shaderSource(s, src); gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) fail(`Shader ${name} failed to compile: ${gl.getShaderInfoLog(s)}`);
+  return s;
+}
+const VERT = shader(gl.VERTEX_SHADER, 'vert', assemble('vert'));
+function program(name) {
+  const p = gl.createProgram();
+  gl.attachShader(p, VERT); gl.attachShader(p, shader(gl.FRAGMENT_SHADER, name, assemble(name)));
+  gl.linkProgram(p);
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) fail(`Shader ${name} failed to link: ${gl.getProgramInfoLog(p)}`);
+  const loc = {};
+  return { p, u: n => (n in loc ? loc[n] : (loc[n] = gl.getUniformLocation(p, n))) };
+}
+const prog = Object.fromEntries(['state', 'field', 'glyphs', 'blur', 'composite'].map(n => [n, program(n)]));
+const vao = gl.createVertexArray();
+
+function makeTex(w, h, data, linear) {
+  const t = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, t);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, data);
+  const f = linear ? gl.LINEAR : gl.NEAREST;
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, f);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, f);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  return t;
+}
+async function imageTex(uri) {
+  const blob = await (await fetch(uri)).blob();
+  const bmp = await createImageBitmap(blob, { premultiplyAlpha: 'none', colorSpaceConversion: 'none' });
+  const t = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, t);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+  gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, bmp);
+  gl.generateMipmap(gl.TEXTURE_2D);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  return t;
+}
+function fbo(tex) {
+  const f = gl.createFramebuffer();
+  gl.bindFramebuffer(gl.FRAMEBUFFER, f);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+  return f;
+}
+
+const T = {}, F = {};
+const UNIT = { state: 0, field: 1, atlas: 2, lut: 3, words: 4, bloom: 5, logo: 6, bg: 7, mask: 8, src: 9 };
+let themeName, TH, words, logoChoice, channel, SEED;
+
+function setTheme(name) {
+  themeName = META.themes[name] ? name : 'nixos';
+  TH = META.themes[themeName];
+  words = TH.words;
+  logoChoice = logoParam || TH.logo.default;
+  const lut = new Uint8Array(256 * 4);
+  TH.lut.forEach((g, i) => { lut[i * 4] = g; lut[i * 4 + 3] = 255; });
+  const wd = new Uint8Array(16 * Math.max(1, words.length) * 4).fill(255);
+  words.forEach((w, row) => w.forEach((g, i) => { wd[(row * 16 + i) * 4] = g; }));
+  if (T.lut) gl.deleteTexture(T.lut);
+  if (T.words) gl.deleteTexture(T.words);
+  T.lut = makeTex(256, 1, lut, false);
+  T.words = makeTex(16, Math.max(1, words.length), wd, false);
+  document.documentElement.dataset.rain = themeName;
+}
+function setChannel(name) {
+  channel = (name || '').trim() || 'public';
+  SEED = fnv1a(channel);
+}
+
+let W = 0, Hh = 0, rows = 0, QW = 0, QH = 0, CELL = 1, COL0 = 0;
+function resize() {
+  const w = Math.max(64, Math.round(canvas.clientWidth * renderScale));
+  const h = Math.max(36, Math.round(canvas.clientHeight * renderScale));
+  if (w === W && h === Hh) return;
+  W = w; Hh = h; canvas.width = W; canvas.height = Hh;
+  // cells never get smaller than ~14 CSS px; narrower screens show the middle of the same stream
+  CELL = Math.max(W / COLS, 14 * renderScale);
+  COL0 = (COLS - W / CELL) / 2;
+  rows = Math.ceil(Hh / CELL);
+  QW = Math.max(16, Math.round(W / 4)); QH = Math.max(9, Math.round(Hh / 4));
+  for (const k of ['state', 'field', 'glyphs', 'blurA', 'blurB']) {
+    if (T[k]) gl.deleteTexture(T[k]);
+    if (F[k]) gl.deleteFramebuffer(F[k]);
+  }
+  T.state = makeTex(COLS, rows, null, false); F.state = fbo(T.state);
+  T.field = makeTex(COLS, rows, null, true); F.field = fbo(T.field);
+  T.glyphs = makeTex(QW, QH, null, true); F.glyphs = fbo(T.glyphs);
+  T.blurA = makeTex(QW, QH, null, true); F.blurA = fbo(T.blurA);
+  T.blurB = makeTex(QW, QH, null, true); F.blurB = fbo(T.blurB);
+}
+
+function bind(unit, tex) { gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D, tex); }
+function common(pr, sec, frac) {
+  gl.uniform1ui(pr.u('uSec'), sec >>> 0);
+  gl.uniform1f(pr.u('uFrac'), frac);
+  gl.uniform1ui(pr.u('uSeed'), SEED);
+}
+function rainUniforms(pr) {
+  gl.uniform1i(pr.u('uCols'), COLS); gl.uniform1i(pr.u('uRows'), rows);
+  gl.uniform1i(pr.u('uState'), UNIT.state); gl.uniform1i(pr.u('uAtlas'), UNIT.atlas);
+  const c = TH.colors;
+  gl.uniform3fv(pr.u('cDeep'), c.deep); gl.uniform3fv(pr.u('cMid'), c.mid);
+  gl.uniform3fv(pr.u('cPale'), c.pale); gl.uniform3fv(pr.u('cHead'), c.head);
+  gl.uniform1i(pr.u('uContrast'), TH.rain.contrast);
+  gl.uniform1f(pr.u('uCell'), CELL); gl.uniform1f(pr.u('uColOffset'), COL0);
+}
+function pass(target, w, h) {
+  gl.bindFramebuffer(gl.FRAMEBUFFER, target);
+  gl.viewport(0, 0, w, h);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+}
+
+function draw(ms) {
+  resize();
+  const whole = Math.floor(ms / 1000);
+  const sec = whole - META.epoch0, frac = (ms - whole * 1000) / 1000;
+  gl.bindVertexArray(vao);
+  const logoOn = logoChoice !== 'none';
+  bind(UNIT.atlas, T.atlas); bind(UNIT.lut, T.lut); bind(UNIT.words, T.words);
+  bind(UNIT.logo, T.logos[logoChoice]); bind(UNIT.bg, T.dummy); bind(UNIT.mask, T.dummy);
+
+  const cell = CELL;
+  let keep = [-1, -1, -1, -1];
+  if (logoOn) {
+    const half = TH.logo.size * Hh / 2 / cell + motion().uDrift * Hh / cell + 1, rc = Hh / 2 / cell;
+    keep = [COLS / 2 - half, rc - half, COLS / 2 + half, rc + half];
+  }
+
+  let pr = prog.state; gl.useProgram(pr.p); common(pr, sec, frac);
+  gl.uniform1i(pr.u('uCols'), COLS); gl.uniform1i(pr.u('uRows'), rows);
+  gl.uniform1i(pr.u('uLUT'), UNIT.lut); gl.uniform1i(pr.u('uWords'), UNIT.words);
+  gl.uniform1i(pr.u('uNumWords'), words.length);
+  gl.uniform4fv(pr.u('uKeep'), keep);
+  gl.uniform1f(pr.u('uDensity'), TH.rain.density); gl.uniform1f(pr.u('uWordRate'), TH.rain.wordRate);
+  gl.uniform1f(pr.u('uGlintRate'), TH.rain.glintRate); gl.uniform1i(pr.u('uContrast'), TH.rain.contrast);
+  pass(F.state, COLS, rows);
+
+  bind(UNIT.state, T.state);
+  pr = prog.field; gl.useProgram(pr.p);
+  gl.uniform1i(pr.u('uState'), UNIT.state); gl.uniform1i(pr.u('uCols'), COLS); gl.uniform1i(pr.u('uRows'), rows);
+  pass(F.field, COLS, rows);
+
+  pr = prog.glyphs; gl.useProgram(pr.p); common(pr, sec, frac); rainUniforms(pr);
+  gl.uniform2f(pr.u('uRes'), W, Hh); gl.uniform2f(pr.u('uTarget'), QW, QH);
+  pass(F.glyphs, QW, QH);
+
+  pr = prog.blur; gl.useProgram(pr.p);
+  gl.uniform1i(pr.u('uSrc'), UNIT.src); gl.uniform1f(pr.u('uSigma'), 0.2 * cell / 4);
+  bind(UNIT.src, T.glyphs); gl.uniform2f(pr.u('uStep'), 1 / QW, 0); pass(F.blurA, QW, QH);
+  bind(UNIT.src, T.blurA); gl.uniform2f(pr.u('uStep'), 0, 1 / QH); pass(F.blurB, QW, QH);
+
+  bind(UNIT.field, T.field); bind(UNIT.bloom, T.blurB);
+  pr = prog.composite; gl.useProgram(pr.p); common(pr, sec, frac); rainUniforms(pr);
+  gl.uniform2f(pr.u('uRes'), W, Hh); gl.uniform2f(pr.u('uOrigin'), 0, 0);
+  for (const [n, k] of [['uField', 'field'], ['uBloom', 'bloom'], ['uLogo', 'logo'], ['uBg', 'bg'], ['uMask', 'mask']])
+    gl.uniform1i(pr.u(n), UNIT[k]);
+  const bg = TH.background;
+  gl.uniform1i(pr.u('uBgMode'), 0);
+  gl.uniform3fv(pr.u('bgTop'), bg.top); gl.uniform3fv(pr.u('bgBot'), bg.bottom);
+  gl.uniform3fv(pr.u('bgCenter'), bg.center); gl.uniform1f(pr.u('bgVignette'), bg.vignette);
+  gl.uniform1f(pr.u('uBgGamma'), 1); gl.uniform1f(pr.u('uBgGain'), 1);
+  gl.uniform2f(pr.u('uBgScale'), 1, 1); gl.uniform2f(pr.u('uBgOffset'), 0, 0);
+  gl.uniform1i(pr.u('uHasLogo'), logoOn ? 1 : 0); gl.uniform1i(pr.u('uHasMask'), 0);
+  gl.uniform3fv(pr.u('cGlow'), TH.colors.glow); gl.uniform3fv(pr.u('cLogoGlow'), TH.logo.glow);
+  gl.uniform1f(pr.u('uBloomK'), TH.rain.bloom); gl.uniform1f(pr.u('uVeil'), TH.rain.veil);
+  gl.uniform1f(pr.u('uLogoSize'), TH.logo.size); gl.uniform1f(pr.u('uLogoGlowK'), TH.logo.glowStrength);
+  for (const [k, v] of Object.entries(motion())) gl.uniform1f(pr.u(k), v);
+  const sn = TH.snow.slice(0, 4);
+  const pack = f => new Float32Array([].concat(...[0, 1, 2, 3].map(i => sn[i] ? f(sn[i]) : [0, 0, 0, 0])));
+  gl.uniform1i(pr.u('uSnowN'), sn.length);
+  gl.uniform4fv(pr.u('uSnowA'), pack(s => [s.cell, s.speed, s.density, s.bright]));
+  gl.uniform4fv(pr.u('uSnowB'), pack(s => [s.rmin, s.rmax, s.sway, s.star]));
+  gl.uniform4fv(pr.u('uSnowC'), pack(s => [...s.color, s.front]));
+  pass(null, W, Hh);
+}
+
+// ---- control strip (hidden for wallpaper hosts with hud=0)
+const panel = document.getElementById('panel');
+const clockEl = document.getElementById('clock');
+const chanIn = document.getElementById('channel');
+const playBtn = document.getElementById('play');
+let idleTimer = 0;
+function wake() {
+  panel.classList.remove('idle');
+  clearTimeout(idleTimer);
+  idleTimer = setTimeout(() => { if (!panel.contains(document.activeElement)) panel.classList.add('idle'); }, 4500);
+}
+function syncButtons() {
+  const mode = rainbowMode || TH.rain.rainbow || 'logo';
+  for (const m of ['logo', 'all', 'off']) document.getElementById('rb-' + m).setAttribute('aria-pressed', String(m === mode));
+  for (const n of Object.keys(META.themes)) {
+    const b = document.getElementById('th-' + n);
+    if (b) b.setAttribute('aria-pressed', String(n === themeName));
+  }
+}
+if (showHud) {
+  panel.hidden = false;
+  ['pointermove', 'pointerdown', 'keydown', 'touchstart'].forEach(e => addEventListener(e, wake, { passive: true }));
+  panel.addEventListener('focusout', wake);
+  for (const n of Object.keys(META.themes)) {
+    const b = document.getElementById('th-' + n);
+    if (b) b.addEventListener('click', () => { setTheme(n); store.set('theme', n); syncButtons(); redrawIfPaused(); });
+  }
+  for (const m of ['logo', 'all', 'off']) {
+    document.getElementById('rb-' + m).addEventListener('click', () => {
+      rainbowMode = m; store.set('rainbow', m); syncButtons(); redrawIfPaused();
+    });
+  }
+  chanIn.value = initialChannel;
+  chanIn.addEventListener('input', () => { setChannel(chanIn.value); store.set('channel', channel); redrawIfPaused(); });
+  document.getElementById('fs').addEventListener('click', () => {
+    const el = document.documentElement;
+    const req = el.requestFullscreen || el.webkitRequestFullscreen;
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+    else if (req) Promise.resolve(req.call(el)).catch(() => {});
+  });
+  wake();
+}
+function tickClock(ms) {
+  if (panel.hidden) return;
+  clockEl.firstChild.nodeValue = new Date(ms).toISOString().slice(11, 21) + ' ';
+}
+
+let paused = reduceMotion && fixedT === null;
+function redrawIfPaused() { if (paused) draw(Date.now()); }
+if (paused && showHud) {
+  playBtn.hidden = false;
+  playBtn.addEventListener('click', () => { paused = !paused; playBtn.textContent = paused ? 'Play animation' : 'Pause'; });
+}
+
+(async function start() {
+  T.atlas = await imageTex(IMAGES.atlas);
+  T.logos = { none: makeTex(1, 1, new Uint8Array(4), true) };
+  for (const v of ['white', 'colours']) T.logos[v] = await imageTex(IMAGES['logo-' + v]);
+  T.dummy = makeTex(1, 1, new Uint8Array([0, 0, 0, 255]), true);
+  setTheme(initialTheme);
+  setChannel(initialChannel);
+  syncButtons();
+  window.__syncrainDraw = ms => { draw(ms); gl.finish(); };
+  window.__syncrainState = () => {           // test hook: the raw rain-cell grid
+    const px = new Uint8Array(COLS * rows * 4);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, F.state);
+    gl.readPixels(0, 0, COLS, rows, gl.RGBA, gl.UNSIGNED_BYTE, px);
+    return { cols: COLS, rows, data: Array.from(px) };
+  };
+  window.__syncrainIdentity = { build: BUILD, stream: STREAM };   // test hook: what this page says it is
+  window.__syncrainReady = true;
+  draw(fixedT !== null ? fixedT * 1000 : Date.now());
+  let last = -1e9;
+  function frame(now) {
+    requestAnimationFrame(frame);
+    const ms = fixedT !== null ? fixedT * 1000 : Date.now();
+    tickClock(ms);
+    if (paused || now - last < 1000 / fpsCap - 2) return;
+    last = now;
+    draw(ms);
+  }
+  requestAnimationFrame(frame);
+})();
+</script>
+<!--@/BODY-->
