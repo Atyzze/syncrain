@@ -11,7 +11,7 @@ GL_ONLY_ES = {"GDK_DEBUG": "gl-disable-gl", "GDK_DISABLE": "gl-api"}
 GL_ONLY_DESKTOP = {"GDK_DEBUG": "gl-disable-gles", "GDK_DISABLE": "gles-api"}
 GL_NONE = {"GDK_DEBUG": "gl-disable", "GDK_DISABLE": "gl"}
 
-#: A fixed moment every lane draws, so their pictures can be compared (2026-10-04 12:00:07 UTC).
+#: A fixed moment every lane draws, so their pictures can be compared (2026-10-07 00:00:07 UTC).
 MOMENT = 1791331207
 
 

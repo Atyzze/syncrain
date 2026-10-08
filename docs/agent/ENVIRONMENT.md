@@ -56,7 +56,7 @@ export PATH=<venv>/bin:/opt/node22/bin:/nix/var/nix/profiles/default/bin:$PATH
 export GI_TYPELIB_PATH=/usr/local/lib/x86_64-linux-gnu/girepository-1.0
 export SYNCRAIN_NIXPKGS=<nixpkgs checkout> SYNCRAIN_HOME_MANAGER=<home-manager checkout>
 export SYNCRAIN_KWIN=<kwin store path>/bin/kwin_wayland
-setsid nohup python3 tools/package_release.py --output <dir> > release.log 2>&1 < /dev/null &
+setsid nohup python3 tools/package_release.py --output <dir> > ../release.log 2>&1 < /dev/null &
 ```
 
    Build 5's gate took about six minutes on two cores; the browser lane is the slowest
@@ -101,3 +101,15 @@ installer, run it once on real Arch packages, as build 2 and build 3 did:
   machine.
 * **The Nix store can be collected.** If `SYNCRAIN_KWIN` points at a path that is gone, build it again
   (step 6); the store path is the same for the same nixpkgs.
+* **`python3` may not be the Python that has GTK.** On an Ubuntu 24.04 sandbox whose `python3` was
+  3.13 (2026-10-08), Ubuntu's `python3-gi` is built for 3.12 and `import gi` failed. After
+  `apt-get update && apt-get install gir1.2-gtk-4.0 python3-gi-cairo python3-opengl python3-pil
+  python3-pytest zstd shellcheck`, a venv made with `python3.12 -m venv --system-site-packages`,
+  first on `PATH`, ran the unit, contract, render and browser lanes; the installer's tests call
+  `python3` from `PATH`.
+* **GitHub access is per repository.** A session cannot create a repository or push a tag (HTTP
+  403 for both, 2026-10-08). The operator creates the repository and the session attaches it;
+  then pushes to a branch, `main` included, go through.
+* **A file the gate does not know at the tree's top fails it**, a release log included
+  (`tests/contract/test_the_release_takes_everything.py`). Write the log outside the tree, as the
+  command above does, and give `--output` a folder outside it too.

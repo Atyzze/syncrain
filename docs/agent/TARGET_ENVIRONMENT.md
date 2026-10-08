@@ -39,6 +39,5 @@ evaluated and built every release (`tests/nix/`); no NixOS machine has run them 
 
 ## What every target needs
 
-A synced clock (NTP; NixOS has timesyncd on, the module makes it explicit), GTK 4.14 or later,
-OpenGL 3.3 or OpenGL ES 3.0, and on Wayland a compositor with wlr-layer-shell (GNOME has none:
-`--window`, or the web page).
+`docs/OPERATIONS.md`, "What it needs", the one place it is kept (the README repeats it in a line
+for visitors to the repository).

@@ -5,6 +5,7 @@ runCommand "syncrain-web-${lib.fileContents ../BUILD_NUMBER}"
   {
     meta = {
       description = "Web version of the syncrain clock-synchronised code-rain wallpaper";
+      homepage = "https://github.com/Atyzze/syncrain";
       license = lib.licenses.mit;
     };
   }

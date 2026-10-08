@@ -44,6 +44,11 @@ which is why syncrain exists.
   again during the drag; a locked screen no longer moves the lead; a leftover script's process is
   recognised by its command.
 
+After build 7 (2026-10-08) the tree went to GitHub, github.com/Atyzze/syncrain: the commit
+`syncrain build 7` is the archive as delivered, and the commit after it changed no behaviour
+(documentation, with a README for visitors and a picture of each theme; package metadata; a test's
+comment). No build was made for it; build 8 carries it.
+
 ## The operator's decisions, in one place
 
 * Before build 1: "could we not make a dynamically real time generated one? where we based it off
@@ -63,4 +68,6 @@ which is why syncrain exists.
   possible? could we reduce wattage needed without gimping the smoothness/fps too much?"
 * Before build 5 (12:19), with their sweep's table: "it definitely went down linearly together
   with fps".
+* After build 7 (2026-10-08): "can you create a new github depository for this and make sure its
+  properly documented?"
 * Standing, from the start: no long dashes in anything written to them.

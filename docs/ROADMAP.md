@@ -44,6 +44,11 @@ answered, with the answer under "Decisions answered".
 
 ### Decisions answered
 
+* **2026-10-08, after build 7**: "can you create a new github depository for this and make sure its
+  properly documented?" The operator created github.com/Atyzze/syncrain; `main` holds build 7 as
+  delivered, then a commit that changed no behaviour (a README for visitors with a picture of each
+  theme, the repository in the install recipes, corrections). Each build from 8 on goes to `main`
+  as one commit (`docs/agent/NEXT_BUILD.md`, "How to make a build").
 * **2026-10-07 12:19, before build 5**: build 4's sweep on their card, "it definitely went down
   linearly together with fps". Build 5 stops drawing what nobody sees and times every frame to the
   refresh; the frame rate itself stays theirs to choose (above).

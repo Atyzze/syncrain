@@ -1,6 +1,6 @@
 # Handoff: the state of syncrain at build 7
 
-This page is what is true now, written for a context that has just opened this archive and knows
+This page is what is true now, written for a context that has just opened this tree and knows
 nothing else. **Build 5** (2026-10-07) followed build 4's power sweep on the operator's RTX 5090,
 which showed the watts following the frames (about 0.17 J a frame per screen) and a covered
 wallpaper drawing at full rate under KWin: on KDE Plasma a screen under a maximized or full-screen
@@ -20,8 +20,10 @@ operator's answers (`docs/agent/NEXT_BUILD.md`).
 
 ## Start here, in a fresh context
 
-1. Unpack the archive and bring the environment up (`tools/prepare_environment.sh --verify` says
-   what is missing; `docs/agent/ENVIRONMENT.md` says how to get it, KWin 6 included).
+1. Clone `main` from github.com/Atyzze/syncrain (without access to it, ask the operator for it
+   before making a build: the archive lacks the commits after it) and bring the environment up
+   (`tools/prepare_environment.sh --verify` says what is missing; `docs/agent/ENVIRONMENT.md` says
+   how to get it, KWin 6 included).
 2. Run `python3 tools/test_suite.py --lane all` on the untouched tree. Between releases three
    checks fail by one, correctly (`docs/agent/NEXT_BUILD.md`, "How to make a build").
 3. Read what the operator sent last, before anything else, and answer it in one plain sentence first.
@@ -46,6 +48,12 @@ right and the document is fixed in the same build.
 * **KWin treats syncrain as an ordinary window** (its layer-shell namespace names no window type),
   so show desktop hides it. Not changed; it belongs to the KDE question in `docs/ROADMAP.md`.
 * **The stream**: id `48e6bf9c`, unchanged since build 3 (`tests/fixtures/stream_freeze.json`).
+* **The repository** (2026-10-08, at the operator's request): github.com/Atyzze/syncrain. `main`
+  holds build 7 as delivered (the commit `syncrain build 7`), then one commit that changed no
+  behaviour: a README for visitors with two pictures (`docs/images/`), the repository in the
+  install recipes and the package metadata, and corrections the code showed (the sweep's length,
+  the page's parameters, `MOMENT`'s date, the release log's place). Make build 8 from a clone of
+  `main`, or the archive drops that commit.
 
 ## What waits on the operator
 

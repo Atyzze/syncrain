@@ -49,6 +49,7 @@ python3Packages.buildPythonApplication {
 
   meta = {
     description = "Never-repeating, clock-synchronised code-rain live wallpaper (Wayland layer-shell and X11)";
+    homepage = "https://github.com/Atyzze/syncrain";
     license = lib.licenses.mit;
     mainProgram = "syncrain";
     platforms = lib.platforms.linux;

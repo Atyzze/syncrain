@@ -33,6 +33,8 @@ became visible after a few seconds.
   but not sent: its review found that last fault.)
 * **On KDE Plasma it covers the desktop icons**, and "show desktop" hides it; clicks still reach the
   desktop.
+* **It is on GitHub** (github.com/Atyzze/syncrain): build 7, with a README for visitors and a
+  picture of each theme. Each new build goes there as one commit, `syncrain build <N>`.
 
 ## What comes next
 

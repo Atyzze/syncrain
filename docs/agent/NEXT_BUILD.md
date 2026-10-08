@@ -71,16 +71,20 @@ shows its cost next to the layer-shell wallpaper's.
 
 ## Before anything
 
-Bring the sandbox up (`docs/agent/ENVIRONMENT.md`); `tools/prepare_environment.sh --verify` lists
-what is missing, KWin 6 included. Then run the full lane once on the untouched tree.
+Start from a clone of `main` (github.com/Atyzze/syncrain): build 7's archive lacks the
+documentation committed after it (`README.md`, "Builds, not versions"), and a build made from the
+archive would take it away again. Without access to the repository, ask for it first. Bring the
+sandbox up (`docs/agent/ENVIRONMENT.md`); `tools/prepare_environment.sh --verify` lists what is
+missing, KWin 6 included. Then run the full lane once on the untouched tree.
 
 ## How to make a build
 
 1. Make the change. Comments say why, not when; tests assert behaviour; a guard that fires is
    usually right.
 2. If a stream file changed (a shader, `themes.json`, the atlas, a logo, `syncrain/engine.py`),
-   decide whether the picture is meant to change. If it is: `python3 tools/stream_freeze.py --write`
-   and say in the notes that machines on build 7 and build 8 no longer match. If not, undo it.
+   decide whether the picture is meant to change. If it is: `python3 tools/stream_freeze.py --write`,
+   say in the notes that machines on build 7 and build 8 no longer match, and make the README's
+   pictures again (`docs/OPERATIONS.md`, "Recipes"). If not, undo it.
 3. Write the notes for build 8 under `docs/build_notes/`, named for its number like the others:
    a title line `# Build 8: <what it does>`, a `**Type: ...**` line (it says "consolidation"
    exactly when the number ends in 0), the changes with the files and tests that hold them, what
@@ -94,7 +98,7 @@ what is missing, KWin 6 included. Then run the full lane once on the untouched t
    the kwin lane next):
 
 ```
-setsid nohup python3 tools/package_release.py --output <dir> > release.log 2>&1 < /dev/null &
+setsid nohup python3 tools/package_release.py --output <dir> > ../release.log 2>&1 < /dev/null &
 ```
 
 7. The release refuses on any failing test and puts `BUILD_NUMBER` back. Read the failure, fix the
@@ -109,6 +113,10 @@ setsid nohup python3 tools/package_release.py --output <dir> > release.log 2>&1 
    into the delivery message and the next build.
 9. Deliver the archive it wrote, `SYNCRAIN8.tar.zst`, and nothing else. Republish the live page
    from `web/artifact.html` (it carries the build number) and say what the operator does.
+10. Commit the tree the release left to `main` as one commit, `syncrain build 8`, and push it. With
+    `<dir>` and the log outside the tree it is the archive's, byte for byte; `git status` shows only
+    the build's own changes. The commit's name marks the build, since a session cannot push a tag
+    (`docs/agent/ENVIRONMENT.md`, "What the sandbox gets wrong").
 
 **Three checks fail by one between releases**, once the documents are rewritten for the build
 being made: this page's first line, the one page's first line and the handoff's first line all

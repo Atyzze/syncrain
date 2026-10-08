@@ -4,10 +4,18 @@ Every recipe and every option, in one place. How it works is `docs/ARCHITECTURE.
 
 ## Install
 
+### What it needs
+
+Linux with GTK 4.14 or later, OpenGL 3.3 or OpenGL ES 3.0, Python 3.10 or later, and a synced
+clock (NTP), since frames come from it. On Wayland, a compositor with wlr-layer-shell; GNOME has
+none, so there use `--window` or the web page ("Desktops", below). The source is the repository
+(github.com/Atyzze/syncrain) or a build's archive, `SYNCRAIN<N>.tar.zst`; both install the same way.
+
 ### Arch, CachyOS, EndeavourOS, Manjaro (no NixOS needed)
 
 ```sh
-tar xf SYNCRAIN<N>.tar.zst && cd syncrain_build_<N>
+git clone https://github.com/Atyzze/syncrain && cd syncrain
+# (or a build's archive: tar xf SYNCRAIN<N>.tar.zst && cd syncrain_build_<N>)
 ./install.sh                  # pacman packages (asks for sudo once), then the app in ~/.local
 syncrain --window             # try it in a normal window
 syncrain                      # run it as your wallpaper; Ctrl+C stops it
@@ -20,9 +28,10 @@ gtk4-layer-shell` with pacman and puts everything else in your home directory: t
 user service. `--theme`, `--channel`, `--rainbow` and `--arg ...` (repeatable) bake options into
 the autostart. If pacman reports missing files, run `sudo pacman -Syu` first.
 
-**Upgrading**: unpack the newer archive and run its `./install.sh`. It says which build it
-replaces ("Upgrading syncrain from build 2 to build 3"), keeps the autostart service, and restarts
-the wallpaper if it is running. `syncrain --build` says what is installed.
+**Upgrading**: unpack the newer archive and run its `./install.sh`, or in a clone `git pull` and
+`./install.sh`. It says which build it replaces ("Upgrading syncrain from build 2 to build 3"),
+keeps the autostart service, and restarts the wallpaper if it is running. `syncrain --build` says
+what is installed.
 
 **Removing**: `./install.sh --uninstall` takes the app, the launcher and the service; the pacman
 packages stay.
@@ -31,7 +40,7 @@ packages stay.
 
 ```nix
 {
-  inputs.syncrain.url = "path:/path/to/syncrain_build_<N>";   # or a git URL once it is pushed
+  inputs.syncrain.url = "github:Atyzze/syncrain";   # or "path:/path/to/syncrain_build_<N>"
   inputs.syncrain.inputs.nixpkgs.follows = "nixpkgs";
 
   outputs = { nixpkgs, syncrain, ... }: {
@@ -54,7 +63,8 @@ come from the clock. Options: `enable`, `package`, `theme`, `channel`, `fps`, `l
 `mask`, `rainbow`, `spin`, `drift`, `scale`, `pauseUnder`, `layer`, `extraArgs` (`nix/options.nix`).
 
 A home-manager module with the same options is `homeManagerModules.default`. Without installing:
-`nix run path:.` (as the wallpaper) or `nix run path:. -- --window`.
+`nix run github:Atyzze/syncrain` (as the wallpaper) or `nix run github:Atyzze/syncrain -- --window`;
+in an unpacked tree, `nix run path:.` does the same.
 
 ### Other distributions
 
@@ -67,8 +77,13 @@ in the unpacked folder. If gtk4-layer-shell is not preloaded, the app re-execute
 `web/index.html` is one self-contained page running the same shaders: open it on two devices on
 the same channel and they show the same frame. As a wallpaper page it reads URL parameters:
 `?theme=nixos&channel=public&fps=30&logo=white&rainbow=logo&spin=180&drift=0.03&hud=0` (`hud=0`
-keeps the control strip hidden behind your icons; `t=<unix seconds>` freezes the clock). On KDE
-Plasma, a wallpaper plugin that shows web pages can host it, which keeps the desktop icons on top.
+keeps the control strip hidden behind your icons; `t=<unix seconds>` freezes the clock;
+`scale=<factor>` sets how many pixels it draws per CSS pixel, by default the screen's pixel ratio
+up to 2, so a lower one spares a weak GPU). The control strip (theme, rainbow, channel, full
+screen) fades when idle, and the page remembers the theme, channel and rainbow picked there; URL
+parameters win over what it remembers. When the system asks for reduced motion, the page starts
+still, with a play button in the control strip; with `hud=0` it stays still. On KDE Plasma, a
+wallpaper plugin that shows web pages can host it, which keeps the desktop icons on top.
 
 ## Options
 
@@ -155,7 +170,7 @@ What it costs on a given card, setting by setting:
 
 ```sh
 systemctl --user stop syncrain       # if the autostart service runs; the sweep refuses to measure two
-syncrain --power-sweep               # about three minutes; the screens turn black for the last phases
+syncrain --power-sweep               # about four minutes; the screens turn black for the last phases
 ```
 
 It runs, after a phase with no syncrain at all: the wallpaper as installed; build 4's frame timer,
@@ -202,6 +217,21 @@ A video of any moment of any channel:
 syncrain --channel public --time 1791331200 --record /tmp/frames --size 1920x1080
 ffmpeg -framerate 30 -i /tmp/frames/frame_%05d.png -c:v libx264 -crf 17 -pix_fmt yuv420p rain.mp4
 ```
+
+The README's pictures (`docs/images/`) are the channel `public` at 1791331207 (2026-10-07
+00:00:07 UTC) in both themes; make them again whenever the stream changes. Draw them unscaled, in
+a window the desktop does not resize (under Xvfb with `GDK_BACKEND=x11`, say), and check that each
+run says it saved `(1600x900)`:
+
+```sh
+syncrain --window --size 1600x900 --time 1791331207 --screenshot nixos.png
+syncrain --window --size 1600x900 --time 1791331207 --theme matrix --screenshot matrix.png
+```
+
+Then save each as `docs/images/nixos.jpg` and `docs/images/matrix.jpg` with Pillow, `quality=90,
+subsampling=0, progressive=True`: JPEG without chroma subsampling keeps the faint characters that
+WebP and a lower quality smooth away. With an unchanged stream and the same renderer (Mesa's
+llvmpipe made these), the files come out byte for byte the same, which makes a quick check.
 
 The darkened CachyOS look (`extras/cachyos-logo-mask.png` masks the 3840x2160 green-nebula
 wallpaper so its logo stays bright and the rain passes behind it):

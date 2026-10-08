@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Make the next numbered syncrain release, or nothing.
 
-    setsid nohup python3 tools/package_release.py --output <dir> > release.log 2>&1 < /dev/null &
+    setsid nohup python3 tools/package_release.py --output <dir> > ../release.log 2>&1 < /dev/null &
 
 In order: undo a previous run that was killed (from `var/release_journal.json`); write
 `current + 1` into BUILD_NUMBER; rebuild the generated web pages for it; run every test lane with
