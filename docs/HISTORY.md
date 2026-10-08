@@ -45,9 +45,10 @@ which is why syncrain exists.
   recognised by its command.
 
 After build 7 (2026-10-08) the tree went to GitHub, github.com/Atyzze/syncrain: the commit
-`syncrain build 7` is the archive as delivered, and the commit after it changed no behaviour
+`syncrain build 7` is the archive as delivered, and the commits after it changed no behaviour
 (documentation, with a README for visitors and a picture of each theme; package metadata; a test's
-comment). No build was made for it; build 8 carries it.
+comment; the generated pages marked as generated for GitHub). No build was made for them; build 8
+carries them.
 
 ## The operator's decisions, in one place
 

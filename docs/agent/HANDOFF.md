@@ -49,11 +49,12 @@ right and the document is fixed in the same build.
   so show desktop hides it. Not changed; it belongs to the KDE question in `docs/ROADMAP.md`.
 * **The stream**: id `48e6bf9c`, unchanged since build 3 (`tests/fixtures/stream_freeze.json`).
 * **The repository** (2026-10-08, at the operator's request): github.com/Atyzze/syncrain. `main`
-  holds build 7 as delivered (the commit `syncrain build 7`), then one commit that changed no
+  holds build 7 as delivered (the commit `syncrain build 7`), then commits that changed no
   behaviour: a README for visitors with two pictures (`docs/images/`), the repository in the
-  install recipes and the package metadata, and corrections the code showed (the sweep's length,
-  the page's parameters, `MOMENT`'s date, the release log's place). Make build 8 from a clone of
-  `main`, or the archive drops that commit.
+  install recipes and the package metadata, the generated pages marked as generated for GitHub
+  (`web/.gitattributes`), and corrections the code showed (the sweep's length, the page's
+  parameters, `MOMENT`'s date, the release log's place). Make build 8 from a clone of `main`, or
+  the archive drops those commits.
 
 ## What waits on the operator
 
