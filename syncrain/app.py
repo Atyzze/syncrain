@@ -76,7 +76,7 @@ def parse_args(argv=None):
                     help="time each pass on this machine's graphics card, print the table, exit")
     ap.add_argument("--power-sweep", action="store_true",
                     help="measure the graphics card's power with syncrain at several settings (a few minutes), "
-                         "print the table and save it")
+                         "print the table and save it; every screen goes black in its last two phases")
     ap.add_argument("--sweep-seconds", type=int, default=25, help="seconds per --power-sweep phase (default 25)")
     ap.add_argument("--diagnose", action="store_true",
                     help="check whether syncrain can draw on this machine, print what it found, exit")
@@ -208,6 +208,15 @@ def settle_memory():
     if trim is not None:
         trim.argtypes = [ctypes.c_size_t]
         trim(0)
+
+
+def resident_mib() -> float:
+    """This process's resident memory (VmRSS), in MiB, or 0 where /proc does not say."""
+    try:
+        with open("/proc/self/status", encoding="ascii") as fh:
+            return next(int(line.split()[1]) for line in fh if line.startswith("VmRSS:")) / 1024
+    except (OSError, StopIteration, ValueError):
+        return 0.0
 
 
 def renderer_name(widget) -> str:
@@ -648,6 +657,9 @@ def main(argv=None):
             self._settle = None
             self.settled = True
             settle_memory()
+            if DEBUG_FPS:
+                print(f"syncrain: memory handed back after the first frames ({resident_mib():.0f} MiB resident)",
+                      flush=True)
             return GLib.SOURCE_REMOVE
 
         def started(self, context):

@@ -108,7 +108,10 @@ and the page draws it to within texture filtering (the browser lane).
 * **What stays in memory**: the program (about 100 KB), libwayland, libEGL, libdbus and the
   graphics driver. One EGL context draws every screen (each screen's surface made current in
   turn), so the programs and textures exist once and each size's intermediate textures once; the
-  scene is unmapped as soon as its pixels are on the card, and the C heap is trimmed.
+  scene is unmapped as soon as its pixels are on the card, and the C heap is trimmed then and again
+  once every screen has drawn its first frames (after a screen change too), when the driver's
+  shader compiler has finished with its working space: with a cold shader cache that was tens of
+  MiB, kept for the life of the process (the GTK host does the same, `settle_memory`).
 * **The same frames**: `render.c` makes the same OpenGL calls in the same order as `renderer.py`,
   and `timing.c` ports what a frame computes on the processor (the viewport's geometry, the clock's
   split, the pacer) operation for operation, with Python's own float floor division and rounding,

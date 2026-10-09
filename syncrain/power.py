@@ -13,6 +13,7 @@ watts). The table goes to the terminal and a JSON file to the home folder, for s
 """
 from __future__ import annotations
 
+import contextlib
 import glob
 import json
 import os
@@ -223,6 +224,37 @@ def phases(seconds: int) -> list[dict]:
     ]
 
 
+def cover_warning(plan: list[dict], seconds: int) -> str | None:
+    """Said before the sweep starts: in the phases with a covering window, every screen goes black."""
+    covering = [n for n, phase in enumerate(plan, 1) if phase.get("cover")]
+    if not covering:
+        return None
+    if covering == list(range(len(plan) - len(covering) + 1, len(plan) + 1)):
+        which = "the last phase" if len(covering) == 1 else \
+            f"the last {({2: 'two', 3: 'three'}).get(len(covering), len(covering))} phases"
+    else:
+        which = "phases " + ", ".join(str(n) for n in covering)
+    names = ", ".join(plan[n - 1]["name"] for n in covering)
+    return (f"Warning: in {which} ({names}) a black window covers every screen, so all your screens go black for "
+            f"about {len(covering) * (seconds + 3)} s. That is the test, not a fault: they come back by themselves "
+            "when the sweep ends. To get them back sooner, close the black windows (Alt+F4) or press Ctrl+C here.")
+
+
+@contextlib.contextmanager
+def interrupted_by_hangup():
+    """While the sweep runs, a closed terminal (SIGHUP) or `kill` (SIGTERM) stops it as Ctrl+C does:
+    its wallpaper and its black covering windows are stopped too, rather than left on the screens."""
+    def interrupt(signum, frame):
+        raise KeyboardInterrupt
+
+    before = {sig: signal.signal(sig, interrupt) for sig in (signal.SIGHUP, signal.SIGTERM)}
+    try:
+        yield
+    finally:
+        for sig, handler in before.items():
+            signal.signal(sig, handler)
+
+
 #: The wallpaper options a sweep passes on to every phase (the rest are the phase's own).
 PASS_ON = ("theme", "channel", "logo", "background", "mask", "bg_gamma", "bg_gain", "rainbow", "spin", "drift",
            "layer", "scale", "fps", "pause_under", "host")
@@ -350,66 +382,71 @@ def run_sweep(args) -> int:
     print(f"{len(plan)} phases of {seconds} s (the first {settle} s of each let the card settle), about "
           f"{len(plan) * (seconds + 3) // 60 + 1} minutes. For a fair 'nothing', give Plasma a still picture as "
           "its wallpaper first. Ctrl+C stops early and still prints what was measured.")
+    warning = cover_warning(plan, seconds)
+    if warning:
+        print(warning)
     source.start()
     results = []
     child = cover = None
     interrupted = False
-    try:
-        for n, phase in enumerate(plan, 1):
-            label = phase["name"]
-            print(f"[{n}/{len(plan)}] {label} ...", flush=True)
-            mark = 0
-            if phase.get("child", True):
-                argv = [sys.executable, "-m", "syncrain", *base_args(args), *phase["args"]]
-                child = Child(argv, child_env(phase.get("env")))
-                if not child.started.wait(timeout=90):
-                    child.stop()
-                    print("   the wallpaper did not start; its output:\n   " + "\n   ".join(child.lines[-8:]))
-                    results.append({"phase": label, "error": "did not start"})
-                    child = None
-                    continue
-                if phase.get("cover"):
-                    how = ["--maximized"] if phase["cover"] == "maximized" else []
-                    cover = Child([sys.executable, "-m", "syncrain.cover", *how], child_env())
-                    cover.started.wait(timeout=60)
-            samples, details = [], []
-            start = time.monotonic()
-            cpu0 = None
-            while time.monotonic() - start < seconds:
-                time.sleep(1.0)
-                if child and time.monotonic() - start >= settle and mark == 0:
-                    mark = len(child.lines)
-                    cpu0, cpu_t0 = child.cpu_seconds(), time.monotonic()
-                reading = source.sample()
-                if reading and time.monotonic() - start >= settle:
-                    samples.append(reading[0])
-                    details.append(reading[1])
-            row = {"phase": label, "watts": sum(samples) / len(samples) if samples else None,
-                   "samples": samples, "detail": details[-1] if details else {}}
-            if child:
-                cpu1 = child.cpu_seconds()
-                if cpu0 is not None and cpu1 is not None and time.monotonic() > cpu_t0:
-                    row["cpu_percent"] = round(100.0 * (cpu1 - cpu0) / (time.monotonic() - cpu_t0), 2)
-                rss = child.resident_mib()
-                if rss is not None:
-                    row["resident_mib"] = round(rss, 1)
-                row["fps"] = child.fps_since(mark)
-                row["timing"] = child.timing_since(mark)
-                row["startup"] = next((line for line in child.lines if line.startswith("syncrain build")), "")
-                row["pause"] = next((line for line in child.lines if "drawing pauses" in line
-                                     or "drawing goes on under" in line), "")
-            results.append(row)
+    with interrupted_by_hangup():
+        try:
+            for n, phase in enumerate(plan, 1):
+                label = phase["name"]
+                black = f" (every screen goes black now, for about {seconds} s)" if phase.get("cover") else ""
+                print(f"[{n}/{len(plan)}] {label} ...{black}", flush=True)
+                mark = 0
+                if phase.get("child", True):
+                    argv = [sys.executable, "-m", "syncrain", *base_args(args), *phase["args"]]
+                    child = Child(argv, child_env(phase.get("env")))
+                    if not child.started.wait(timeout=90):
+                        child.stop()
+                        print("   the wallpaper did not start; its output:\n   " + "\n   ".join(child.lines[-8:]))
+                        results.append({"phase": label, "error": "did not start"})
+                        child = None
+                        continue
+                    if phase.get("cover"):
+                        how = ["--maximized"] if phase["cover"] == "maximized" else []
+                        cover = Child([sys.executable, "-m", "syncrain.cover", *how], child_env())
+                        cover.started.wait(timeout=60)
+                samples, details = [], []
+                start = time.monotonic()
+                cpu0 = None
+                while time.monotonic() - start < seconds:
+                    time.sleep(1.0)
+                    if child and time.monotonic() - start >= settle and mark == 0:
+                        mark = len(child.lines)
+                        cpu0, cpu_t0 = child.cpu_seconds(), time.monotonic()
+                    reading = source.sample()
+                    if reading and time.monotonic() - start >= settle:
+                        samples.append(reading[0])
+                        details.append(reading[1])
+                row = {"phase": label, "watts": sum(samples) / len(samples) if samples else None,
+                       "samples": samples, "detail": details[-1] if details else {}}
+                if child:
+                    cpu1 = child.cpu_seconds()
+                    if cpu0 is not None and cpu1 is not None and time.monotonic() > cpu_t0:
+                        row["cpu_percent"] = round(100.0 * (cpu1 - cpu0) / (time.monotonic() - cpu_t0), 2)
+                    rss = child.resident_mib()
+                    if rss is not None:
+                        row["resident_mib"] = round(rss, 1)
+                    row["fps"] = child.fps_since(mark)
+                    row["timing"] = child.timing_since(mark)
+                    row["startup"] = next((line for line in child.lines if line.startswith("syncrain build")), "")
+                    row["pause"] = next((line for line in child.lines if "drawing pauses" in line
+                                         or "drawing goes on under" in line), "")
+                results.append(row)
+                for c in (cover, child):
+                    if c:
+                        c.stop()
+                child = cover = None
+        except KeyboardInterrupt:
+            interrupted = True
+        finally:
             for c in (cover, child):
                 if c:
                     c.stop()
-            child = cover = None
-    except KeyboardInterrupt:
-        interrupted = True
-    finally:
-        for c in (cover, child):
-            if c:
-                c.stop()
-        source.stop()
+            source.stop()
     report(results, source, interrupted)
     return 0 if not interrupted else 130
 

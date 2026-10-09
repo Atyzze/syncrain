@@ -29,8 +29,14 @@ Where syncrain runs, as far as this tree knows it. The build sandbox is
   ebb and flow, not a leak, and asked for the footprint itself to come down instead. Build 7 did
   keep about 120 MiB more after every screen change (in the sandbox), and a DisplayPort screen
   waking from sleep is one, so some of those steps may have been that; build 8 keeps nothing after
-  one. Build 8 (the native wallpaper) has not run there yet; the sweep's "MiB" column and btop will
-  say what NVIDIA's driver keeps.
+  one.
+* **Build 8 there** (their sweep, 2026-10-09 09:32 UTC, `docs/build_notes/BUILD9_NOTES.md`): the
+  native wallpaper draws with NVIDIA's EGL ("OpenGL ES 3.2 on NVIDIA GeForce RTX 5090/PCIe/SSE2"),
+  at 123 MiB and 0.9% of one core at 30 fps (the GTK host: 205 MiB, 4.7%), +11.9 W at 30 fps
+  against +10.6 W for the GTK host in the same sweep, within the rows' run-to-run spread; covered
+  screens cost nothing. Its first phase kept 182 MiB, most likely the native program's first start
+  there, with NVIDIA's shader cache still cold. The operator: "122 on the other hand feels just
+  right for something like this".
 * They unpack archives under `/data/projects/nixOS/liveWallpaper/` (a browser's duplicate
   download gave one folder a name with a space and brackets, which the installer handles) and
   install with `./install.sh`; build 3 is installed there.

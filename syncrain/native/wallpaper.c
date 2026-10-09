@@ -199,6 +199,7 @@ static struct {
 	bool announced;
 	bool drawn;                              /* a frame was committed: no more handing over */
 	const char *lost;                        /* why the wallpaper must stop with status 1 */
+	bool settled;                            /* memory handed back since the screens last changed */
 	bool running;
 	struct watch *watch;
 	bool watch_said, watch_retried;
@@ -467,6 +468,42 @@ static void schedule(struct screen *s)
 	s->due = now + (int64_t)(delay > 1000 ? delay : 1000);
 }
 
+/* Once every screen shown has drawn its first frames (after startup, and after the screens changed):
+ * hand back to the system what starting left free in the C heap, as the GTK host does (app.py,
+ * settle_memory). The driver's shader compiler works there the first time it meets the shaders, and
+ * with a cold shader cache (the first start after an install or a driver update) that held tens of
+ * MiB until the process ended: on the operator's NVIDIA card the first native run of a sweep kept
+ * 182 MiB, the later ones 123. Nothing is allocated per frame, so once is enough. */
+static void settle_memory(void)
+{
+	if (W.settled)
+		return;
+	struct screen *s;
+	int drawn = 0;
+	wl_list_for_each(s, &W.screens, link) {
+		if (!s->render || s->hidden)
+			continue;
+		if (s->counter < 2)
+			return;
+		drawn++;
+	}
+	if (!drawn)
+		return;
+	W.settled = true;
+	malloc_trim(0);
+	if (opt.debug_fps > 0) {
+		long kib = 0;
+		FILE *status = fopen("/proc/self/status", "r");
+		char line[128];
+		while (status && fgets(line, sizeof line, status))
+			if (sscanf(line, "VmRSS: %ld", &kib) == 1)
+				break;
+		if (status)
+			fclose(status);
+		printf("syncrain: memory handed back after the first frames (%.0f MiB resident)\n", kib / 1024.0);
+	}
+}
+
 /* The frame did not reach the compositor (a driver can fail a swap after a resume or a reset of the
  * card): nothing was committed, so neither its callback nor its feedback will come. Before any frame
  * was shown, the GTK host may still draw here. After, the next frame tries again at its time; frames
@@ -526,6 +563,7 @@ static void draw(struct screen *s)
 		if (s->failing_since)
 			fprintf(stderr, "syncrain: frames are shown again\n");
 		s->failing_since = 0;
+		settle_memory();
 	} else {
 		swap_failed(s, f, error);
 	}
@@ -727,6 +765,7 @@ static void create_screen(struct output *o)
 	struct screen *s = calloc(1, sizeof *s);
 	if (!s)
 		return;
+	W.settled = false;                             /* settle again once the new screen has drawn */
 	s->output = o;
 	o->screen = s;
 	pacer_init(&s->pacer, opt.fps);
@@ -760,6 +799,7 @@ static void destroy_screen(struct screen *s)
 {
 	if (!s)
 		return;
+	W.settled = false;
 	wl_list_remove(&s->link);
 	if (s->output)
 		s->output->screen = NULL;

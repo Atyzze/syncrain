@@ -184,13 +184,19 @@ What it costs on a given card, setting by setting:
 
 ```sh
 systemctl --user stop syncrain       # if the autostart service runs; the sweep refuses to measure two
-syncrain --power-sweep               # about four minutes; the screens turn black for the last phases
+syncrain --power-sweep               # about four minutes; every screen turns black in the last two phases
 ```
+
+The sweep says so before it starts, and again as each of those phases begins: a black window
+covers every screen for about a minute in all. The screens come back by themselves when the sweep
+ends; to get them back sooner, close the black windows (Alt+F4) or press Ctrl+C in the sweep's
+terminal. Closing that terminal stops the sweep the same way, black windows included.
 
 It runs, after a phase with no syncrain at all: the wallpaper as installed; the same drawn by the
 Python and GTK host (`--host gtk`), for comparison (on a screen at a fractional scale such as 125%
-or 150%, the GTK host also draws more pixels: `docs/ARCHITECTURE.md`, "Three hosts"); build 4's frame timer; 20 and 15 fps; and the
-wallpaper behind a maximized and behind a full-screen window (`syncrain/cover.py`). For each it
+or 150%, the GTK host also draws more pixels: `docs/ARCHITECTURE.md`, "Three hosts"); build 4's
+frame timer; 20 and 15 fps; and the wallpaper behind a maximized and behind a full-screen window
+(`syncrain/cover.py`). For each it
 prints the card's power, how far above "nothing" it is, the frames drawn, how evenly and how
 steadily they were timed (as `SYNCRAIN_DEBUG_FPS` reports them, above), the wallpaper's processor
 time (100 is one core kept busy) and resident memory, what drew it (`native`, or GTK's renderer)

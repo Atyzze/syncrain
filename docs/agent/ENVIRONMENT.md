@@ -123,8 +123,10 @@ installer, run it once on real Arch packages, as build 2 and build 3 did:
   first on `PATH`, ran the unit, contract, render and browser lanes; the installer's tests call
   `python3` from `PATH`.
 * **GitHub access is per repository.** A session cannot create a repository or push a tag (HTTP
-  403 for both, 2026-10-08). The operator creates the repository and the session attaches it;
-  then pushes to a branch, `main` included, go through.
+  403 for both, 2026-10-08). The operator creates the repository and the session attaches it with
+  push access (the session's add-repository tool); until then the git proxy refuses a push with
+  403, "not in this session's authorized repository set" (2026-10-09). Then pushes to a branch,
+  `main` included, go through, from any clone of it.
 * **A file the gate does not know at the tree's top fails it**, a release log included
   (`tests/contract/test_the_release_takes_everything.py`). Write the log outside the tree, as the
   command above does, and give `--output` a folder outside it too.

@@ -15,6 +15,7 @@ import shutil
 import signal
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -242,3 +243,38 @@ def test_when_the_first_frame_cannot_be_shown_the_gtk_host_draws(root, tmp_path)
     assert code == 0, err
     assert "a frame could not be shown (EGL error 0x3003)" in err and "the GTK host takes over" in err, err
     assert HOSTS["gtk"] in out, out
+
+
+@pytest.mark.parametrize("host", ["native", "gtk"])
+def test_memory_is_handed_back_after_the_first_frames_and_after_a_screen_change(root, tmp_path, host):
+    """What starting leaves free in the C heap (the shader compiler's working space above all, much of
+    it with a cold shader cache) goes back to the system once every screen has drawn its first
+    frames, and again once a new screen has."""
+    need(shutil.which("sway") is not None and shutil.which("swaymsg") is not None, "no sway and swaymsg")
+    settled = "memory handed back after the first frames"
+    with headless_sway(tmp_path / "run", screen="320x180") as session:
+        env = wallpaper_env(root, session, SYNCRAIN_DEBUG_FPS="5")
+        proc, line = start(root, env, "--host", "auto" if host == "native" else "gtk")
+        lines: list[str] = []
+
+        def read():
+            for text in iter(proc.stdout.readline, ""):
+                lines.append(text)
+
+        threading.Thread(target=read, daemon=True).start()
+
+        def wait_for_settles(count):
+            deadline = time.monotonic() + 30
+            while sum(settled in text for text in lines) < count and time.monotonic() < deadline:
+                time.sleep(0.2)
+            return sum(settled in text for text in lines)
+
+        try:
+            assert HOSTS[host] in line, line + proc.stderr.read()
+            assert wait_for_settles(1) == 1, "".join(lines)
+            subprocess.run(["swaymsg", "-q", "create_output"], env=dict(os.environ, **session), check=True)
+            assert wait_for_settles(2) == 2, "".join(lines)
+        finally:
+            proc.send_signal(signal.SIGTERM)
+            proc.wait(timeout=30)
+    assert proc.returncode == 0

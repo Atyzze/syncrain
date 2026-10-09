@@ -429,6 +429,8 @@ def test_the_power_sweep_on_kwin_draws_nothing_behind_windows(two, tmp_path):
     assert installed["timing"]["steady"] >= timer["timing"]["steady"] + 20, (timer, installed)
     assert "drawing pauses on a screen under maximized and full-screen windows" in installed["pause"]
     assert "behind a maximized window" in done.stdout and " steady " in done.stdout
+    assert "a black window covers every screen, so all your screens go black" in done.stdout
+    assert "[7/8] behind a maximized window ... (every screen goes black now, for about 7 s)" in done.stdout
 
 
 def test_frames_stay_on_time_on_a_141_hz_screen(fast):

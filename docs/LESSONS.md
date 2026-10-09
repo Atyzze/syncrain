@@ -88,6 +88,13 @@ went; since the textures belonged to the whole share group, every screen change 
 screen waking from sleep is one) kept about 120 MiB. Make what every screen reads once, and delete
 each screen's own objects when its area is unrealized.
 
+**A cold shader cache costs memory for as long as the process lives, unless the heap is handed
+back.** The first time a driver meets the shaders (after an install, or after a driver update) its
+compiler works in the C heap, and glibc keeps what it frees for later. On the operator's NVIDIA
+card build 8's first native run kept 182 MiB, the later ones 123; in the sandbox 155 MiB against
+133. `malloc_trim` once every screen has drawn its first frames gives the free pages back (155 to
+142 MiB in the sandbox; build 9).
+
 **From GTK 4.16 a GLArea's frame goes out as a dmabuf and comes back in**, even when GTK's own
 OpenGL renderer draws it: exported, wrapped and imported by the same renderer, which also started a
 Vulkan renderer beside itself for the first one. `GDK_DISABLE=dmabuf` (read once, when GTK

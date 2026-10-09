@@ -3,8 +3,11 @@ and what each phase runs. The whole sweep runs in the render lane, with a stand-
 from __future__ import annotations
 
 import os
+import signal
 import threading
 import time
+
+import pytest
 
 from syncrain import power
 from syncrain.app import parse_args
@@ -125,3 +128,25 @@ def test_the_timing_reports_are_averaged_over_the_screens():
     assert child.timing_since(0) == {"spacing": "1/2/5", "even": 90.0, "steady": 82.0, "lead_ms": 12.4}
     child.lines = ["syncrain: 30.0 fps at 2560x1440 (area 0), spacing 2 refreshes 100%, steady 100%"]
     assert child.timing_since(0) == {"spacing": "2", "even": 100.0, "steady": 100.0}, "build 5's reports"
+
+
+def test_the_sweep_warns_before_it_turns_every_screen_black():
+    """The operator, after build 8's sweep: it "should have a warning message in it that in the last
+    two tests, all your screens might go black for a while"."""
+    warning = power.cover_warning(power.phases(25), 25)
+    assert warning.startswith("Warning: in the last two phases (behind a maximized window, behind a full-screen "
+                              "window) a black window covers every screen"), warning
+    assert "all your screens go black for about 56 s" in warning and "Alt+F4" in warning and "Ctrl+C" in warning
+    assert power.cover_warning([p for p in power.phases(25) if not p.get("cover")], 25) is None
+
+
+@pytest.mark.parametrize("sig", [signal.SIGHUP, signal.SIGTERM], ids=["closed-terminal", "kill"])
+def test_a_closed_terminal_stops_the_sweep_as_ctrl_c_does(sig):
+    """The black windows must not outlive the sweep: SIGHUP and SIGTERM end its phases the way Ctrl+C
+    does (its children are stopped on the way out), and the handlers that were there come back."""
+    before = signal.getsignal(signal.SIGHUP), signal.getsignal(signal.SIGTERM)
+    with pytest.raises(KeyboardInterrupt):
+        with power.interrupted_by_hangup():
+            os.kill(os.getpid(), sig)
+            time.sleep(5)
+    assert (signal.getsignal(signal.SIGHUP), signal.getsignal(signal.SIGTERM)) == before

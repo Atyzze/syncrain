@@ -1,7 +1,7 @@
-# History: the GIFs to build 8
+# History: the GIFs to build 9
 
 Where each build's notes are kept, a line for what each build did, and the operator's decisions in
-their own words. Builds 1 to 8: `docs/build_notes/BUILD<n>_NOTES.md` (all of them, until a
+their own words. Builds 1 to 9: `docs/build_notes/BUILD<n>_NOTES.md` (all of them, until a
 consolidation folds the older ones in here). The rules the builds taught are in `docs/LESSONS.md`.
 
 ## Before build 1: the GIFs (2026-10-06)
@@ -49,13 +49,18 @@ which is why syncrain exists.
   processor time around each frame. The Python and GTK host, still drawing everywhere else, drops
   PyOpenGL and numpy, GTK's dmabuf round trip, and the 120 MiB build 7 kept after every screen
   change. The power sweep shows each phase's processor time, memory and what drew it. Delivered in
-  the chat for the operator to try before it goes to GitHub, as they asked.
+  the chat for the operator to try before it went to GitHub, as they asked; on their RTX 5090 it
+  runs at 123 MiB and 0.9% of a core, and they approved it the same morning.
+* **9** (2026-10-09): the power sweep warns that every screen goes black in its last two phases,
+  and a closed terminal no longer leaves the black windows behind; the native wallpaper hands back
+  what a cold shader cache left in its heap after the first frames.
 
 After build 7 (2026-10-08) the tree went to GitHub, github.com/Atyzze/syncrain: the commit
 `syncrain build 7` is the archive as delivered, and the commits after it changed no behaviour
 (documentation, with a README for visitors and a picture of each theme; package metadata; a test's
 comment; the generated pages marked as generated for GitHub). No build was made for them; build 8
-carries them.
+carries them. Build 8 went to `main` as `syncrain build 8` on 2026-10-09, once the operator had
+tried it; build 9 followed it there.
 
 ## The operator's decisions, in one place
 
@@ -89,4 +94,9 @@ carries them.
   sacrificing actual fps/watt ratio, because even more important is power usage down, so I'm really
   interested to see whether or not a full rust, c, asm, cpp or any other languages has anything to
   offer here."
+* After build 8 (2026-10-09 11:36), with their sweep: "success, definitely less cpu and memory used,
+  and 122MB feels way more acceptable and natural even than 330 and 400+ thats for a wallapper ....
+  too heavy, 122 on the other hand feels just right for something like this, so, update the github
+  please, also, the power-sweep should have a warning message in it that in the last two tests, all
+  your screens might go black for a while".
 * Standing, from the start: no long dashes in anything written to them.

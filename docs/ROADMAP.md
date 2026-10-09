@@ -5,16 +5,16 @@ is in `docs/build_notes/` and `docs/HISTORY.md`.
 
 ## Where things stand
 
-Build 8 (2026-10-09) answers the operator's memory and language question: on Wayland the wallpaper
-is a C program with neither Python nor GTK in memory (`syncrain/native/`), drawing the GTK host's
-frames to the pixel; in the sandbox it keeps about 136 MiB for two screens against build 7's 308,
-most of it the software renderer standing in for a graphics card. The Python and GTK host, which
-still draws on X11, in windows and wherever the native wallpaper cannot, is lighter too and no
-longer keeps 120 MiB after every screen change. The power sweep shows each phase's processor time
-and memory. Build 7 (2026-10-07) fixed what reviews of builds 5 and 6 found (frames on time on fast
-screens, the KWin script's starts and drags); build 5 stopped drawing covered screens on KDE Plasma
-and timed every frame to the refresh. The picture is build 3's. Build 7 runs on the operator's
-desktop; build 8 waits for their trial before it goes to GitHub.
+Build 9 (2026-10-09) makes the power sweep warn that every screen goes black in its last two phases,
+as the operator asked, and lets the native wallpaper hand back what a cold shader cache left in its
+heap. Build 8 (the same day) answered the operator's memory and language question: on Wayland the
+wallpaper is a C program with neither Python nor GTK in memory (`syncrain/native/`), drawing the
+GTK host's frames to the pixel; on the operator's RTX 5090 it runs at 123 MiB and 0.9% of a core at
+30 fps, against 205 MiB and 4.7% for the Python and GTK host, which still draws on X11, in windows
+and wherever the native wallpaper cannot. Build 7 (2026-10-07) fixed what reviews of builds 5 and 6
+found (frames on time on fast screens, the KWin script's starts and drags); build 5 stopped drawing
+covered screens on KDE Plasma and timed every frame to the refresh. The picture is build 3's. Build
+8 runs on the operator's desktop; builds 8 and 9 are on GitHub.
 
 ## What is open
 
@@ -24,14 +24,11 @@ answered, with the answer under "Decisions answered".
 
 ### Questions for the operator
 
-* **Build 8 on GitHub** (2026-10-09): the operator asked to try build 8 before it is committed.
-  When it runs to their liking, it goes to `main` as the commit `syncrain build 8`; what they see
-  otherwise (btop's memory, the sweep's table, `syncrain --diagnose`) goes into build 9 first.
-* **The default frame rate** (asked 2026-10-07 12:25, with build 4's numbers from their card, two
-  screens): (1) 30 fps, +10.6 W, as now; (2) 20 fps, +6.9 W; (3) 15 fps, +5.0 W. The fastest rain
-  streams move about 21 rows a second, so below about 21 fps some skip a row now and then.
-  Recommended: keep 30 until the new frame timing (builds 5 to 7) is on their screens, then judge
-  by eye; the sweep's 20 and 15 fps rows show both the watts and the timing.
+* **The default frame rate** (asked 2026-10-07 12:25 with build 4's numbers; these are their sweep of
+  build 8, 2026-10-09, two screens): (1) 30 fps, +11.9 W, as now; (2) 20 fps, +7.3 W; (3) 15 fps,
+  +3.5 W, each with the frames 97 to 100% even and steady. The fastest rain streams move about 21
+  rows a second, so below about 21 fps some skip a row now and then. Recommended: judge by eye,
+  with `syncrain --fps 20` for a day; keep 30 if the snow and the trails look worse.
 * **Pause behind maximized windows too, or only full-screen ones?** (asked 12:25.) Build 5 pauses
   behind both (`--pause-under maximized`, the default); the catch is a window that is see-through by
   itself, behind which the rain would stand still. Recommended: both.
@@ -47,6 +44,10 @@ answered, with the answer under "Decisions answered".
 
 ### Decisions answered
 
+* **2026-10-09 11:36, after build 8**: "success, definitely less cpu and memory used, and 122MB feels
+  way more acceptable ... update the github please, also, the power-sweep should have a warning
+  message in it that in the last two tests, all your screens might go black for a while". Build 8
+  went to `main`; build 9 carries the warning.
 * **2026-10-09 07:05, before build 8**: "drop the memory leak assumption and instead optimize around
   minimal memory footprint without sacrificing actual fps/watt ratio, because even more important is
   power usage down", and whether "a full rust, c, asm, cpp or any other languages has anything to
@@ -81,14 +82,13 @@ answered, with the answer under "Decisions answered".
 
 ### Planned builds, in order
 
-1. **Build 9: from the operator's trial of build 8 and their answers** (`docs/agent/NEXT_BUILD.md`):
-   anything the native wallpaper does differently on their NVIDIA card; the default frame rate they
-   choose; the pause as they want it; anything a sweep shows (a covered screen should cost what
-   "nothing" costs).
-2. **The Plasma wallpaper plugin**, if the operator chooses it.
-3. **NixOS image**: syncrain as the default wallpaper of a NixOS image: a module option that turns
+1. **Build 10: consolidation** (fixed; `docs/agent/NEXT_BUILD.md`): build 8 and 9's notes folded
+   into the history, every standing document checked against the code.
+2. **Build 11: from the operator's answers**: the default frame rate they choose; the pause as they
+   want it; anything a sweep shows.
+3. **The Plasma wallpaper plugin**, if the operator chooses it.
+4. **NixOS image**: syncrain as the default wallpaper of a NixOS image: a module option that turns
    it on for every graphical user, and a flake template for an image that has it.
-4. **Build 10: consolidation.**
 
 ## Build cadence
 
