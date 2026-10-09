@@ -136,7 +136,8 @@ def test_the_sweep_warns_before_it_turns_every_screen_black():
     warning = power.cover_warning(power.phases(25), 25)
     assert warning.startswith("Warning: in the last two phases (behind a maximized window, behind a full-screen "
                               "window) a black window covers every screen"), warning
-    assert "all your screens go black for about 56 s" in warning and "Alt+F4" in warning and "Ctrl+C" in warning
+    assert "all your screens go black for about 25 s in each" in warning, warning
+    assert "(Alt+Tab) and press Ctrl+C" in warning and "Alt+F4" not in warning, warning
     assert power.cover_warning([p for p in power.phases(25) if not p.get("cover")], 25) is None
 
 
@@ -144,9 +145,47 @@ def test_the_sweep_warns_before_it_turns_every_screen_black():
 def test_a_closed_terminal_stops_the_sweep_as_ctrl_c_does(sig):
     """The black windows must not outlive the sweep: SIGHUP and SIGTERM end its phases the way Ctrl+C
     does (its children are stopped on the way out), and the handlers that were there come back."""
-    before = signal.getsignal(signal.SIGHUP), signal.getsignal(signal.SIGTERM)
+    before = [signal.getsignal(s) for s in power.STOPPING]
     with pytest.raises(KeyboardInterrupt):
         with power.interrupted_by_hangup():
-            os.kill(os.getpid(), sig)
-            time.sleep(5)
-    assert (signal.getsignal(signal.SIGHUP), signal.getsignal(signal.SIGTERM)) == before
+            try:
+                os.kill(os.getpid(), sig)
+                time.sleep(5)
+            except KeyboardInterrupt:
+                # stopping the children: a second signal of any kind must not cut that short
+                for again in power.STOPPING:
+                    os.kill(os.getpid(), again)
+                time.sleep(0.2)
+                raise
+    assert [signal.getsignal(s) for s in power.STOPPING] == before
+
+
+def test_a_sweep_started_with_nohup_outlives_its_terminal():
+    """`nohup` leaves SIGHUP ignored; the sweep keeps it so."""
+    before = signal.signal(signal.SIGHUP, signal.SIG_IGN)
+    try:
+        with power.interrupted_by_hangup():
+            os.kill(os.getpid(), signal.SIGHUP)
+            time.sleep(0.2)
+        assert signal.getsignal(signal.SIGHUP) is signal.SIG_IGN
+    finally:
+        signal.signal(signal.SIGHUP, before)
+
+
+def test_the_results_are_saved_even_when_the_table_cannot_be_printed(tmp_path, monkeypatch):
+    """A closed terminal makes every print fail; the JSON is written before the first one."""
+    import builtins
+
+    class Gone(OSError):
+        pass
+
+    def no_terminal(*args, **kwargs):
+        raise Gone(5, "Input/output error")
+
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setattr(builtins, "print", no_terminal)
+    source = power.Command("echo 1")
+    with pytest.raises(Gone):
+        power.report([{"phase": "nothing (your desktop alone)", "watts": 50.0}], source, interrupted=True)
+    saved = list(tmp_path.glob("syncrain-power-*.json"))
+    assert len(saved) == 1 and '"interrupted": true' in saved[0].read_text()

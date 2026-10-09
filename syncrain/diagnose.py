@@ -50,7 +50,7 @@ def graphics_cards() -> list[str]:
 def session_lines() -> list[str]:
     keys = ("XDG_SESSION_TYPE", "XDG_CURRENT_DESKTOP", "WAYLAND_DISPLAY", "DISPLAY", "GDK_BACKEND",
             "GDK_DEBUG", "GDK_DISABLE", "GSK_RENDERER", "LIBGL_ALWAYS_SOFTWARE", "__GLX_VENDOR_LIBRARY_NAME",
-            "__EGL_VENDOR_LIBRARY_FILENAMES", "SYNCRAIN_WALLPAPER")
+            "__EGL_VENDOR_LIBRARY_FILENAMES", "SYNCRAIN_WALLPAPER", "__NV_DISABLE_EXPLICIT_SYNC", "__GL_YIELD")
     lines = [f"{k}={os.environ[k]}" for k in keys if os.environ.get(k)]
     preload = os.environ.get("LD_PRELOAD", "")
     lines.append("gtk4-layer-shell preloaded: " + ("yes" if "gtk4-layer-shell" in preload else "no"))
@@ -192,8 +192,9 @@ def run(args) -> int:
 
     section("session", session_lines())
     section("graphics cards", graphics_cards())
-    from .app import use_gl_renderer
+    from .app import avoid_the_explicit_sync_leak, use_gl_renderer
     use_gl_renderer()                        # what the wallpaper itself does, so the answer is about it
+    avoid_the_explicit_sync_leak()
     try:
         import gi
         gi.require_version("Gtk", "4.0")

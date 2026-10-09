@@ -62,7 +62,8 @@ which screens a maximized or full-screen window covers; those stop drawing until
 * On the operator's RTX 5090: the native wallpaper 123 MiB and 0.9% of a core at 30 fps; the GTK
   host 205 MiB and 4.7%. Most of either is the driver; syncrain's own state is a few MiB.
 * The watts follow the frames (about 0.17 J a frame per screen), not the pixels or the language.
-* Known: NVIDIA's Wayland driver leaks a fixed amount per frame with explicit sync on (build 11).
+* NVIDIA's Wayland driver leaks a fixed amount per frame with explicit sync on, so syncrain turns
+  it off for its own process (`syncrain/app.py`, `avoid_the_explicit_sync_leak`).
 
 ## Builds and the stream (`syncrain/build.py`)
 

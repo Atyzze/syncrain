@@ -2,8 +2,10 @@
 
 GSK_RENDERER=gl keeps GTK from handing every frame to Vulkan; with it, GDK_DISABLE=dmabuf keeps GTK
 4.16 and later from exporting every frame as a dmabuf and importing it back, and from starting a
-Vulkan renderer for that. GDK reads GDK_DISABLE once, when GTK initialises, which PyGObject does
-on `from gi.repository import Gtk`, so both have to be in place before anything imports gi.
+Vulkan renderer for that. __NV_DISABLE_EXPLICIT_SYNC=1 keeps NVIDIA's Wayland driver from losing
+memory on every frame it presents, and __GL_YIELD=USLEEP lets its wait for a frame sleep. GDK reads
+GDK_DISABLE once, when GTK initialises, which PyGObject does on `from gi.repository import Gtk`, so
+all of it has to be in place before anything imports gi; the native wallpaper inherits it.
 """
 from __future__ import annotations
 
@@ -15,12 +17,12 @@ import pytest
 
 from syncrain import app
 
-NAMES = ("GSK_RENDERER", "GDK_DISABLE")
+NAMES = ("GSK_RENDERER", "GDK_DISABLE", "__NV_DISABLE_EXPLICIT_SYNC", "__GL_YIELD")
 
 
 @pytest.fixture
 def clean(monkeypatch):
-    """Neither set, and afterwards exactly what was there before (the app sets them itself,
+    """None of them set, and afterwards exactly what was there before (the app sets them itself,
     so the tests set them with os.environ too and this puts all of it back)."""
     before = {n: os.environ.get(n) for n in NAMES}
     for name in NAMES:
@@ -54,6 +56,28 @@ def test_a_renderer_the_user_chose_is_kept_and_vulkan_keeps_its_dmabufs(clean):
     assert "GDK_DISABLE" not in os.environ
 
 
+def test_nvidia_presents_without_explicit_sync_and_waits_asleep(clean):
+    app.avoid_the_explicit_sync_leak()
+    assert os.environ["__NV_DISABLE_EXPLICIT_SYNC"] == "1"
+    assert os.environ["__GL_YIELD"] == "USLEEP"
+
+
+def test_values_the_user_set_win(clean):
+    os.environ["__NV_DISABLE_EXPLICIT_SYNC"] = "0"
+    os.environ["__GL_YIELD"] = "NOTHING"
+    app.avoid_the_explicit_sync_leak()
+    assert os.environ["__NV_DISABLE_EXPLICIT_SYNC"] == "0"
+    assert os.environ["__GL_YIELD"] == "NOTHING"
+
+
+def test_the_native_wallpaper_inherits_them(clean):
+    """The launcher replaces itself with the native program, passing it this environment."""
+    from syncrain import native
+    app.avoid_the_explicit_sync_leak()
+    env = native.environment()
+    assert env["__NV_DISABLE_EXPLICIT_SYNC"] == "1" and env["__GL_YIELD"] == "USLEEP"
+
+
 class GiImported(Exception):
     """Raised by the stand-in gi module at the moment syncrain first imports it."""
 
@@ -73,4 +97,5 @@ def test_everything_is_set_before_gtk_is_imported(clean):
     clean.setattr(app, "_preload_layer_shell", lambda: None)
     with pytest.raises(GiImported):
         app.main(["--window"])
-    assert seen == {"GSK_RENDERER": "gl", "GDK_DISABLE": "dmabuf"}
+    assert seen == {"GSK_RENDERER": "gl", "GDK_DISABLE": "dmabuf", "__NV_DISABLE_EXPLICIT_SYNC": "1",
+                    "__GL_YIELD": "USLEEP"}

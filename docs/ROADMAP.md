@@ -17,7 +17,7 @@ Open questions, planned builds, the cadence and the constraints. What shipped: `
 ## Decisions answered
 
 * **2026-10-09 13:07**: memory still creeps on build 8 ("Will it ever gc and go back down?"); the
-  documents: "Keep it minimal please". Build 10 makes them short; build 11 stops the creep.
+  documents: "Keep it minimal please". Build 10 made them short; build 11 stops the creep.
 * **2026-10-09 11:36**: build 8 approved for GitHub; a warning before the sweep's black screens.
   Builds 8 and 9.
 * **2026-10-09 07:05**: the smallest footprint, power first; does another language help? Build 8.
@@ -30,10 +30,9 @@ Open questions, planned builds, the cadence and the constraints. What shipped: `
 
 ## Planned builds
 
-1. **Build 11**: NVIDIA's explicit-sync leak (`docs/agent/NEXT_BUILD.md`).
-2. **The operator's answers** above.
-3. **The Plasma wallpaper plugin**, if chosen.
-4. **A NixOS image** with syncrain as its wallpaper.
+1. **The operator's answers** above (`docs/agent/NEXT_BUILD.md`).
+2. **The Plasma wallpaper plugin**, if chosen.
+3. **A NixOS image** with syncrain as its wallpaper.
 
 ## Build cadence
 
@@ -41,7 +40,7 @@ Consolidation builds: every build number ending in 0, and no other build. Fixed:
 rule, adopted at build 3. A consolidation changes no behaviour: it folds older notes into the
 history, makes every document true and short again, and writes down what it finds as open items.
 
-Next consolidation: 10
+Next consolidation: 20
 
 `tests/contract/test_the_working_documents_are_current.py` reads the two lines above.
 

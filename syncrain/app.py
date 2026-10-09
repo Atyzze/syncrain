@@ -186,6 +186,18 @@ def use_gl_renderer():
             os.environ["GDK_DISABLE"] = ",".join(disabled + ["dmabuf"])
 
 
+def avoid_the_explicit_sync_leak():
+    """NVIDIA's Wayland driver keeps a small allocation for every frame it presents while explicit
+    sync is on: on the operator's desktop the wallpaper grew by about 0.9 MiB a minute (two screens
+    at 30 fps), in either host, and only while it drew; on Mesa it stays flat. With explicit sync
+    off the driver falls back to implicit sync, which does not leak; __GL_YIELD=USLEEP lets the
+    driver sleep while it waits for a frame there, rather than spin. Both are NVIDIA's own
+    variables, which other drivers ignore; a value the user set wins. Set before GTK starts and
+    before the native wallpaper, which inherits them through execve."""
+    os.environ.setdefault("__NV_DISABLE_EXPLICIT_SYNC", "1")
+    os.environ.setdefault("__GL_YIELD", "USLEEP")
+
+
 def _libc_function(name):
     """A glibc function by name, or None (another C library, or none of that name)."""
     try:
@@ -270,6 +282,7 @@ def main(argv=None):
         return 0
     # Before GTK is imported: PyGObject initialises GTK on import, and GDK reads GDK_DISABLE then.
     use_gl_renderer()
+    avoid_the_explicit_sync_leak()
     if args.host != "gtk" and not (args.power_sweep or args.benchmark or args.diagnose):
         if native.applies(args):
             path = native.binary()

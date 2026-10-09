@@ -37,6 +37,8 @@ showed within seconds, which is why syncrain draws every frame from the clock.
 * **9** (2026-10-09): the sweep warns before its black screens; memory handed back after the first
   frames (a cold shader cache had kept 182 MiB).
 * **10** (2026-10-09): consolidation. The documents made short; builds 1 to 8 folded in here.
+* **11** (2026-10-09): no memory creep on NVIDIA (explicit sync off for syncrain's own process);
+  build 9's review fixed.
 
 ## The operator's words
 

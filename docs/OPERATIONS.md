@@ -69,6 +69,8 @@ the session's environment.
 Environment: `SYNCRAIN_DEBUG_FPS=<s>` reports each screen's frame rate and timing ("even" and
 "steady" near 100% means smooth); `SYNCRAIN_GL_DEBUG=1` checks every OpenGL call;
 `SYNCRAIN_WALLPAPER=<path>` names the native program; `GSK_RENDERER` picks GTK's renderer.
+syncrain sets `__NV_DISABLE_EXPLICIT_SYNC=1` and `__GL_YIELD=USLEEP` for itself unless you set them
+(NVIDIA's driver leaks memory per frame with explicit sync on).
 
 ## When it does not draw
 

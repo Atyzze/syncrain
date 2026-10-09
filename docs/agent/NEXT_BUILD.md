@@ -1,28 +1,24 @@
-# The next build is 11
+# The next build is 12
 
 The first line is parsed: `# The next build is <N>`, exactly one above `BUILD_NUMBER`.
 
-## Build 11: stop the memory creep on NVIDIA
+## Build 12: the operator's answers
 
-* **Change**: set `__NV_DISABLE_EXPLICIT_SYNC=1` and `__GL_YIELD=USLEEP` in syncrain's own
-  environment before GTK or the native wallpaper start (`syncrain/app.py`, beside
-  `use_gl_renderer`). A value the user set wins. The native wallpaper inherits both through
-  `os.execve`.
-* **Why**: NVIDIA's Wayland driver keeps a fixed allocation for every frame presented while explicit
-  sync is on. On the operator's desktop: +0.9 MiB a minute (two screens at 30 fps), flat while the
-  screens are off. On Mesa: flat over 20,000 frames. NVIDIA's forum has the same leak with
-  `eglgears_wayland` alone (May 2026), and `__NV_DISABLE_EXPLICIT_SYNC=1` stops it there.
-  `__GL_YIELD=USLEEP` makes the driver sleep, not spin, while it waits in the implicit-sync path.
-* **Also, from build 9's review**: the sweep should save its JSON before printing (a closed terminal
-  loses both now), ignore a second signal during its cleanup, keep an inherited `SIG_IGN` (nohup),
-  and advise Alt+Tab to its terminal and Ctrl+C (Alt+F4 leaves the phase measuring an uncovered
-  wallpaper); the native wallpaper should not settle its memory before a new screen is configured.
+* Read what the operator sent last, and answer it in one plain sentence first. If memory still
+  grows with build 11, that comes first: `syncrain --diagnose` shows whether their session sets
+  `__NV_DISABLE_EXPLICIT_SYNC` itself.
+* **The three questions** in `docs/ROADMAP.md`. A default frame rate of 20 or 15 lives in four
+  places: `--fps` in `syncrain/app.py`, `fps` in `nix/options.nix`, `base_args` in
+  `syncrain/power.py` and the options table in `docs/OPERATIONS.md`. Pausing only under full-screen
+  windows: `--pause-under` in `syncrain/app.py`, `pauseUnder` in `nix/options.nix` and
+  `nix/args.nix`, `syncrain/power.py`, `docs/OPERATIONS.md`.
+* **The Plasma wallpaper plugin**, if chosen: a Plasma 6 wallpaper package drawing the web page or
+  the shaders behind the icons, installed by `install.sh`; it keeps both power savings (no frames
+  for covered screens, frames on the refresh).
 
-**Known blockers**: the leak exists only on NVIDIA. The sandbox can check that both variables are
-set before GTK starts and reach the native program; the operator's btop is the real test.
+**Known blockers**: watts, NVIDIA's driver and Plasma's shell exist only on the operator's machine.
 
-**Acceptance**: a test for each change, failing without it; every lane passes; memory flat on the
-operator's desktop over an hour.
+**Acceptance**: the chosen defaults everywhere they live, each read by a test; every lane passes.
 
 ## How to make a build
 

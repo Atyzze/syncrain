@@ -236,18 +236,33 @@ def cover_warning(plan: list[dict], seconds: int) -> str | None:
         which = "phases " + ", ".join(str(n) for n in covering)
     names = ", ".join(plan[n - 1]["name"] for n in covering)
     return (f"Warning: in {which} ({names}) a black window covers every screen, so all your screens go black for "
-            f"about {len(covering) * (seconds + 3)} s. That is the test, not a fault: they come back by themselves "
-            "when the sweep ends. To get them back sooner, close the black windows (Alt+F4) or press Ctrl+C here.")
+            f"about {seconds} s in each. That is the test, not a fault: they come back by themselves when the sweep "
+            "ends. To get them back sooner, switch back to this terminal (Alt+Tab) and press Ctrl+C.")
+
+
+STOPPING = (signal.SIGINT, signal.SIGHUP, signal.SIGTERM)
+
+
+def hold_signals():
+    """While the sweep stops its children: a second Ctrl+C, hang-up or kill must not cut that short,
+    or a wallpaper stays behind in its own session."""
+    for sig in STOPPING:
+        signal.signal(sig, signal.SIG_IGN)
 
 
 @contextlib.contextmanager
 def interrupted_by_hangup():
     """While the sweep runs, a closed terminal (SIGHUP) or `kill` (SIGTERM) stops it as Ctrl+C does:
-    its wallpaper and its black covering windows are stopped too, rather than left on the screens."""
+    its wallpaper and its black covering windows are stopped too, rather than left on the screens.
+    A signal its starter ignored (`nohup`) stays ignored; every handler is put back on the way out."""
     def interrupt(signum, frame):
+        hold_signals()
         raise KeyboardInterrupt
 
-    before = {sig: signal.signal(sig, interrupt) for sig in (signal.SIGHUP, signal.SIGTERM)}
+    before = {sig: signal.getsignal(sig) for sig in STOPPING}
+    for sig in (signal.SIGHUP, signal.SIGTERM):
+        if before[sig] is not signal.SIG_IGN:
+            signal.signal(sig, interrupt)
     try:
         yield
     finally:
@@ -443,6 +458,7 @@ def run_sweep(args) -> int:
         except KeyboardInterrupt:
             interrupted = True
         finally:
+            hold_signals()
             for c in (cover, child):
                 if c:
                     c.stop()
@@ -460,6 +476,9 @@ def drawn_by(startup: str) -> str:
 
 
 def report(results, source, interrupted) -> None:
+    """The record goes to its file before anything is printed: a sweep whose terminal was closed
+    cannot print, but still keeps what it measured."""
+    saved = save_record(results, source, interrupted)
     idle = next((r["watts"] for r in results if r["phase"].startswith("nothing") and r.get("watts")), None)
     print()
     print(f"{'phase':30s} {'card W':>7s} {'above':>7s} {'frames/s':>9s} {'even':>5s} {'steady':>6s} "
@@ -487,12 +506,17 @@ def report(results, source, interrupted) -> None:
     pause = next((r["pause"] for r in results if r.get("pause")), "")
     if pause:
         print(pause)
+    print(saved)
+
+
+def save_record(results, source, interrupted) -> str:
+    """~/syncrain-power-<utc>.json; returns the line that says where it went, or why it did not."""
     record = {"contract": "syncrain-power-sweep-1", "build": build.BUILD_NUMBER, "stream": build.stream_id(),
               "source": source.describe(), "when_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
               "interrupted": interrupted, "phases": results}
     out = Path.home() / f"syncrain-power-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}.json"
     try:
         out.write_text(json.dumps(record, indent=1) + "\n", encoding="utf-8")
-        print(f"\nsaved {out} (send this file)")
+        return f"\nsaved {out} (send this file)"
     except OSError as e:
-        print(f"\ncould not save the results: {e}")
+        return f"\ncould not save the results: {e}"

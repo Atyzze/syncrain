@@ -1,4 +1,4 @@
-# Where we are, at build 10
+# Where we are, at build 11
 
 The project on one page. Detail: `docs/agent/HANDOFF.md`.
 
@@ -14,15 +14,15 @@ name, so everyone on a channel sees the same rain. Linux (Wayland, X11) and the 
 * **Power**: about 11 W at 30 fps; the watts follow the frames, not the language.
 * **Covered screens are not drawn** (0 W behind a full-screen window), and every frame lands on
   the refresh.
-* **Open fault: memory creeps** about 0.9 MiB a minute while it draws. NVIDIA's Wayland driver
-  leaks a little per frame while explicit sync is on; flat on other drivers. Build 11 turns
-  explicit sync off for syncrain.
+* **Memory creep fixed, to be confirmed**: builds 8 to 10 grew about 0.9 MiB a minute while
+  drawing, because NVIDIA's Wayland driver leaks a little per frame with explicit sync on. Build 11
+  turns explicit sync off for syncrain only. Watch btop: it should stay near 123 MiB.
 * **On GitHub**: github.com/Atyzze/syncrain, one commit per build.
 
 ## What comes next
 
-* **Build 11**: the memory creep.
-* **Then**: your answers below; the KDE plugin if you want it; a NixOS image.
+* **Build 12**: your answers below.
+* **Then**: the KDE plugin if you want it; a NixOS image.
 
 ## The decision in front of you
 

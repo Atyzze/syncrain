@@ -481,9 +481,9 @@ static void settle_memory(void)
 	struct screen *s;
 	int drawn = 0;
 	wl_list_for_each(s, &W.screens, link) {
-		if (!s->render || s->hidden)
+		if (s->hidden || (s->configured && !s->render))   /* covered, or a screen that cannot be drawn */
 			continue;
-		if (s->counter < 2)
+		if (s->counter < 2)                       /* a new screen not yet configured counts too */
 			return;
 		drawn++;
 	}
