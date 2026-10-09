@@ -7,7 +7,8 @@ Where syncrain runs, as far as this tree knows it. The build sandbox is
 
 * **CachyOS** (Arch-based, with CachyOS's own repositories for Zen 4 and Zen 5 CPUs), **KDE Plasma 6
   on Wayland**, Konsole with the **fish** shell, **two screens**. Python 3.14, gtk4-layer-shell
-  1.3.0 (from `cachyos-extra-znver4`), python-opengl 3.1.10, as of 2026-10-07. Pacman runs Limine
+  1.3.0 (from `cachyos-extra-znver4`), python-opengl 3.1.10 (which build 8 no longer uses), as of
+  2026-10-07. Pacman runs Limine
   and snapper hooks that take a btrfs snapshot around every transaction.
 * The same machine as GSD's research host (AMD Ryzen 9 9950X3D, 16 cores, about 92 GiB of RAM),
   so a heavy syncrain setting competes with a running study: 30 fps is the cap; `--fps 15` halves
@@ -22,6 +23,14 @@ Where syncrain runs, as far as this tree knows it. The build sandbox is
   the matrix theme 1 W; covered by a full-screen window it still drew 60 frames a second for
   +11.0 W, because KWin keeps asking a covered wallpaper for frames (build 5 stops that). Build 3 ran
   there from 02:52 ("it works perfectly"); the GIF wallpaper before it cost a little more than 20 W.
+* **What build 7 kept in memory there** (btop, 2026-10-08 and 09): 287 MiB resident at boot, 291
+  and 299 within minutes, 331 after 37 minutes, 402 after 1 h 22, 382 ten minutes later, and 420
+  after a night (about 9 h). The operator read the falls and the plateau as the garbage collector's
+  ebb and flow, not a leak, and asked for the footprint itself to come down instead. Build 7 did
+  keep about 120 MiB more after every screen change (in the sandbox), and a DisplayPort screen
+  waking from sleep is one, so some of those steps may have been that; build 8 keeps nothing after
+  one. Build 8 (the native wallpaper) has not run there yet; the sweep's "MiB" column and btop will
+  say what NVIDIA's driver keeps.
 * They unpack archives under `/data/projects/nixOS/liveWallpaper/` (a browser's duplicate
   download gave one folder a name with a space and brackets, which the installer handles) and
   install with `./install.sh`; build 3 is installed there.

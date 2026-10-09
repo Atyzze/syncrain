@@ -1,7 +1,7 @@
-# History: the GIFs to build 7
+# History: the GIFs to build 8
 
 Where each build's notes are kept, a line for what each build did, and the operator's decisions in
-their own words. Builds 1 to 7: `docs/build_notes/BUILD<n>_NOTES.md` (all of them, until a
+their own words. Builds 1 to 8: `docs/build_notes/BUILD<n>_NOTES.md` (all of them, until a
 consolidation folds the older ones in here). The rules the builds taught are in `docs/LESSONS.md`.
 
 ## Before build 1: the GIFs (2026-10-06)
@@ -43,6 +43,13 @@ which is why syncrain exists.
 * **7** (2026-10-07): build 6 with what its review found, fixed: a screen uncovered by a drag draws
   again during the drag; a locked screen no longer moves the lead; a leftover script's process is
   recognised by its command.
+* **8** (2026-10-09): memory and the processor, the picture unchanged. On Wayland the wallpaper is
+  a C program with neither Python nor GTK in memory (the native wallpaper): in the sandbox about
+  136 MiB against build 7's 308 for two screens, the same frames to the pixel, with half the
+  processor time around each frame. The Python and GTK host, still drawing everywhere else, drops
+  PyOpenGL and numpy, GTK's dmabuf round trip, and the 120 MiB build 7 kept after every screen
+  change. The power sweep shows each phase's processor time, memory and what drew it. Delivered in
+  the chat for the operator to try before it goes to GitHub, as they asked.
 
 After build 7 (2026-10-08) the tree went to GitHub, github.com/Atyzze/syncrain: the commit
 `syncrain build 7` is the archive as delivered, and the commits after it changed no behaviour
@@ -71,4 +78,15 @@ carries them.
   with fps".
 * After build 7 (2026-10-08): "can you create a new github depository for this and make sure its
   properly documented?"
+* Before build 8 (2026-10-08 22:33, with btop showing build 7 at 287 MiB): "can we get it as low as
+  realistically possible and also make sure it doesnt creep up? we want to keep the
+  look/feel/smoothess of the current default 60fps settings and reduce the power/cpu needed as much
+  as possible ... do not change any functionality, only performance gains are of interest, less
+  memory (no leaks, should we do it all rust native maybe instead of python?)"; then "do not push to
+  github when done, instead, just deliver the new build here in chat so I can try it out myself
+  before we commit it"; and at 07:05 the next morning, with build 7 at 420 MiB after the night:
+  "drop the memory leak assumption and instead optimize around minimal memory footprint without
+  sacrificing actual fps/watt ratio, because even more important is power usage down, so I'm really
+  interested to see whether or not a full rust, c, asm, cpp or any other languages has anything to
+  offer here."
 * Standing, from the start: no long dashes in anything written to them.

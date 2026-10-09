@@ -44,13 +44,16 @@ ROOT_FILES = {".gitignore", "BUILD_NUMBER", "LICENSE", "README.md", "flake.nix",
 OPTIONAL_ROOT_FILES = {"flake.lock"}
 ROOT_DIRS = {"docs", "extras", "nix", "syncrain", "tests", "tools", "web"}
 #: Never in a release: host state, caches and build products.
-EXCLUDED_PARTS = {".git", ".pytest_cache", "__pycache__", "build", "dist", "var", ".venv", "venv"}
+EXCLUDED_PARTS = {".git", ".pytest_cache", "__pycache__", "build", "dist", "var", ".venv", "venv",
+                  "syncrain-wallpaper"}
 EXCLUDED_SUFFIXES = {".pyc", ".pyo"}
 #: What a fresh machine needs; the release refuses to ship without any of them.
 REQUIRED_RELEASE_PATHS = {
     "BUILD_NUMBER", "README.md", "LICENSE", "install.sh", "flake.nix", "pyproject.toml",
     "syncrain/__main__.py", "syncrain/app.py", "syncrain/build.py", "syncrain/diagnose.py", "syncrain/engine.py",
-    "syncrain/renderer.py", "syncrain/data/themes.json", "syncrain/data/atlas.png",
+    "syncrain/renderer.py", "syncrain/gl.py", "syncrain/native.py", "syncrain/native/build.sh",
+    "syncrain/native/wallpaper.c", "syncrain/native/render.c", "syncrain/native/syncrain.h",
+    "syncrain/data/themes.json", "syncrain/data/atlas.png",
     "web/index.html", "web/artifact.html", "web/template.html",
     "nix/package.nix", "nix/nixos-module.nix", "nix/hm-module.nix",
     "tests/fixtures/stream_freeze.json", "tools/package_release.py", "tools/test_suite.py",

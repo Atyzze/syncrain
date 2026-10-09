@@ -172,7 +172,7 @@ def detect_power_source(sysfs: str = "/sys/class/drm"):
 
 
 SWEEP_FLAGS = ("--power-sweep", "--benchmark", "--diagnose", "--build", "--version", "--list-themes", "--screenshot",
-               "--record", "--help")
+               "--record", "--help", "--probe")
 
 
 def running_wallpapers(proc_dir: str = "/proc", exclude: set[int] | None = None) -> list[tuple[int, str]]:
@@ -194,14 +194,15 @@ def running_wallpapers(proc_dir: str = "/proc", exclude: set[int] | None = None)
 
 
 def is_syncrain_command(args: list[str]) -> bool:
-    """python -m syncrain (the installer's launcher execs this), or the Nix package's wrapped script."""
+    """python -m syncrain (the installer's launcher execs this), the Nix package's wrapped script, or
+    the native wallpaper that either replaces itself with (syncrain/native.py)."""
     if not args:
         return False
     if any(a == "syncrain" and i > 0 and args[i - 1] == "-m" for i, a in enumerate(args)):
         return True
     names = [os.path.basename(a) for a in args[:2]]
-    return names[0] == ".syncrain-wrapped" or (names[0].startswith("python") and len(names) > 1
-                                                and names[1] in ("syncrain", ".syncrain-wrapped"))
+    return names[0] in (".syncrain-wrapped", "syncrain-wallpaper") or (
+        names[0].startswith("python") and len(names) > 1 and names[1] in ("syncrain", ".syncrain-wrapped"))
 
 
 # ---------------------------------------------------------------- the sweep
@@ -213,6 +214,7 @@ def phases(seconds: int) -> list[dict]:
     return [
         {"name": "nothing (your desktop alone)", "child": False},
         {"name": "as installed (30 fps)", "args": []},
+        {"name": "the Python and GTK host", "args": ["--host", "gtk"]},
         {"name": "build 4's frame timer", "args": ["--pacing", "timer"]},
         {"name": "--fps 20", "args": ["--fps", "20"]},
         {"name": "--fps 15", "args": ["--fps", "15"]},
@@ -223,14 +225,15 @@ def phases(seconds: int) -> list[dict]:
 
 #: The wallpaper options a sweep passes on to every phase (the rest are the phase's own).
 PASS_ON = ("theme", "channel", "logo", "background", "mask", "bg_gamma", "bg_gain", "rainbow", "spin", "drift",
-           "layer", "scale", "fps", "pause_under")
+           "layer", "scale", "fps", "pause_under", "host")
 
 
 def base_args(args) -> list[str]:
     out = []
     for key in PASS_ON:
         value = getattr(args, key, None)
-        default = {"theme": "nixos", "channel": "public", "scale": 1.0, "fps": 30.0, "pause_under": "maximized"}.get(key)
+        default = {"theme": "nixos", "channel": "public", "scale": 1.0, "fps": 30.0, "pause_under": "maximized",
+                   "host": "auto"}.get(key)
         if value is not None and value != default:
             out += ["--" + key.replace("_", "-"), str(value)]
     return out
@@ -286,6 +289,24 @@ class Child:
         if lead:
             out["lead_ms"] = round(sum(lead) / len(lead), 1)
         return out
+
+    def cpu_seconds(self) -> float | None:
+        """Processor time the wallpaper has used, all its threads, user and system (/proc/<pid>/stat)."""
+        try:
+            fields = Path(f"/proc/{self.proc.pid}/stat").read_text().rsplit(")", 1)[1].split()
+            return (int(fields[11]) + int(fields[12])) / os.sysconf("SC_CLK_TCK")
+        except (OSError, IndexError, ValueError):
+            return None
+
+    def resident_mib(self) -> float | None:
+        """The wallpaper's resident memory now (VmRSS), in MiB."""
+        try:
+            for line in Path(f"/proc/{self.proc.pid}/status").read_text().splitlines():
+                if line.startswith("VmRSS:"):
+                    return int(line.split()[1]) / 1024
+        except (OSError, IndexError, ValueError):
+            pass
+        return None
 
     def stop(self):
         if self.proc.poll() is None:
@@ -353,10 +374,12 @@ def run_sweep(args) -> int:
                     cover.started.wait(timeout=60)
             samples, details = [], []
             start = time.monotonic()
+            cpu0 = None
             while time.monotonic() - start < seconds:
                 time.sleep(1.0)
                 if child and time.monotonic() - start >= settle and mark == 0:
                     mark = len(child.lines)
+                    cpu0, cpu_t0 = child.cpu_seconds(), time.monotonic()
                 reading = source.sample()
                 if reading and time.monotonic() - start >= settle:
                     samples.append(reading[0])
@@ -364,6 +387,12 @@ def run_sweep(args) -> int:
             row = {"phase": label, "watts": sum(samples) / len(samples) if samples else None,
                    "samples": samples, "detail": details[-1] if details else {}}
             if child:
+                cpu1 = child.cpu_seconds()
+                if cpu0 is not None and cpu1 is not None and time.monotonic() > cpu_t0:
+                    row["cpu_percent"] = round(100.0 * (cpu1 - cpu0) / (time.monotonic() - cpu_t0), 2)
+                rss = child.resident_mib()
+                if rss is not None:
+                    row["resident_mib"] = round(rss, 1)
                 row["fps"] = child.fps_since(mark)
                 row["timing"] = child.timing_since(mark)
                 row["startup"] = next((line for line in child.lines if line.startswith("syncrain build")), "")
@@ -385,11 +414,19 @@ def run_sweep(args) -> int:
     return 0 if not interrupted else 130
 
 
+def drawn_by(startup: str) -> str:
+    """What drew a phase, from its startup line: "native", or GTK's renderer ("gl", "vulkan")."""
+    if ", native wallpaper," in startup:
+        return "native"
+    found = re.search(r"GTK renderer (\S+?),", startup)
+    return found.group(1) if found else ""
+
+
 def report(results, source, interrupted) -> None:
     idle = next((r["watts"] for r in results if r["phase"].startswith("nothing") and r.get("watts")), None)
     print()
     print(f"{'phase':30s} {'card W':>7s} {'above':>7s} {'frames/s':>9s} {'even':>5s} {'steady':>6s} "
-          f"{'drawn by':>9s}  card state")
+          f"{'cpu %':>6s} {'MiB':>6s} {'drawn by':>9s}  card state")
     for r in results:
         w = r.get("watts")
         above = f"{w - idle:+.1f}" if (w is not None and idle is not None and not r["phase"].startswith("nothing")) else ""
@@ -398,14 +435,18 @@ def report(results, source, interrupted) -> None:
         timing = r.get("timing") or {}
         even = f"{timing['even']:.0f}%" if timing else ""
         calm = f"{timing['steady']:.0f}%" if timing else ""
-        drawn = re.search(r"GTK renderer (\S+?),", r.get("startup", ""))
+        drawn = drawn_by(r.get("startup", ""))
         state = " ".join(f"{k} {v}" for k, v in r.get("detail", {}).items())
         watts = "?" if w is None else f"{w:.1f}"
+        cpu = f"{r['cpu_percent']:.1f}" if r.get("cpu_percent") is not None else ""
+        mib = f"{r['resident_mib']:.0f}" if r.get("resident_mib") is not None else ""
         print(f"{r['phase']:30s} {watts:>7s} {above:>7s} {fps_text:>9s} {even:>5s} {calm:>6s} "
-              f"{drawn.group(1) if drawn else '':>9s}  {r.get('error', state)}")
+              f"{cpu:>6s} {mib:>6s} {drawn:>9s}  {r.get('error', state)}")
     print("'above' is the card's power above 'nothing'; frames/s counts every screen together. 'even': frames\n"
           "shown the same number of refreshes apart; 'steady': frames shown the usual delay after the moment\n"
-          "they were drawn for. The motion is smooth when both are near 100%.")
+          "they were drawn for. The motion is smooth when both are near 100%. 'cpu %': the wallpaper's processor\n"
+          "time as a share of one core (100 is one core kept busy); 'MiB': its resident memory at the end of the\n"
+          "phase; 'drawn by': the native wallpaper, or the GTK host with GTK's renderer.")
     pause = next((r["pause"] for r in results if r.get("pause")), "")
     if pause:
         print(pause)

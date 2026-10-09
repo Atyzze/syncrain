@@ -22,23 +22,21 @@ class QueryTimer:
 
     method = "GPU timer queries"
 
-    def __init__(self, GL, names):
-        self.GL, self.names = GL, names
-        ids = (ctypes.c_uint * len(names))()
-        GL.glGenQueries(len(names), ids)
-        self.ids = dict(zip(names, ids))
+    def __init__(self, gl, names):
+        self.gl, self.names = gl, names
+        self.ids = dict(zip(names, gl.gen_queries(len(names))))
         self.total = {n: 0.0 for n in names}
         self._result = ctypes.c_uint64(0)
 
     def begin(self, name):
-        self.GL.glBeginQuery(self.GL.GL_TIME_ELAPSED, self.ids[name])
+        self.gl.glBeginQuery(self.gl.GL_TIME_ELAPSED, self.ids[name])
 
     def end(self, name):
-        self.GL.glEndQuery(self.GL.GL_TIME_ELAPSED)
+        self.gl.glEndQuery(self.gl.GL_TIME_ELAPSED)
 
     def collect(self):
         for n, qid in self.ids.items():
-            self.GL.glGetQueryObjectui64v(qid, self.GL.GL_QUERY_RESULT, ctypes.byref(self._result))
+            self.gl.glGetQueryObjectui64v(qid, self.gl.GL_QUERY_RESULT, ctypes.byref(self._result))
             self.total[n] += self._result.value / 1e6
 
 
@@ -47,17 +45,17 @@ class FinishTimer:
 
     method = "glFinish around each pass (this context has no timer queries)"
 
-    def __init__(self, GL, names):
-        self.GL, self.names = GL, names
+    def __init__(self, gl, names):
+        self.gl, self.names = gl, names
         self.total = {n: 0.0 for n in names}
         self._t = 0.0
 
     def begin(self, name):
-        self.GL.glFinish()
+        self.gl.glFinish()
         self._t = time.perf_counter()
 
     def end(self, name):
-        self.GL.glFinish()
+        self.gl.glFinish()
         self.total[name] += (time.perf_counter() - self._t) * 1000.0
 
     def collect(self):
@@ -85,9 +83,7 @@ def run_benchmark(args) -> int:
     if display is None:
         print("syncrain: no display (run it inside your desktop session)")
         return 1
-    if "Wayland" in type(display).__name__:
-        os.environ.setdefault("PYOPENGL_PLATFORM", "egl")
-    from OpenGL import GL
+    from . import gl
     from .app import EXIT_NO_GL, describe_context, gl_context_problem
     from .renderer import Renderer
 
@@ -106,16 +102,16 @@ def run_benchmark(args) -> int:
     r = Renderer(theme=args.theme, channel=args.channel, logo=args.logo, background=args.background, mask=args.mask,
                  bg_gamma=args.bg_gamma, bg_gain=args.bg_gain, rainbow=args.rainbow, spin=args.spin, drift=args.drift)
     r.init(use_es)
-    fbo, tex = GL.glGenFramebuffers(1), GL.glGenTextures(1)
-    GL.glBindTexture(GL.GL_TEXTURE_2D, tex)
-    GL.glTexImage2D(GL.GL_TEXTURE_2D, 0, GL.GL_RGBA8, w, h, 0, GL.GL_RGBA, GL.GL_UNSIGNED_BYTE, None)
-    GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, fbo)
-    GL.glFramebufferTexture2D(GL.GL_FRAMEBUFFER, GL.GL_COLOR_ATTACHMENT0, GL.GL_TEXTURE_2D, tex, 0)
+    fbo, tex = gl.gen_framebuffer(), gl.gen_texture()
+    gl.glBindTexture(gl.GL_TEXTURE_2D, tex)
+    gl.glTexImage2D(gl.GL_TEXTURE_2D, 0, gl.GL_RGBA8, w, h, 0, gl.GL_RGBA, gl.GL_UNSIGNED_BYTE, None)
+    gl.glBindFramebuffer(gl.GL_FRAMEBUFFER, fbo)
+    gl.glFramebufferTexture2D(gl.GL_FRAMEBUFFER, gl.GL_COLOR_ATTACHMENT0, gl.GL_TEXTURE_2D, tex, 0)
     moment = time.time() if args.time is None else args.time
     for i in range(WARMUP):
         r.render(moment + i / 30, fbo, 0, 0, w, h)
-    GL.glFinish()
-    timer = FinishTimer(GL, r.PASSES) if use_es else QueryTimer(GL, r.PASSES)
+    gl.glFinish()
+    timer = FinishTimer(gl, r.PASSES) if use_es else QueryTimer(gl, r.PASSES)
     r.timer = timer
     host = 0.0
     frames = FRAMES
@@ -125,9 +121,9 @@ def run_benchmark(args) -> int:
         host += time.thread_time() - t0
         timer.collect()
     r.timer = None
-    GL.glFinish()
+    gl.glFinish()
     print(f"{build.describe()} --benchmark")
-    print(f"{describe_context(ctx, Gdk, GL)}, {w}x{h}, {frames} frames, timed by {timer.method}")
+    print(f"{describe_context(ctx, Gdk)}, {w}x{h}, {frames} frames, timed by {timer.method}")
     print(f"{'pass':12s} {'ms per frame':>12s}")
     total = 0.0
     for name in r.PASSES:

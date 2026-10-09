@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import hashlib
 from functools import lru_cache
-from importlib.metadata import PackageNotFoundError, version as _distribution_field
 from pathlib import Path
 
 PACKAGE = Path(__file__).resolve().parent
@@ -28,7 +27,16 @@ BUILD_FILE = ROOT / "BUILD_NUMBER"
 def _read_build_number() -> int:
     if BUILD_FILE.is_file():
         return int(BUILD_FILE.read_text(encoding="utf-8").strip())
-    try:   # an installed wheel: the packaging metadata field holds the build number
+    # An installed wheel: the packaging metadata field holds the build number. Its METADATA file
+    # sits beside the package; read there, it costs nothing, where importlib.metadata brings the
+    # email package and a few mebibytes with it, so that is only the fallback.
+    found = list(PACKAGE.parent.glob("syncrain-*.dist-info/METADATA"))
+    if len(found) == 1:                      # more than one is a broken install: let importlib decide
+        for line in found[0].read_text(encoding="utf-8").splitlines():
+            if line.startswith("Version:"):
+                return int(line.split(":", 1)[1].strip().split(".", 1)[0])
+    from importlib.metadata import PackageNotFoundError, version as _distribution_field
+    try:
         return int(_distribution_field("syncrain").split(".", 1)[0])
     except (PackageNotFoundError, ValueError) as exc:
         raise RuntimeError("cannot tell which syncrain build this is: "

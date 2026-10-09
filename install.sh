@@ -13,7 +13,9 @@
 #   ~/.config/systemd/user/syncrain.service  only with --autostart
 set -euo pipefail
 
-PACKAGES=(python python-gobject python-cairo python-opengl python-pillow gtk4 gtk4-layer-shell)
+PACKAGES=(python python-gobject python-cairo python-pillow gtk4 gtk4-layer-shell)
+# what the native wallpaper is built with (syncrain/native/build.sh); wayland and dbus are on every Plasma desktop
+BUILD_PACKAGES=(gcc pkgconf wayland dbus)
 PREFIX="${PREFIX:-$HOME/.local}"
 SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 AUTOSTART=0 UNINSTALL=0 NODEPS=0 YES=0
@@ -74,7 +76,7 @@ if [ "$UNINSTALL" = 1 ]; then
   fi
   rm -rf "$APPDIR" "$BINDIR/syncrain"
   info "removed $APPDIR and $BINDIR/syncrain"
-  info "pacman packages were left installed: ${PACKAGES[*]}"
+  info "pacman packages were left installed: ${PACKAGES[*]} ${BUILD_PACKAGES[*]}"
   exit 0
 fi
 
@@ -85,9 +87,9 @@ BUILD="$(tr -d '[:space:]' < "$SRC/BUILD_NUMBER")"
 
 # ---- 1. system packages
 if [ "$NODEPS" = 0 ]; then
-  command -v pacman >/dev/null || die "pacman not found: this script is for Arch-based systems (use --no-deps if you installed the dependencies yourself: ${PACKAGES[*]})"
+  command -v pacman >/dev/null || die "pacman not found: this script is for Arch-based systems (use --no-deps if you installed the dependencies yourself: ${PACKAGES[*]} ${BUILD_PACKAGES[*]})"
   missing=()
-  for p in "${PACKAGES[@]}"; do pacman -Qq "$p" >/dev/null 2>&1 || missing+=("$p"); done
+  for p in "${PACKAGES[@]}" "${BUILD_PACKAGES[@]}"; do pacman -Qq "$p" >/dev/null 2>&1 || missing+=("$p"); done
   if [ ${#missing[@]} -gt 0 ]; then
     bold "Installing packages: ${missing[*]}"
     confirm=(); [ "$YES" = 1 ] && confirm=(--noconfirm)
@@ -105,13 +107,15 @@ python3 - <<'EOF' || die "the Python dependencies did not load (see above)"
 import gi
 gi.require_version("Gtk", "4.0")
 from gi.repository import Gtk  # noqa: F401
-import OpenGL.GL  # noqa: F401
+import ctypes
+ctypes.CDLL("libepoxy.so.0")  # GTK's OpenGL loader, which syncrain calls OpenGL through
 import PIL  # noqa: F401
 import cairo  # noqa: F401
 try:
     gi.require_version("Gtk4LayerShell", "1.0")
 except ValueError:
-    print("  note: gtk4-layer-shell is missing, so syncrain only runs on X11 or in --window mode")
+    print("  note: gtk4-layer-shell is missing, so on Wayland only the native wallpaper can draw; "
+          "the GTK host runs on X11 or with --window")
 EOF
 
 # ---- 3. the app
@@ -130,6 +134,16 @@ cp -r "$SRC/syncrain" "$APPDIR/"
 find "$APPDIR" -name '__pycache__' -type d -prune -exec rm -rf {} +
 for f in BUILD_NUMBER README.md LICENSE; do [ -f "$SRC/$f" ] && cp "$SRC/$f" "$APPDIR/"; done
 if [ -f "$SRC/web/index.html" ]; then mkdir -p "$APPDIR/web" && cp "$SRC/web/index.html" "$APPDIR/web/"; fi
+
+# The native wallpaper (syncrain/native/) draws on Wayland with neither Python nor GTK in memory.
+# Without it, the Python and GTK host draws the same frames, as before.
+NATIVE="$APPDIR/syncrain/native/syncrain-wallpaper"
+if log="$(sh "$APPDIR/syncrain/native/build.sh" "$NATIVE" 2>&1)"; then
+  info "native wallpaper: built"
+else
+  printf '\033[33mnote:\033[0m the native wallpaper did not build, so the Python and GTK host draws instead (it is built with: %s):\n' "${BUILD_PACKAGES[*]}"
+  printf '%s\n' "$log" | tail -n 6 | sed 's/^/    /'
+fi
 
 cat > "$BINDIR/syncrain" <<EOF
 #!/bin/sh

@@ -5,16 +5,16 @@ is in `docs/build_notes/` and `docs/HISTORY.md`.
 
 ## Where things stand
 
-Build 7 (2026-10-07) fixes what reviews of builds 5 and 6 found: the lead before each frame follows
-what GTK reports, so frames stay on time on fast screens; the KWin script starts even when KWin
-reuses its number, cleans up after a crashed syncrain, costs KWin less during a drag and answers
-during it (build 6, which waited for a drag to end, was not delivered). Build 5, delivered before
-it, follows build 4's power sweep on the operator's RTX 5090 (the watts follow the frames,
-about 0.17 J a frame per screen; a covered wallpaper drew at full rate under KWin): on KDE Plasma a
-screen under a maximized or full-screen window is not drawn (`syncrain/hidden.py`), and frames land
-on whole refreshes, each drawn for the refresh it is shown on (`syncrain/pacing.py`). A headless KWin
-6.7.5 runs in the release's lanes, with a 141 Hz screen since build 6. The picture is build 3's.
-Build 4 runs on the operator's desktop; builds 5 and 7 have not run there yet.
+Build 8 (2026-10-09) answers the operator's memory and language question: on Wayland the wallpaper
+is a C program with neither Python nor GTK in memory (`syncrain/native/`), drawing the GTK host's
+frames to the pixel; in the sandbox it keeps about 136 MiB for two screens against build 7's 308,
+most of it the software renderer standing in for a graphics card. The Python and GTK host, which
+still draws on X11, in windows and wherever the native wallpaper cannot, is lighter too and no
+longer keeps 120 MiB after every screen change. The power sweep shows each phase's processor time
+and memory. Build 7 (2026-10-07) fixed what reviews of builds 5 and 6 found (frames on time on fast
+screens, the KWin script's starts and drags); build 5 stopped drawing covered screens on KDE Plasma
+and timed every frame to the refresh. The picture is build 3's. Build 7 runs on the operator's
+desktop; build 8 waits for their trial before it goes to GitHub.
 
 ## What is open
 
@@ -24,6 +24,9 @@ answered, with the answer under "Decisions answered".
 
 ### Questions for the operator
 
+* **Build 8 on GitHub** (2026-10-09): the operator asked to try build 8 before it is committed.
+  When it runs to their liking, it goes to `main` as the commit `syncrain build 8`; what they see
+  otherwise (btop's memory, the sweep's table, `syncrain --diagnose`) goes into build 9 first.
 * **The default frame rate** (asked 2026-10-07 12:25, with build 4's numbers from their card, two
   screens): (1) 30 fps, +10.6 W, as now; (2) 20 fps, +6.9 W; (3) 15 fps, +5.0 W. The fastest rain
   streams move about 21 rows a second, so below about 21 fps some skip a row now and then.
@@ -44,6 +47,15 @@ answered, with the answer under "Decisions answered".
 
 ### Decisions answered
 
+* **2026-10-09 07:05, before build 8**: "drop the memory leak assumption and instead optimize around
+  minimal memory footprint without sacrificing actual fps/watt ratio, because even more important is
+  power usage down", and whether "a full rust, c, asm, cpp or any other languages has anything to
+  offer here". Carried out by build 8: the native wallpaper in C (memory and processor time; the
+  card's watts follow the frames in any language), the GTK host lightened, the sweep measuring
+  processor time and memory beside the watts.
+* **2026-10-09 00:02, during build 8**: "do not push to github when done, instead, just deliver the
+  new build here in chat so I can try it out myself before we commit it". Build 8 is delivered in
+  the chat and waits (above).
 * **2026-10-08, after build 7**: "can you create a new github depository for this and make sure its
   properly documented?" The operator created github.com/Atyzze/syncrain; `main` holds build 7 as
   delivered, then commits that changed no behaviour (a README for visitors with a picture of each
@@ -69,9 +81,10 @@ answered, with the answer under "Decisions answered".
 
 ### Planned builds, in order
 
-1. **Build 8: from the operator's answers and a sweep of build 5 or 7 on their card**
-   (`docs/agent/NEXT_BUILD.md`): the default frame rate they choose; the pause as they want it;
-   anything the sweep shows (a covered screen should cost what "nothing" costs).
+1. **Build 9: from the operator's trial of build 8 and their answers** (`docs/agent/NEXT_BUILD.md`):
+   anything the native wallpaper does differently on their NVIDIA card; the default frame rate they
+   choose; the pause as they want it; anything a sweep shows (a covered screen should cost what
+   "nothing" costs).
 2. **The Plasma wallpaper plugin**, if the operator chooses it.
 3. **NixOS image**: syncrain as the default wallpaper of a NixOS image: a module option that turns
    it on for every graphical user, and a flake template for an image that has it.
@@ -111,7 +124,8 @@ Not to be argued again. A build that breaks one says why in its notes.
   release machine never ran; if one cannot run, fix the environment (`docs/agent/ENVIRONMENT.md`).
 * **The stream changes only on purpose**: `python3 tools/stream_freeze.py --write`, and the notes
   say the picture changed and that machines on the previous build stop matching.
-* **The page and the app draw the same frame**; the browser lane holds them to it.
+* **The page, the GTK host and the native wallpaper draw the same frame**; the browser lane holds
+  the page to the GTK host, the wayland lane the native wallpaper to it, to the pixel.
 * **Never ask GTK for an OpenGL version**; take what it hands out and check it.
 * **Nothing flashes.** Every motion is slow (the fastest colour cycle is a minute and a half), for
   photosensitivity; a "pixel cleaner" that strobes is out.

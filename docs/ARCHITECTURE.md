@@ -1,8 +1,8 @@
 # Architecture
 
-How a frame is made, why every machine on a channel makes the same one, and how the app, the
-page and the packages carry it. The recipes are in `docs/OPERATIONS.md`; why things are the way
-they are, case by case, is in `docs/LESSONS.md`.
+How a frame is made, why every machine on a channel makes the same one, and how the native
+wallpaper, the GTK host, the page and the packages carry it. The recipes are in
+`docs/OPERATIONS.md`; why things are the way they are, case by case, is in `docs/LESSONS.md`.
 
 ## The promise
 
@@ -11,8 +11,11 @@ loops, and any two machines whose clocks agree draw the same frame at the same m
 on the channel `public` see the same rain; `friends` is a different, equally endless stream.
 
 "The same frame" holds between machines whose stream fingerprints match (see "Builds and the
-stream" below). Between the native app and the web page of one build it holds to within texture
-filtering: 0.14 of 255 on average at 1280x720 (`tests/browser/test_the_web_page.py`).
+stream" below). Between the native wallpaper and the GTK host of one build it holds to the pixel
+on a screen at a whole-number scale (`tests/wayland/test_the_wallpaper_layer.py`; at a fractional
+scale the two sample the same picture differently, "Three hosts" below); between those and the web
+page, to within texture filtering: 0.14 of 255 on average at 1280x720
+(`tests/browser/test_the_web_page.py`).
 
 ## The clock and the channel (`syncrain/engine.py`)
 
@@ -32,7 +35,7 @@ filtering: 0.14 of 255 on average at 1280x720 (`tests/browser/test_the_web_page.
   or future moment. Mixing a public randomness beacon (drand) into the seed would make it truly
   random and keep everyone in sync; it is not implemented.
 
-## The six passes (`syncrain/data/shaders/`, driven by `syncrain/renderer.py` and `web/template.html`)
+## The six passes (`syncrain/data/shaders/`, driven by `syncrain/renderer.py`, `syncrain/native/render.c`, `web/template.html`)
 
 1. **state** (`state.frag`): a 64-column grid of cells. Each column gets one spawn chance per
    second; whether a drop spawns, its speed (7.5 to 20.8 rows a second), trail, brightness, start
@@ -78,14 +81,73 @@ pixels, which pixel fixers do by flashing colours fast, and syncrain never does 
   fails when one moves until `tools/stream_freeze.py --write` re-takes it, which a build does only
   on purpose and says so in its notes.
 
-## The native app (`syncrain/app.py`)
+## Three hosts over the same shaders
 
-* GTK 4 with a `Gtk.GLArea` per viewport and PyOpenGL. **OpenGL or OpenGL ES, whichever GTK hands
-  out**: GTK 4.14 and later create every context to share with the display's own, which is OpenGL
-  ES unless `GDK_DEBUG=gl-prefer-gl`. The app asks for no version (desktop "3.3" asked of OpenGL ES
-  matches nothing, which was build 2's grey screen on the operator's machine) and checks after the
-  fact that it got GL 3.3 or GLES 3.0; the shaders get the matching header (`#version 330 core`
-  or `#version 300 es` with high precision). Both draw the same frame, pixel for pixel on Mesa.
+The shaders are one set of files; three programs feed them and put their frames on screen. On a
+Wayland session the wallpaper is **the native wallpaper**, a C program with neither Python nor GTK
+in it (`syncrain/native/`); in a window, on X11, for screenshots and recordings and wherever the
+native wallpaper cannot draw, it is **the GTK host**, Python and GTK (`syncrain/app.py`); in a
+browser, **the page** (`web/template.html`). `syncrain` always starts in Python, reads its options
+and picks (`--host`: `auto`, `native` or `gtk`; `syncrain/native.py`). The two Linux hosts draw the
+same frame to the pixel on a screen at a whole-number scale (the wayland lane holds them to it),
+and the page draws it to within texture filtering (the browser lane).
+
+### The native wallpaper (`syncrain/native/`, started by `syncrain/native.py`)
+
+* **When**: on a Wayland session, for the wallpaper itself (not `--window`, `--screenshot`,
+  `--record`, nor build 4's `--pacing timer`), when the program is built: `install.sh` builds it
+  into the installed copy, beside its sources (syncrain/native/syncrain-wallpaper), the Nix package
+  into `libexec/`, and `SYNCRAIN_WALLPAPER` names it wherever it is.
+* **How it starts**: Python prepares the scene, everything a frame needs that never changes, with
+  the GTK host's own functions (`syncrain/renderer.py`: the shader sources, the textures' pixels,
+  the uniforms set once; `syncrain/hidden.py`: the KWin script; the command that starts the GTK
+  host, left out with `--host native`). It writes the scene to a memfd (contract
+  `syncrain-scene-1`; `syncrain/native/scene.c` says the format) and replaces its own process with
+  the program (`os.execve`): the same pid, and nothing of Python left. One source of truth: the C
+  side reads what Python made.
+* **What stays in memory**: the program (about 100 KB), libwayland, libEGL, libdbus and the
+  graphics driver. One EGL context draws every screen (each screen's surface made current in
+  turn), so the programs and textures exist once and each size's intermediate textures once; the
+  scene is unmapped as soon as its pixels are on the card, and the C heap is trimmed.
+* **The same frames**: `render.c` makes the same OpenGL calls in the same order as `renderer.py`,
+  and `timing.c` ports what a frame computes on the processor (the viewport's geometry, the clock's
+  split, the pacer) operation for operation, with Python's own float floor division and rounding,
+  so the doubles come out bit for bit the same (`tests/native/` compares them value for value).
+  The composite pass draws straight into the screen's buffer, where the GTK host draws into a
+  GLArea's texture that GTK then draws into the window again: one full-screen copy less per frame
+  and screen.
+* **Screens**: a layer-shell surface per screen (`zwlr_layer_shell_v1`), on the layer the GTK host
+  would take, click-through (an empty input region) and opaque, at the screen's own pixel size
+  (fractional scale and viewporter where the compositor has them). At a fractional scale (125%,
+  150%) GTK's GLArea draws at the next whole scale and GTK scales the picture down to the screen,
+  so there the GTK host draws 1.8 to 2.6 times the pixels for the same picture, a little softer.
+* **When a frame is drawn**: the pacer is `syncrain/pacing.py`'s, ported. Its refresh grid comes
+  from the compositor's presentation feedback (`wp_presentation`), read the way GTK's frame clock
+  reads it (`get_refresh_info`), and a frame is drawn only after the compositor has called back
+  for the one before, as GTK's frame clock waits, so a screen the compositor stops asking costs
+  nothing. `SYNCRAIN_DEBUG_FPS` reports as the GTK host does.
+* **Covered screens**: `kwin.c` loads the same KWin script over libdbus and believes only KWin's
+  bus name, as `syncrain/hidden.py` does ("Covered screens", below).
+* **When it cannot draw**: whatever fails before the first frame is shown (no Wayland, no
+  layer-shell, no EGL, an OpenGL too old, a shader the driver refuses, a first swap that fails)
+  hands over to the GTK host: the program runs the command the scene names, with gtk4-layer-shell
+  back in `LD_PRELOAD`, so the wallpaper draws wherever build 7 drew. After the first frame, a swap
+  that fails is dropped and the next frame tries again; when none can be shown for 5 s, or the
+  compositor goes away, the program stops with status 1, as GTK does, so its service starts it
+  again. `--probe` reports what it finds without drawing (`syncrain --diagnose`).
+* **Its startup line** names it: `syncrain build <N> (stream <id>): OpenGL ES 3.2 on <card>,
+  native wallpaper, 2 screens`.
+
+### The GTK host (`syncrain/app.py`)
+
+* GTK 4 with a `Gtk.GLArea` per viewport, and OpenGL through ctypes (`syncrain/gl.py`: the
+  functions come from libepoxy, GTK's own OpenGL loader, so no OpenGL binding and no numpy are
+  loaded). **OpenGL or OpenGL ES, whichever GTK hands out**: GTK 4.14 and later create every
+  context to share with the display's own, which is OpenGL ES unless `GDK_DEBUG=gl-prefer-gl`. The
+  app asks for no version (desktop "3.3" asked of OpenGL ES matches nothing, which was build 2's
+  grey screen on the operator's machine) and checks after the fact that it got GL 3.3 or GLES 3.0;
+  the shaders get the matching header (`#version 330 core` or `#version 300 es` with high
+  precision). Both draw the same frame, pixel for pixel on Mesa.
 * **Wayland**: one layer-shell surface per monitor through gtk4-layer-shell, which must be loaded
   before libwayland-client (the app re-executes itself once with `LD_PRELOAD`; the Nix wrapper and
   the installer's launcher preload it). The background layer everywhere except KDE Plasma, whose
@@ -101,9 +163,22 @@ pixels, which pixel fixers do by flashing colours fast, and syncrain never does 
 * **GTK's own OpenGL renderer** puts the picture on screen (`GSK_RENDERER=gl`, unless the user set
   it). On Wayland, GTK 4.16 and later otherwise draw with Vulkan and hand a GLArea's texture over
   every frame: through a dmabuf where the GL driver can export one, else through the processor, a
-  full screen per frame per screen.
+  full screen per frame per screen. With the OpenGL renderer, GTK's dmabufs are turned off too
+  (`GDK_DISABLE=dmabuf`): from 4.16 a GLArea exports every frame as a dmabuf, and the same renderer
+  imported it back, after starting a Vulkan renderer beside itself for the first one.
+* **Objects on the card**: the programs and the textures every frame reads are made once per
+  process; GTK makes every context of a display share objects, so every screen's context uses
+  them. Each screen's own targets are deleted when its area goes (the screens changed, or the app
+  stops). Build 7 made everything again for every screen and deleted nothing, and since textures
+  belong to the whole share group, every screen change (a screen unplugged, or a DisplayPort screen
+  waking from sleep) left about 120 MiB behind (`tests/render/test_the_gpu_objects.py`, and the
+  wayland lane's screen-change test).
+* **After startup**: once every screen has drawn its first frame, the app collects Python's
+  garbage and hands the C heap's free pages back (`settle_memory`); a frame makes no garbage, so
+  the collector has nothing to do after that.
 * **One line at startup** names the build, the stream, the OpenGL it got, GTK's renderer and the
-  screens: `syncrain build <N> (stream <id>): OpenGL ES 3.2 on <card>, GTK renderer gl, 2 screens`.
+  screens (the native wallpaper's says "native wallpaper" where this one names GTK's renderer):
+  `syncrain build <N> (stream <id>): OpenGL ES 3.2 on <card>, GTK renderer gl, 2 screens`.
 * **When a frame is drawn, and for which moment** (`syncrain/pacing.py`). Each screen asks for its
   next frame on its own: after a frame, the pacer takes the screen's refresh grid from GTK's frame
   clock (`get_refresh_info`, which GTK keeps from the compositor's presentation feedback) and picks
@@ -144,21 +219,34 @@ pixels, which pixel fixers do by flashing colours fast, and syncrain never does 
   and full-screen windows (KWin)" once KWin has answered.
 * `--diagnose` (`syncrain/diagnose.py`) runs the same checks without a window and prints a
   verdict first: the session, the libraries, the graphics cards from sysfs, the context GTK hands
-  out, the shaders compiled on it, one frame drawn offscreen and, on Plasma, what KWin says about
-  covered screens.
+  out, the shaders compiled on it, one frame drawn offscreen, whether the native wallpaper is built
+  and what it finds here (its `--probe`) and, on Plasma, what KWin says about covered screens.
 
 ## Where a frame's work goes
 
 Every pixel is computed on the graphics card by the shaders, which its driver compiles to the card's
 own code; there is no faster language to rewrite them in, only less work to give them. The host
-(`syncrain/renderer.py`) issues about forty OpenGL calls a frame, everything that never changes
-having been set when the programs were built: about 0.6 ms of one CPU thread per frame in the
-sandbox. On the sandbox's software renderer at 1920x1080 the composite pass is 88% of a frame (the
-four snow layers half of it) and the two quarter-size blurs 9%. `syncrain --benchmark` measures the
-same on a real card; `syncrain --power-sweep` measures what it costs in watts (`syncrain/power.py`).
+issues about forty OpenGL calls a frame (`syncrain/renderer.py`, or `syncrain/native/render.c`),
+everything that never changes having been set when the programs were built. Around those calls,
+the GTK host runs Python and GTK's frame clock and draws the frame's texture into the window once
+more; the native wallpaper runs a few hundred lines of C and draws nothing twice (build 8's notes
+have the processor time of each). On the sandbox's software renderer at 1920x1080 the composite
+pass is 88% of a frame (the four snow layers half of it) and the two quarter-size blurs 9%.
+`syncrain --benchmark` measures the same on a real card; `syncrain --power-sweep` measures what it
+costs in watts (`syncrain/power.py`).
 On the operator's RTX 5090 the watts follow the frames, not the pixels: about 0.17 J a frame per
 screen, of which halving the resolution saves an eighth (build 4's sweep). Most of a frame's cost is
 the card waking for it, so what saves power is drawing fewer frames, and none that nobody sees.
+
+## Where the memory goes
+
+What a wallpaper keeps resident is mostly what it loads, not what it draws: the interpreter and
+toolkit it runs in, and the graphics driver, whose share depends on the driver. The native
+wallpaper loads neither Python nor GTK; what it keeps beyond the driver is a few MiB. In the
+sandbox, where the driver is Mesa's llvmpipe (LLVM compiling the shaders for the processor), two
+screens cost build 7 about 308 MiB, the GTK host of build 8 about 263 MiB and the native wallpaper
+about 136 MiB, of which llvmpipe is about 130 (build 8's notes have the breakdown). The power
+sweep prints each phase's resident memory beside its watts (`docs/OPERATIONS.md`, "Power").
 
 ## The web page (`web/template.html`, `tools/build_web.py`)
 
@@ -171,10 +259,14 @@ the release rebuilds them and the gate fails when they differ from what the gene
 ## Packaging
 
 * `install.sh`: the Arch-family installer (pacman packages, then everything in `~/.local`, an
-  optional systemd user service). It reads `BUILD_NUMBER`, names upgrades, restarts a running
-  wallpaper, and writes a launcher that preloads gtk4-layer-shell and sets `PYTHONSAFEPATH`.
-* `nix/`: the package (version from `BUILD_NUMBER`), the web bundle, a NixOS module and a
-  home-manager module sharing `nix/options.nix` and `nix/args.nix`; `flake.nix` exposes them.
+  optional systemd user service). It reads `BUILD_NUMBER`, names upgrades, builds the native
+  wallpaper into the installed copy (`syncrain/native/build.sh`; when it cannot, it says so and the
+  GTK host draws), restarts a running wallpaper, and writes a launcher that preloads
+  gtk4-layer-shell and sets `PYTHONSAFEPATH`.
+* `nix/`: the package (version from `BUILD_NUMBER`; the native wallpaper built into `libexec/`,
+  opening libglvnd's libEGL, which finds the system's driver, and named by the wrapper's
+  `SYNCRAIN_WALLPAPER`), the web bundle, a NixOS module and a home-manager module sharing
+  `nix/options.nix` and `nix/args.nix`; `flake.nix` exposes them.
 * systemd quoting, everywhere a service line is written: each argument's backslashes, `%` and `$`
   are doubled, then it is single-quoted, because systemd unescapes inside single quotes, expands
   specifiers before splitting and variables after (`tests/support.py`, `systemd_exec_words`).

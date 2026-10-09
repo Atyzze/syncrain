@@ -50,7 +50,7 @@ def graphics_cards() -> list[str]:
 def session_lines() -> list[str]:
     keys = ("XDG_SESSION_TYPE", "XDG_CURRENT_DESKTOP", "WAYLAND_DISPLAY", "DISPLAY", "GDK_BACKEND",
             "GDK_DEBUG", "GDK_DISABLE", "GSK_RENDERER", "LIBGL_ALWAYS_SOFTWARE", "__GLX_VENDOR_LIBRARY_NAME",
-            "__EGL_VENDOR_LIBRARY_FILENAMES", "PYOPENGL_PLATFORM")
+            "__EGL_VENDOR_LIBRARY_FILENAMES", "SYNCRAIN_WALLPAPER")
     lines = [f"{k}={os.environ[k]}" for k in keys if os.environ.get(k)]
     preload = os.environ.get("LD_PRELOAD", "")
     lines.append("gtk4-layer-shell preloaded: " + ("yes" if "gtk4-layer-shell" in preload else "no"))
@@ -60,10 +60,8 @@ def session_lines() -> list[str]:
 def library_lines(Gtk) -> tuple[list[str], bool | None]:
     """The versions that matter, and whether the compositor offers a wallpaper layer (None: not asked)."""
     import gi
-    import OpenGL
     import PIL
-    lines = [f"Python {platform.python_version()}, PyGObject {gi.__version__}, PyOpenGL {OpenGL.__version__}, "
-             f"Pillow {PIL.__version__}",
+    lines = [f"Python {platform.python_version()}, PyGObject {gi.__version__}, Pillow {PIL.__version__}",
              f"GTK {Gtk.get_major_version()}.{Gtk.get_minor_version()}.{Gtk.get_micro_version()}"]
     layer = None
     try:
@@ -78,26 +76,25 @@ def library_lines(Gtk) -> tuple[list[str], bool | None]:
     return lines, layer
 
 
-def draw_one_frame(args, use_es, GL):
+def draw_one_frame(args, use_es, gl):
     """Compile everything and draw the theme offscreen at a fixed moment; return (mean, lit share)."""
     from .renderer import Renderer
     w, h = 640, 360
     r = Renderer(theme=args.theme, channel=args.channel, logo=args.logo,
                  rainbow=args.rainbow, spin=args.spin, drift=args.drift)
     r.init(use_es)
-    fbo, tex = GL.glGenFramebuffers(1), GL.glGenTextures(1)
-    GL.glBindTexture(GL.GL_TEXTURE_2D, tex)
-    GL.glTexImage2D(GL.GL_TEXTURE_2D, 0, GL.GL_RGBA8, w, h, 0, GL.GL_RGBA, GL.GL_UNSIGNED_BYTE, None)
-    GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, fbo)
-    GL.glFramebufferTexture2D(GL.GL_FRAMEBUFFER, GL.GL_COLOR_ATTACHMENT0, GL.GL_TEXTURE_2D, tex, 0)
-    status = GL.glCheckFramebufferStatus(GL.GL_FRAMEBUFFER)
-    if status != GL.GL_FRAMEBUFFER_COMPLETE:
+    fbo, tex = gl.gen_framebuffer(), gl.gen_texture()
+    gl.glBindTexture(gl.GL_TEXTURE_2D, tex)
+    gl.glTexImage2D(gl.GL_TEXTURE_2D, 0, gl.GL_RGBA8, w, h, 0, gl.GL_RGBA, gl.GL_UNSIGNED_BYTE, None)
+    gl.glBindFramebuffer(gl.GL_FRAMEBUFFER, fbo)
+    gl.glFramebufferTexture2D(gl.GL_FRAMEBUFFER, gl.GL_COLOR_ATTACHMENT0, gl.GL_TEXTURE_2D, tex, 0)
+    status = gl.glCheckFramebufferStatus(gl.GL_FRAMEBUFFER)
+    if status != gl.GL_FRAMEBUFFER_COMPLETE:
         raise RuntimeError(f"offscreen target incomplete (status {int(status):#x})")
     started = time.monotonic()
     r.render(1791331200.0, fbo, 0, 0, w, h)
-    GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, fbo)
-    GL.glPixelStorei(GL.GL_PACK_ALIGNMENT, 1)
-    data = bytes(GL.glReadPixels(0, 0, w, h, GL.GL_RGBA, GL.GL_UNSIGNED_BYTE))
+    gl.glBindFramebuffer(gl.GL_FRAMEBUFFER, fbo)
+    data = gl.read_pixels(0, 0, w, h)
     elapsed = time.monotonic() - started
     lum = [data[i] + data[i + 1] + data[i + 2] for i in range(0, len(data), 4)]
     mean = sum(lum) / (3 * len(lum))
@@ -170,6 +167,20 @@ def covering_lines(args) -> list[str]:
     return lines
 
 
+def native_lines(args) -> list[str]:
+    """Whether the native wallpaper is built, and what it finds here (`syncrain-wallpaper --probe`)."""
+    from . import native
+    path = native.binary()
+    if not path:
+        return ["not built, so the GTK host draws the wallpaper (install.sh builds it with a C compiler, "
+                "pkg-config, wayland-scanner and the libwayland and libdbus headers)"]
+    lines = [f"program: {path}"]
+    if not native.wayland_session():
+        return lines + ["not used in this session: it draws the wallpaper on Wayland only"]
+    _code, found = native.probe(args, path)
+    return lines + found
+
+
 def run(args) -> int:
     out: list[str] = []
     verdict = None
@@ -181,6 +192,8 @@ def run(args) -> int:
 
     section("session", session_lines())
     section("graphics cards", graphics_cards())
+    from .app import use_gl_renderer
+    use_gl_renderer()                        # what the wallpaper itself does, so the answer is about it
     try:
         import gi
         gi.require_version("Gtk", "4.0")
@@ -191,20 +204,16 @@ def run(args) -> int:
         Gtk = Gdk = None
     display = None
     if Gtk is not None:
-        from .app import use_gl_renderer
-        use_gl_renderer()                    # what the wallpaper itself does, so the answer is about it
         Gtk.init()
         display = Gdk.Display.get_default()
         if display is None:
             verdict, code = "no display: run this inside your desktop session, not over SSH or a TTY", 1
     if display is not None:
         backend = type(display).__name__.replace("Gdk", "").replace("Display", "") or "unknown"
-        if backend == "Wayland":
-            os.environ.setdefault("PYOPENGL_PLATFORM", "egl")
         libs, layer = library_lines(Gtk)
         section("libraries", libs + [f"GDK backend: {backend}"])
         section("screens", screen_lines(display))
-        from OpenGL import GL
+        from . import gl
         from .app import EXIT_NO_GL, gl_context_problem
 
         gl_lines = []
@@ -220,7 +229,7 @@ def run(args) -> int:
             use_es, problem = gl_context_problem(ctx, Gdk)
             for name in ("GL_VENDOR", "GL_RENDERER", "GL_VERSION", "GL_SHADING_LANGUAGE_VERSION"):
                 try:
-                    gl_lines.append(f"{name}: {GL.glGetString(getattr(GL, name)).decode(errors='replace')}")
+                    gl_lines.append(f"{name}: {gl.get_string(getattr(gl, name))}")
                 except Exception as e:  # noqa: BLE001
                     gl_lines.append(f"{name}: unreadable ({e})")
             major, minor = ctx.get_version()
@@ -229,7 +238,7 @@ def run(args) -> int:
                 verdict, code = problem, EXIT_NO_GL
             else:
                 try:
-                    mean, lit, elapsed = draw_one_frame(args, use_es, GL)
+                    mean, lit, elapsed = draw_one_frame(args, use_es, gl)
                     gl_lines.append(f"test frame: 640x360 in {elapsed * 1000:.0f} ms, mean brightness {mean:.1f}, "
                                     f"{lit * 100:.1f}% of pixels lit")
                     if mean < 1.0:
@@ -241,6 +250,7 @@ def run(args) -> int:
             section("OpenGL", gl_lines)
         if backend == "Wayland" and layer:
             section("covering windows", covering_lines(args))
+        section("native wallpaper", native_lines(args))
         if verdict is None:
             kind = "OpenGL ES" if use_es else "OpenGL"
             verdict = f"OK, syncrain can draw here ({kind} {major}.{minor})"

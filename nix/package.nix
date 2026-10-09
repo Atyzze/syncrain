@@ -5,6 +5,11 @@
   gobject-introspection,
   gtk4,
   gtk4-layer-shell,
+  pkg-config,
+  wayland,
+  wayland-scanner,
+  dbus,
+  libglvnd,
 }:
 
 python3Packages.buildPythonApplication {
@@ -23,25 +28,39 @@ python3Packages.buildPythonApplication {
   nativeBuildInputs = [
     wrapGAppsHook4
     gobject-introspection
+    pkg-config
+    wayland-scanner
   ];
 
   buildInputs = [
     gtk4
     gtk4-layer-shell
+    wayland
+    dbus
   ];
 
   dependencies = with python3Packages; [
     pygobject3
-    pyopengl
     pillow
   ];
 
-  # one wrapper: GTK/GI paths from wrapGAppsHook4, plus gtk4-layer-shell loaded before libwayland-client
+  # The native wallpaper (syncrain/native/): on Wayland it draws with neither Python nor GTK in
+  # memory. It opens EGL when it starts; libglvnd's finds the system's driver (/run/opengl-driver).
+  postBuild = ''
+    SYNCRAIN_LIBEGL=${lib.getLib libglvnd}/lib/libEGL.so.1 sh syncrain/native/build.sh native/syncrain-wallpaper
+  '';
+  postInstall = ''
+    install -Dm755 native/syncrain-wallpaper $out/libexec/syncrain/syncrain-wallpaper
+  '';
+
+  # one wrapper: GTK/GI paths from wrapGAppsHook4, gtk4-layer-shell loaded before libwayland-client,
+  # and where the native wallpaper is
   dontWrapGApps = true;
   preFixup = ''
     makeWrapperArgs+=(
       "''${gappsWrapperArgs[@]}"
       --prefix LD_PRELOAD : ${gtk4-layer-shell}/lib/libgtk4-layer-shell.so
+      --set-default SYNCRAIN_WALLPAPER $out/libexec/syncrain/syncrain-wallpaper
     )
   '';
 

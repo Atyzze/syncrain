@@ -24,8 +24,9 @@ turning slowly through the rainbow) and **matrix** (green). It runs as a wallpap
   Plasma it covers the desktop icons, which still take the clicks. On X11 it is the desktop window
   itself.
 * **Frugal.** Frames are capped and timed to the screen's refresh wherever a compositor reports it,
-  and on Wayland a screen hidden by a window is not drawn. `syncrain --power-sweep` measures what it
-  costs on your graphics card.
+  and on Wayland a screen hidden by a window is not drawn. On Wayland the wallpaper is a small C
+  program with neither Python nor GTK in memory. `syncrain --power-sweep` measures what it costs on
+  your graphics card.
 * **Easy on screens and eyes.** Nothing stays put, against burn-in: the logo turns, drifts and
   cycles through the rainbow. Nothing flashes.
 
@@ -76,7 +77,7 @@ whoever makes the next build. Read these, in this order:
 5. [`docs/agent/ENVIRONMENT.md`](docs/agent/ENVIRONMENT.md): the agent sandbox: bring-up, the lanes, the traps
 6. [`docs/agent/TARGET_ENVIRONMENT.md`](docs/agent/TARGET_ENVIRONMENT.md): the machines syncrain runs on
 7. [`docs/ROADMAP.md`](docs/ROADMAP.md): what is open, in order; the build cadence; standing constraints
-8. [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md): the clock, the passes, the stream, the app, the page, the packages
+8. [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md): the clock, the passes, the stream, the hosts, the page, the packages
 9. [`docs/OPERATIONS.md`](docs/OPERATIONS.md): every option and recipe: install, upgrade, run, diagnose, record
 10. [`docs/LESSONS.md`](docs/LESSONS.md): the rules this project learned by shipping their opposite
 11. [`docs/HISTORY.md`](docs/HISTORY.md): a line per build, and the operator's decisions
@@ -107,10 +108,11 @@ from the last archive.
     python3 tools/test_suite.py                  # every lane this machine can run; the rest skip with a reason
     python3 tools/stream_freeze.py               # the stream has not moved
 
-The lanes: unit, contract (the project's rules), render (the app on Xvfb), wayland (the wallpaper
-layer in a headless Sway), kwin (the wallpaper on a headless KWin 6, Plasma's compositor: covered
-screens and frame timing), browser (the page in Chromium, and against the app), nix (the package
-and both services, evaluated and built). What each needs: `docs/agent/ENVIRONMENT.md`.
+The lanes: unit, contract (the project's rules), native (the C wallpaper built and checked against
+the Python host's arithmetic), render (the GTK host on Xvfb), wayland (the wallpaper layer in a
+headless Sway, drawn by both hosts), kwin (the wallpaper on a headless KWin 6, Plasma's compositor:
+covered screens and frame timing), browser (the page in Chromium, and against the GTK host), nix
+(the package and both services, evaluated and built, and the package's native wallpaper run). What each needs: `docs/agent/ENVIRONMENT.md`.
 
 ### Releasing
 
@@ -141,8 +143,12 @@ handoff and `docs/agent/NEXT_BUILD.md` (which names the build after it). The gat
 * **Never ask GTK for an OpenGL version.** GTK hands out OpenGL ES unless told otherwise; build 2
   asked for "3.3" and drew nothing on the operator's machine. Take what comes and check it
   (`syncrain/app.py`, `gl_context_problem`).
-* **The page and the app are two implementations of the host side** (JavaScript and Python) over
-  the same shaders. Change one, change the other; the browser lane compares their frames.
+* **There are three implementations of the host side** over the same shaders: the page
+  (JavaScript), the GTK host (Python) and the native wallpaper (C). Change one, change the others.
+  The browser lane compares the page with the GTK host, the wayland lane the native wallpaper with
+  the GTK host, to the pixel, and `tests/native/` the C arithmetic with the Python, to the bit.
+  The C side gets everything that never changes from the Python side (`syncrain/native.py`) and
+  must compute the rest as Python does: Python's float floor division and rounding are not C's.
 * **systemd unescapes inside single quotes.** Every service line goes through the same quoting
   (`docs/ARCHITECTURE.md`, "Packaging"), and the tests parse it the way systemd does.
 
@@ -155,20 +161,29 @@ handoff and `docs/agent/NEXT_BUILD.md` (which names the build after it). The gat
   shell is not.
 * **What the operator's machine runs.** The launcher's module path, preloading, systemd quoting:
   each was right in the sandbox and wrong somewhere else once (`docs/LESSONS.md`).
+* **The driver under the native wallpaper.** The sandbox has only Mesa; the native wallpaper's own
+  EGL (a window surface per screen, one context for all of them) first meets NVIDIA's driver on the
+  operator's machine. What fails before the first frame hands over to the GTK host; after it, a
+  frame that cannot be shown is tried again, and 5 s of them stop the wallpaper with status 1 for
+  its service to start it again, without the GTK host.
 
 ### Layout
 
-    syncrain/            the app: app.py (windows, layers, OpenGL, signals), renderer.py (the six passes),
-                         pacing.py (when frames are drawn), hidden.py (KWin: covered screens),
-                         engine.py (clock, seed, motion), build.py (build number, stream fingerprint),
-                         diagnose.py, bench.py (--benchmark), power.py (--power-sweep), cover.py,
-                         data/ (shaders, themes.json, glyph atlas, logos)
+    syncrain/            the app: app.py (options, the GTK host: windows, layers, signals), gl.py (OpenGL
+                         through libepoxy), renderer.py (the six passes), pacing.py (when frames are
+                         drawn), hidden.py (KWin: covered screens), native.py (starts the native
+                         wallpaper), engine.py (clock, seed, motion), build.py (build number, stream
+                         fingerprint), diagnose.py, bench.py (--benchmark), power.py (--power-sweep),
+                         cover.py, data/ (shaders, themes.json, glyph atlas, logos)
+    syncrain/native/     the native wallpaper in C: wallpaper.c (Wayland, screens, the loop), render.c
+                         (EGL, the six passes), timing.c (geometry, clock, pacer), kwin.c, scene.c,
+                         build.sh, protocols/
     web/                 template.html, and index.html and artifact.html generated from it
     nix/                 the package, the web bundle, the NixOS and home-manager modules
     install.sh           the Arch-family installer
     tools/               package_release.py, test_suite.py, stream_freeze.py, build_web.py, build_assets.py,
                          prepare_environment.sh
-    tests/               unit, contract, render, wayland, kwin, browser, nix; fixtures/stream_freeze.json
+    tests/               unit, contract, native, render, wayland, kwin, browser, nix; fixtures/stream_freeze.json
     extras/              the CachyOS logo mask
     docs/                everything above; images/ holds this page's pictures
 

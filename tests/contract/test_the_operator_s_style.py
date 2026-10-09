@@ -15,7 +15,7 @@ from tests.support import our_text_files
 
 LONG_DASHES = ("\u2014", "\u2013")   # em dash, en dash
 PRONOUN = re.compile(r"\b(he|He|him|Him|his|His|himself|she|She|her|Her|herself)\b")
-LABEL = re.compile(r"^\s*(?:#+|//+|/\*+)\s*:?\s*(?:Builds?\s+)?\d+[a-z]?(?:\s*(?:,|and|to|&|/)\s*\d+)*\s*[:.]\s")
+LABEL = re.compile(r"^\s*(?:#+|//+|/\*+|\*+)\s*:?\s*(?:Builds?\s+)?\d+[a-z]?(?:\s*(?:,|and|to|&|/)\s*\d+)*\s*[:.]\s")
 
 
 def test_no_long_dashes(root):
@@ -41,7 +41,8 @@ def test_the_operator_is_they(root):
 def test_comments_say_why_not_when(root):
     found = []
     for path in our_text_files():
-        if path.suffix not in {".py", ".sh", ".nix", ".glsl", ".frag", ".vert", ".js"} and path.name != "template.html":
+        if path.suffix not in {".py", ".sh", ".nix", ".glsl", ".frag", ".vert", ".js", ".c", ".h"} \
+                and path.name != "template.html":
             continue
         for n, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
             if LABEL.match(line):
@@ -50,7 +51,8 @@ def test_comments_say_why_not_when(root):
 
 
 def test_the_label_rule_refuses_a_label_and_spares_a_sentence():
-    for label in ("# Build 2: the launcher", "# 3: gone", "// Build 12. why", "# Builds 4 and 5: both"):
+    for label in ("# Build 2: the launcher", "# 3: gone", "// Build 12. why", "# Builds 4 and 5: both",
+                  " * Build 8: inside a C comment"):
         assert LABEL.match(label), label
     for sentence in ("# Build 2 started the unpacked copy", "# 30 fps is the cap", "# 64 columns: why"):
         assert not LABEL.match(sentence), sentence

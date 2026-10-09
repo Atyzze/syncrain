@@ -10,3 +10,5 @@ var/
 .pytest_cache/
 .venv/
 venv/
+# the native wallpaper, built by install.sh into an installed copy (or by hand into a tree)
+syncrain-wallpaper

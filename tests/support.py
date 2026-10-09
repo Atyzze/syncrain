@@ -1,6 +1,11 @@
 """Helpers the lanes share (imported as `tests.support`; fixtures live in conftest.py)."""
 from __future__ import annotations
 
+import contextlib
+import os
+import signal
+import subprocess
+import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -27,10 +32,54 @@ def brightness(path: Path) -> float:
     return sum(ImageStat.Stat(Image.open(path).convert("RGB")).mean) / 3
 
 
+class Session(dict):
+    """The environment a client reaches a compositor with; `compositor` is the compositor's process."""
+
+    compositor: subprocess.Popen
+
+
+@contextlib.contextmanager
+def headless_sway(run: Path, screen: str = "1280x720"):
+    """A headless Sway with one screen of `screen` (WxH), run from the new runtime directory `run`:
+    yields the environment a client reaches it with (XDG_RUNTIME_DIR, WAYLAND_DISPLAY, SWAYSOCK), as a
+    Session."""
+    run.mkdir(mode=0o700, parents=True)
+    (run / "sway.conf").write_text(f"output * resolution {screen}\ndefault_border none\n")
+    env = dict(os.environ, XDG_RUNTIME_DIR=str(run), WLR_BACKENDS="headless", WLR_LIBINPUT_NO_DEVICES="1",
+               WLR_RENDERER="pixman", WLR_HEADLESS_OUTPUTS="1")
+    env.pop("WAYLAND_DISPLAY", None)
+    env.pop("DISPLAY", None)
+    compositor = subprocess.Popen(["sway", "-c", str(run / "sway.conf")], env=env, stdout=subprocess.DEVNULL,
+                                  stderr=subprocess.DEVNULL, start_new_session=True)
+    try:
+        deadline = time.monotonic() + 20
+        while not (list(run.glob("wayland-*[0-9]")) and list(run.glob("sway-ipc.*"))):
+            if compositor.poll() is not None or time.monotonic() > deadline:
+                raise RuntimeError("headless sway did not start")
+            time.sleep(0.1)
+        session = Session(XDG_RUNTIME_DIR=str(run), WAYLAND_DISPLAY=sorted(p.name for p in run.glob("wayland-*[0-9]"))[0],
+                          SWAYSOCK=str(sorted(run.glob("sway-ipc.*"))[0]))
+        session.compositor = compositor
+        yield session
+    finally:
+        if compositor.poll() is None:
+            compositor.send_signal(signal.SIGTERM)
+        try:
+            compositor.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            compositor.kill()
+
+
+def grab(session: dict, path: Path) -> None:
+    """What the Wayland session's screen shows, as a PNG (grim)."""
+    subprocess.run(["grim", str(path)], env=dict(os.environ, **session), check=True, timeout=30)
+
+
 def our_text_files() -> list[Path]:
     """Every text file this project wrote (not generated pages, not binary assets, not caches)."""
     skip_dirs = {".git", "__pycache__", "var", "result", "build", "dist", ".pytest_cache"}
-    suffixes = {".py", ".md", ".sh", ".nix", ".toml", ".glsl", ".frag", ".vert", ".js", ".json", ".txt"}
+    suffixes = {".py", ".md", ".sh", ".nix", ".toml", ".glsl", ".frag", ".vert", ".js", ".json", ".txt", ".c",
+                ".h"}
     generated = {ROOT / "web" / "index.html", ROOT / "web" / "artifact.html"}
     files = [p for p in ROOT.rglob("*") if p.is_file() and not (set(p.relative_to(ROOT).parts) & skip_dirs)
              and (p.suffix in suffixes or p.name in {"template.html", "LICENSE", ".gitignore"})

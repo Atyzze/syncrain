@@ -2,7 +2,9 @@
 and what each phase runs. The whole sweep runs in the render lane, with a stand-in power reading."""
 from __future__ import annotations
 
+import os
 import threading
+import time
 
 from syncrain import power
 from syncrain.app import parse_args
@@ -53,9 +55,11 @@ def test_other_wallpapers_are_found_however_they_were_started(tmp_path):
         103: ["python3", "-m", "syncrain", "--diagnose"],                              # a tool, not a wallpaper
         104: ["nvim", "syncrain"],                                                    # a folder of that name
         105: ["python3", "-m", "syncrain", "--power-sweep"],                           # the sweep itself
+        106: ["/opt/syncrain/syncrain/native/syncrain-wallpaper", "--scene", "3", "--fps", "30.0"],  # exec'd
+        107: ["/usr/bin/syncrain-wallpaper-editor"],                                  # a name that only starts so
     })
-    assert sorted(pid for pid, _ in power.running_wallpapers(proc)) == [101, 102]
-    assert power.running_wallpapers(proc, exclude={101, 102}) == []
+    assert sorted(pid for pid, _ in power.running_wallpapers(proc)) == [101, 102, 106]
+    assert power.running_wallpapers(proc, exclude={101, 102, 106}) == []
 
 
 def test_every_phase_is_named_once_and_the_sweep_starts_from_nothing():
@@ -65,6 +69,8 @@ def test_every_phase_is_named_once_and_the_sweep_starts_from_nothing():
     assert names[0].startswith("nothing") and plan[0]["child"] is False
     assert {p.get("cover") for p in plan} >= {"maximized", "fullscreen"}, "behind both kinds of window"
     assert any(p.get("args") == ["--pacing", "timer"] for p in plan), "build 4's frame timer, for comparison"
+    assert names[1].startswith("as installed") and plan[1]["args"] == []
+    assert plan[2]["args"] == ["--host", "gtk"], "the Python and GTK host right after, to compare with"
 
 
 def test_the_phases_run_with_the_wallpaper_s_own_options():
@@ -73,6 +79,26 @@ def test_the_phases_run_with_the_wallpaper_s_own_options():
     assert power.base_args(parse_args(["--power-sweep"])) == []
     assert power.base_args(parse_args(["--power-sweep", "--pause-under", "fullscreen"])) == \
         ["--pause-under", "fullscreen"]
+    assert power.base_args(parse_args(["--power-sweep", "--host", "gtk"])) == ["--host", "gtk"]
+
+
+def test_each_phase_says_what_drew_it():
+    assert power.drawn_by("syncrain build 8 (stream x): OpenGL ES 3.2 on y, native wallpaper, 2 screens") == "native"
+    assert power.drawn_by("syncrain build 8 (stream x): OpenGL 4.6 on y, GTK renderer gl, 2 screens") == "gl"
+    assert power.drawn_by("") == ""
+
+
+def test_the_wallpaper_s_processor_time_and_memory_are_read_from_proc():
+    child = power.Child.__new__(power.Child)
+    child.proc = type("Proc", (), {"pid": os.getpid()})()
+    before = child.cpu_seconds()
+    deadline = time.monotonic() + 10
+    while child.cpu_seconds() == before and time.monotonic() < deadline:
+        sum(i * i for i in range(20_000))
+    assert before is not None and child.cpu_seconds() > before
+    assert 1 < child.resident_mib() < 4096
+    child.proc.pid = 2 ** 22 + 1                      # above the kernel's largest pid: no such process
+    assert child.cpu_seconds() is None and child.resident_mib() is None
 
 
 def test_the_frame_rate_reports_are_read_per_screen():

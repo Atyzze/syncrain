@@ -7,6 +7,13 @@ Plasma's shell is not here (no panel, no desktop); KWin is, with the scripting A
 pause uses (syncrain/hidden.py). Build 4's sweep found KWin asking a covered wallpaper for frames
 at full rate on the operator's desktop; the first test shows KWin still does, and the rest hold
 build 5's answer: a screen under a maximized or full-screen window is not drawn until it shows.
+The wallpaper is the native one (syncrain/native/, built by the lane), as on the operator's
+desktop; the full-screen pause is also checked with the GTK host (--host gtk), and build 4's frame
+timer (--pacing timer), which the GTK host keeps, is timed beside the pacer.
+
+The frame timing is judged by the median of six 2-second reports. KWin composites in software here
+and the wallpaper draws with llvmpipe on the same two processors, so a frame now and then takes
+three times as long as usual; a median rides over those moments, a minimum does not.
 
 Needs KWin 6 (SYNCRAIN_KWIN, or kwin_wayland on PATH), dbus-daemon and dbus-send, gtk4-layer-shell's
 typelib, and two processors or more (docs/agent/ENVIRONMENT.md).
@@ -23,6 +30,7 @@ import subprocess
 import sys
 import threading
 import time
+from statistics import median
 
 import pytest
 
@@ -179,7 +187,7 @@ def needs():
 
 
 @pytest.fixture(scope="module")
-def two(tmp_path_factory):
+def two(tmp_path_factory, native_wallpaper):
     """Two small screens: software rendering here takes about 6 ms a frame at 320x180, so two screens
     at 30 fps leave the processors room for KWin, and the timing measured is the pacing's."""
     needs()
@@ -189,7 +197,7 @@ def two(tmp_path_factory):
 
 
 @pytest.fixture(scope="module")
-def fast(tmp_path_factory):
+def fast(tmp_path_factory, native_wallpaper):
     """One small screen at 141 Hz, where a frame has 7 ms instead of 16.7 in which to reach KWin."""
     needs()
     session = Session(tmp_path_factory.mktemp("kwinfast"), screens=1, size=(320, 180), outputs=FAST_SCREEN)
@@ -198,7 +206,7 @@ def fast(tmp_path_factory):
 
 
 @pytest.fixture(scope="module")
-def one(tmp_path_factory):
+def one(tmp_path_factory, native_wallpaper):
     """One small screen, like `two`: at 640x360 a frame takes 18 ms here, more than half a refresh."""
     needs()
     session = Session(tmp_path_factory.mktemp("kwin1"), screens=1, size=(320, 180))
@@ -242,8 +250,9 @@ def test_kwin_still_asks_a_covered_wallpaper_for_frames(two):
         assert p.stop() == 0
 
 
-def test_a_full_screen_window_stops_the_drawing_until_it_goes(two):
-    p = two.syncrain()
+@pytest.mark.parametrize("host", ["auto", "gtk"], ids=["native", "gtk-host"])
+def test_a_full_screen_window_stops_the_drawing_until_it_goes(two, host):
+    p = two.syncrain("--host", host)
     cover = None
     try:
         started(p, 2)
@@ -363,31 +372,31 @@ def test_the_script_leaves_kwin_with_the_wallpaper(two):
     assert not list(two.run.glob("syncrain-watch-*.js")), "the script file was left behind"
 
 
+def settled_timing(session, *args, skip=6.0, count=6):
+    """Reports after the pacer has had `skip` seconds to find the screen's timing."""
+    p = session.syncrain(*args, SYNCRAIN_DEBUG_FPS="2")
+    try:
+        t, _ = p.wait_for(r"^syncrain: drawing pauses")
+        deadline = time.monotonic() + 60
+        while len(p.reports(t + skip)) < count and time.monotonic() < deadline:
+            time.sleep(0.2)
+        return p.reports(t + skip)[:count]
+    finally:
+        assert p.stop() == 0
+
+
 def test_frames_land_on_every_second_refresh_drawn_for_the_moment_they_are_shown(one):
     """30 fps on a 60 Hz screen: each frame two refreshes after the one before, and drawn for the
     refresh it is shown on. Build 4's timer (`--pacing timer`, compared here) drew each frame for
     the moment the timer fired, anywhere up to a refresh before it was shown, so the motion stepped
     unevenly even when the frames were evenly spaced."""
-    def timing(*args):
-        p = one.syncrain(*args, SYNCRAIN_DEBUG_FPS="2")
-        try:
-            t, _ = p.wait_for(r"^syncrain: drawing pauses")
-            deadline = time.monotonic() + 40
-            while len(p.reports(t + 3)) < 4 and time.monotonic() < deadline:
-                time.sleep(0.2)
-            return p.reports(t + 3)[:4]
-        finally:
-            assert p.stop() == 0
-
-    paced = timing()
-    assert len(paced) == 4, paced
-    fps = sorted(r[1] for r in paced)
-    even = sorted(r[3] for r in paced)
-    calm = sorted(r[4] for r in paced)
-    assert all(r[2] == 2 for r in paced) and 29.0 <= fps[1] and fps[2] <= 31.0, paced
-    assert even[1] >= 85 and calm[1] >= 90, f"frames off the cadence or off the moment drawn for: {paced}"
-    timer = timing("--pacing", "timer")
-    assert sorted(r[4] for r in timer)[2] < 70, f"build 4's timer was as steady as the pacer: {timer}"
+    paced = settled_timing(one, skip=3.0)
+    assert len(paced) == 6, paced
+    assert all(r[2] == 2 for r in paced) and 29.0 <= median([r[1] for r in paced]) <= 31.0, paced
+    even, calm = median([r[3] for r in paced]), median([r[4] for r in paced])
+    assert even >= 85 and calm >= 90, f"frames off the cadence or off the moment drawn for: {paced}"
+    timer = settled_timing(one, "--pacing", "timer", skip=3.0)
+    assert median([r[4] for r in timer]) < 70, f"build 4's timer was as steady as the pacer: {timer}"
 
 
 def test_diagnose_says_what_kwin_reports_and_the_screens_refresh_rates(two):
@@ -422,31 +431,19 @@ def test_the_power_sweep_on_kwin_draws_nothing_behind_windows(two, tmp_path):
     assert "behind a maximized window" in done.stdout and " steady " in done.stdout
 
 
-def settled_timing(session, *args, skip=6.0, count=4):
-    """Reports after the pacer has had `skip` seconds to find the screen's timing."""
-    p = session.syncrain(*args, SYNCRAIN_DEBUG_FPS="2")
-    try:
-        t, _ = p.wait_for(r"^syncrain: drawing pauses")
-        deadline = time.monotonic() + 60
-        while len(p.reports(t + skip)) < count and time.monotonic() < deadline:
-            time.sleep(0.2)
-        return p.reports(t + skip)[:count]
-    finally:
-        assert p.stop() == 0
-
-
 def test_frames_stay_on_time_on_a_141_hz_screen(fast):
     """At 141 Hz a frame has 7 ms in which to reach KWin, and where those 7 ms lie depends on how long
     drawing takes. Build 5 asked a fixed half refresh and 6 ms ahead: here 74 to 84% of frames were
-    steady (build 4's timer: about 55%). Build 6 moves the lead by what GTK reports (syncrain/pacing.py)."""
+    steady (build 4's timer: about 55%). Build 6 moves the lead by what the compositor reports
+    (syncrain/pacing.py; the native wallpaper's port of it: syncrain/native/timing.c)."""
     paced = settled_timing(fast)
-    assert len(paced) == 4, paced
+    assert len(paced) == 6, paced
     assert all(r[2] == 5 for r in paced), f"not every 5th refresh at a 30 fps cap: {paced}"
-    assert all(27.5 <= r[1] <= 29.0 for r in paced), paced
-    even, calm = sorted(r[3] for r in paced), sorted(r[4] for r in paced)
-    assert even[1] >= 80 and calm[1] >= 85, f"frames off the moment drawn for at 141 Hz: {paced}"
+    assert 27.5 <= median([r[1] for r in paced]) <= 29.0, paced
+    even, calm = median([r[3] for r in paced]), median([r[4] for r in paced])
+    assert even >= 80 and calm >= 85, f"frames off the moment drawn for at 141 Hz: {paced}"
     timer = settled_timing(fast, "--pacing", "timer", skip=3.0)
-    assert sorted(r[4] for r in timer)[2] <= calm[1] - 15, (timer, paced)
+    assert median([r[4] for r in timer]) <= calm - 15, (timer, paced)
 
 
 def test_the_pause_starts_when_kwin_gives_the_script_a_number_in_use(two, tmp_path):

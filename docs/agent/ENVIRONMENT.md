@@ -9,12 +9,13 @@ what is missing and the exports the lanes need). The machines syncrain runs on a
 
 | Lane | Needs |
 | --- | --- |
-| unit, contract | Python 3.11 or later with PyGObject, PyOpenGL, Pillow, pycairo, pytest; bash, shellcheck, zstd |
-| render | the above, GTK 4.14 or later with its typelibs, Mesa (llvmpipe is fine), Xvfb |
-| wayland | the above, sway, grim, gtk4-layer-shell 1.x and its typelib on `GI_TYPELIB_PATH` |
+| unit, contract | Python 3.11 or later with PyGObject, Pillow, pycairo, pytest, pyflakes; bash, shellcheck, zstd; the native lane's tools for the installer's test |
+| native | a C compiler, pkg-config, wayland-scanner, and the libwayland-client, libwayland-egl and libdbus-1 headers (Ubuntu: `gcc pkg-config libwayland-dev libdbus-1-dev`; Arch: `gcc pkgconf wayland dbus`) |
+| render | the unit lane's, GTK 4.14 or later with its typelibs, Mesa (llvmpipe is fine), Xvfb |
+| wayland | the above and the native lane's, sway, grim, gtk4-layer-shell 1.x and its typelib on `GI_TYPELIB_PATH` |
 | kwin | the wayland lane's GTK side, KWin 6 (`SYNCRAIN_KWIN`: the path of `kwin_wayland`), `dbus-daemon` and `dbus-send`, node (the KWin script's unit test runs in it) |
 | browser | node with Playwright, and Playwright's Chromium (`PLAYWRIGHT_BROWSERS_PATH`) |
-| nix | nix-instantiate and nix-build; local checkouts of nixpkgs and home-manager named by `SYNCRAIN_NIXPKGS` and `SYNCRAIN_HOME_MANAGER` |
+| nix | nix-instantiate and nix-build; local checkouts of nixpkgs and home-manager named by `SYNCRAIN_NIXPKGS` and `SYNCRAIN_HOME_MANAGER`; sway and grim, and an OpenGL driver where Nix's programs look for one (`/run/opengl-driver`, step 8) |
 | release | all of the above, plus setuptools and wheel in the same Python |
 
 The release runs `tools/test_suite.py --lane all --require-all`: a missing environment fails the
@@ -27,7 +28,7 @@ release instead of skipping. A lane that skips on the release machine never ran.
    `grim`, `shellcheck`, `zstd`; node 22 in `/opt/node22/bin`; Playwright's Chromium in
    `/opt/pw-browsers`; Nix in `/nix/var/nix/profiles/default/bin`.
 2. **A venv outside the tree** with the app's libraries and the tools:
-   `python3 -m venv <venv> && <venv>/bin/pip install PyGObject PyOpenGL Pillow pycairo pytest pyflakes "setuptools>=64" wheel`.
+   `python3 -m venv <venv> && <venv>/bin/pip install PyGObject Pillow pycairo pytest pyflakes "setuptools>=64" wheel`.
 3. **gtk4-layer-shell from source**, since Ubuntu 24.04 has none: clone
    github.com/wmww/gtk4-layer-shell at v1.3.0, `meson setup build -Dintrospection=true`,
    `ninja -C build install` (into `/usr/local`). If `g-ir-scanner` fails on a Python it cannot
@@ -49,7 +50,16 @@ release instead of skipping. A lane that skips on the release machine never ran.
    mode before KWin starts (`FAST_SCREEN` in `tests/kwin/test_the_kwin_desktop.py`, 141.33 Hz), the
    file KWin itself writes after `kscreen-doctor output.Virtual-0.addCustomMode...` (libkscreen,
    also in nixpkgs, if another mode is wanted).
-7. **The release**, from the tree, with the venv's Python first on `PATH` and the exports above:
+7. **The native wallpaper's build tools** (build 8): `apt-get install gcc pkg-config libwayland-dev
+   libdbus-1-dev` (wayland-scanner comes with libwayland-dev, through libwayland-bin). The lanes
+   build the program themselves (`native_wallpaper` in `tests/conftest.py`); by hand,
+   `sh syncrain/native/build.sh var/native/syncrain-wallpaper` and `SYNCRAIN_WALLPAPER` naming it.
+8. **An OpenGL driver for Nix's programs**, for the nix lane's run of the package's native
+   wallpaper: Nix's libglvnd looks for drivers under `/run/opengl-driver`, as on NixOS. Build Mesa
+   from the same nixpkgs and link it there:
+   `ln -sfn "$(nix build --no-link --print-out-paths -f "$SYNCRAIN_NIXPKGS" mesa)" /run/opengl-driver`
+   (the sandbox's `/run` is kept only until it restarts; the link must be made again after one).
+9. **The release**, from the tree, with the venv's Python first on `PATH` and the exports above:
 
 ```
 export PATH=<venv>/bin:/opt/node22/bin:/nix/var/nix/profiles/default/bin:$PATH
@@ -98,7 +108,12 @@ installer, run it once on real Arch packages, as build 2 and build 3 did:
   The lanes force each API on its own (`docs/LESSONS.md`, "OpenGL and GTK").
 * **Two processors and software rendering**: a 640x360 frame takes 18 ms here. Timing tests use
   screens small enough that the machine keeps up (the kwin lane: 320x180), or they measure the
-  machine.
+  machine. Even at 320x180 a frame now and then takes three times as long as usual (llvmpipe and
+  KWin's software compositing share the two processors), so the kwin lane judges frame timing by
+  the median of six reports, not by the worst.
+* **Memory measured here is Mesa's llvmpipe as much as syncrain**: about 130 MiB of the native
+  wallpaper's 136 is LLVM and llvmpipe (`docs/build_notes/BUILD8_NOTES.md`). A graphics card's
+  driver keeps a different amount; only the operator's machine says how much.
 * **The Nix store can be collected.** If `SYNCRAIN_KWIN` points at a path that is gone, build it again
   (step 6); the store path is the same for the same nixpkgs.
 * **`python3` may not be the Python that has GTK.** On an Ubuntu 24.04 sandbox whose `python3` was

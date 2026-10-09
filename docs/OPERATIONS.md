@@ -8,7 +8,10 @@ Every recipe and every option, in one place. How it works is `docs/ARCHITECTURE.
 
 Linux with GTK 4.14 or later, OpenGL 3.3 or OpenGL ES 3.0, Python 3.10 or later, and a synced
 clock (NTP), since frames come from it. On Wayland, a compositor with wlr-layer-shell; GNOME has
-none, so there use `--window` or the web page ("Desktops", below). The source is the repository
+none, so there use `--window` or the web page ("Desktops", below). On Wayland the wallpaper is a
+small C program, built when syncrain is installed (a C compiler, pkg-config, wayland-scanner and
+the libwayland and libdbus headers); without it, Python and GTK draw the same frames ("Memory",
+below). The source is the repository
 (github.com/Atyzze/syncrain) or a build's archive, `SYNCRAIN<N>.tar.zst`; both install the same way.
 
 ### Arch, CachyOS, EndeavourOS, Manjaro (no NixOS needed)
@@ -22,10 +25,12 @@ syncrain                      # run it as your wallpaper; Ctrl+C stops it
 ./install.sh --autostart      # optional: start it with every graphical login
 ```
 
-The script installs `python python-gobject python-cairo python-opengl python-pillow gtk4
-gtk4-layer-shell` with pacman and puts everything else in your home directory: the app in
-`~/.local/share/syncrain`, a launcher at `~/.local/bin/syncrain`, and with `--autostart` a systemd
-user service. `--theme`, `--channel`, `--rainbow` and `--arg ...` (repeatable) bake options into
+The script installs `python python-gobject python-cairo python-pillow gtk4 gtk4-layer-shell`,
+and `gcc pkgconf wayland dbus` to build the native wallpaper with, with pacman, and puts everything
+else in your home directory: the app in `~/.local/share/syncrain` with the native wallpaper built
+into it, a launcher at `~/.local/bin/syncrain`, and with `--autostart` a systemd user service. If
+the native wallpaper does not build, the installer says why and the Python and GTK host draws
+instead. `--theme`, `--channel`, `--rainbow` and `--arg ...` (repeatable) bake options into
 the autostart. If pacman reports missing files, run `sudo pacman -Syu` first.
 
 **Upgrading**: unpack the newer archive and run its `./install.sh`, or in a clone `git pull` and
@@ -68,9 +73,15 @@ in an unpacked tree, `nix run path:.` does the same.
 
 ### Other distributions
 
-GTK 4, gtk4-layer-shell (for Wayland), PyGObject, pycairo, PyOpenGL and Pillow, then `pip install .`
-in the unpacked folder. If gtk4-layer-shell is not preloaded, the app re-executes itself once with
-`LD_PRELOAD` set.
+GTK 4, gtk4-layer-shell (for Wayland), PyGObject, pycairo and Pillow, then `pip install .` in the
+unpacked folder. If gtk4-layer-shell is not preloaded, the app re-executes itself once with
+`LD_PRELOAD` set. For the native wallpaper, build it anywhere and name it in the session's
+environment (or the service's):
+
+```sh
+sh syncrain/native/build.sh ~/.local/libexec/syncrain-wallpaper
+export SYNCRAIN_WALLPAPER=~/.local/libexec/syncrain-wallpaper
+```
 
 ### In a browser
 
@@ -101,6 +112,7 @@ wallpaper plugin that shows web pages can host it, which keeps the desktop icons
 | `--scale` | `1.0` | Render resolution scale; try 0.75 on a weak GPU |
 | `--layer` | auto | `background` or `bottom` (Wayland); auto is `bottom` on KDE Plasma, `background` elsewhere |
 | `--pause-under` | `maximized` | On KDE Plasma: stop drawing a screen while a maximized or full-screen window covers it (`maximized`), only while a full-screen one does (`fullscreen`), or `never` ("Power", below) |
+| `--host` | `auto` | What draws the wallpaper on Wayland: `auto` is the native wallpaper when it is built, else Python and GTK; `native` insists on it and says why when it cannot; `gtk` is Python and GTK, as in builds 1 to 7 ("Memory", below). On X11, in a window, for `--screenshot` and `--record`, Python and GTK draw |
 | `--window` | - | An ordinary window instead of the wallpaper |
 | `--size WxH` | `1280x720` | Window size for `--window` and `--record`; for `--benchmark`, the size it draws at (default: the first screen) |
 | `--offset S` | `0` | Add S seconds to the clock (for a clock you know is off) |
@@ -120,10 +132,10 @@ were timed: `syncrain: 30.0 fps at 2560x1440 (area 0), spacing 2 refreshes 100%,
 before; "steady" the share shown the usual delay after the moment they were drawn for (within 2
 ms); "lead" how long before its refresh a frame is asked for now, which syncrain adjusts to the
 screen and the machine (`docs/ARCHITECTURE.md`). Both shares near 100% means the motion moves by the
-same step every frame. With it set, syncrain also says when
-a screen is covered and when it shows again. `GSK_RENDERER=vulkan` (or `gl`, the default syncrain
-sets) chooses how GTK puts the picture on screen; `SYNCRAIN_GL_DEBUG=1` turns on PyOpenGL's error
-checking.
+same step every frame. With it set, syncrain also says when a screen is covered and when it shows
+again. `GSK_RENDERER=vulkan` (or `gl`, the default syncrain sets) chooses how GTK puts the picture
+on screen; `SYNCRAIN_GL_DEBUG=1` makes either host check its OpenGL calls for errors;
+`SYNCRAIN_WALLPAPER=<path>` names the native wallpaper's program.
 
 ## When it does not draw
 
@@ -134,14 +146,16 @@ syncrain --diagnose
 The first line after the build is the verdict ("OK, syncrain can draw here (OpenGL ES 3.2)" or
 the reason it cannot); then the session, the library versions, the graphics cards and driver, the
 OpenGL context GTK hands out with its vendor and renderer, one test frame, every screen with its
-size, scale and refresh rate; on KDE Plasma also
+size, scale and refresh rate; "native wallpaper": whether it is built, and on Wayland what it finds
+there (the compositor's protocols, the screens, the OpenGL it gets and whether the shaders compile,
+and its own verdict); on KDE Plasma also
 "covering windows": whether KWin answers the script that pauses covered screens, and which screens
 are covered right now (run from a maximized terminal, that screen says so). Run it inside the
 desktop session and send the whole output. If OpenGL cannot start, the wallpaper closes itself at
 once with exit status 69, and the autostart service does not retry.
 
 `journalctl --user -u syncrain` shows the service's startup line (build, stream, the OpenGL it got,
-the number of screens) and, on Plasma, "drawing pauses on a screen under maximized and full-screen
+"native wallpaper" or GTK's renderer, the number of screens) and, on Plasma, "drawing pauses on a screen under maximized and full-screen
 windows (KWin)" once KWin has answered.
 
 ## Power
@@ -173,11 +187,14 @@ systemctl --user stop syncrain       # if the autostart service runs; the sweep 
 syncrain --power-sweep               # about four minutes; the screens turn black for the last phases
 ```
 
-It runs, after a phase with no syncrain at all: the wallpaper as installed; build 4's frame timer,
-for comparison; 20 and 15 fps; and the wallpaper behind a maximized and behind a full-screen window
-(`syncrain/cover.py`). For each it prints the card's power, how far above "nothing" it is, the
-frames drawn, how evenly and how steadily they were timed (as `SYNCRAIN_DEBUG_FPS` reports them,
-above) and the card's state; the same goes to `~/syncrain-power-<utc>.json`. Give Plasma a still
+It runs, after a phase with no syncrain at all: the wallpaper as installed; the same drawn by the
+Python and GTK host (`--host gtk`), for comparison (on a screen at a fractional scale such as 125%
+or 150%, the GTK host also draws more pixels: `docs/ARCHITECTURE.md`, "Three hosts"); build 4's frame timer; 20 and 15 fps; and the
+wallpaper behind a maximized and behind a full-screen window (`syncrain/cover.py`). For each it
+prints the card's power, how far above "nothing" it is, the frames drawn, how evenly and how
+steadily they were timed (as `SYNCRAIN_DEBUG_FPS` reports them, above), the wallpaper's processor
+time (100 is one core kept busy) and resident memory, what drew it (`native`, or GTK's renderer)
+and the card's state; the same goes to `~/syncrain-power-<utc>.json`. Give Plasma a still
 picture as its wallpaper first, or "nothing" includes whatever that wallpaper costs. Power comes
 from `nvidia-smi` (NVIDIA), the amdgpu power sensor (AMD), or any command printing watts named by
 `SYNCRAIN_POWER_COMMAND`.
@@ -189,6 +206,18 @@ What lowers the cost further, at some smoothness or sharpness: `--fps 20` or `--
 frames: the snow and the fading trails move less smoothly, and below about 21 fps the fastest rain
 streams sometimes skip a row), `--scale 0.75` (56% of the pixels, slightly softer letters; little
 saving, since the cost is per frame).
+
+## Memory
+
+On Wayland the wallpaper is the native wallpaper (`syncrain/native/`): `syncrain` starts in Python,
+prepares what the frames need and replaces itself with a small C program, so what stays in memory
+is that program, the Wayland, EGL and D-Bus libraries and the graphics driver. On the sandbox's
+software renderer, two screens: build 7 kept about 308 MiB, Python and GTK in build 8 (`--host gtk`)
+about 263 MiB, the native wallpaper about 136 MiB, of which the software renderer is about 130 MiB
+and syncrain itself a few. On a graphics card the driver's share is the driver's: btop, or the
+sweep's "MiB" column, shows it on yours. It does not grow while it runs; build 7 kept about 120 MiB
+more after every screen change (a screen unplugged, or a DisplayPort screen waking from sleep),
+which build 8 does not, with either host.
 
 ## Desktops
 
@@ -247,7 +276,8 @@ A changed atlas or theme changes the stream (`tools/stream_freeze.py`).
 
 ## Credits and licences
 
-Code: MIT (`LICENSE`). The NixOS snowflake: Simon Frankau and Tim Cuthbertson, from
+Code: MIT (`LICENSE`). The Wayland protocol descriptions in `syncrain/native/protocols/` come from
+wayland-protocols and wlr-protocols, each under the MIT-style licence it carries. The NixOS snowflake: Simon Frankau and Tim Cuthbertson, from
 NixOS/nixos-artwork, CC BY 4.0; NixOS is a trademark of the NixOS Foundation. The glyph atlas is
 rendered from Noto Sans Mono CJK JP (SIL Open Font License 1.1) and DejaVu Sans (Bitstream Vera
 and DejaVu licence).

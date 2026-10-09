@@ -138,11 +138,16 @@ update();
 """
 
 
+def script_template(maximized: bool) -> str:
+    """The script with everything but whom to tell filled in ("@SERVICE@" stays): what the native
+    wallpaper's scene carries, since only it knows its own bus name."""
+    return (SCRIPT.replace("@MAXIMIZED@", "true" if maximized else "false")
+                  .replace("@PATH@", PATH).replace("@INTERFACE@", INTERFACE))
+
+
 def script_source(service: str, maximized: bool) -> str:
     """The script for one syncrain process: whom to tell, and whether maximized windows count."""
-    return (SCRIPT.replace("@SERVICE@", json.dumps(service))
-                  .replace("@MAXIMIZED@", "true" if maximized else "false")
-                  .replace("@PATH@", PATH).replace("@INTERFACE@", INTERFACE))
+    return script_template(maximized).replace("@SERVICE@", json.dumps(service))
 
 
 SCRIPT_FILE = re.compile(r"^syncrain-watch-(\d+)\.js$")

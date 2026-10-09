@@ -7,13 +7,13 @@ X11:     one desktop-type window covering the whole screen, one viewport per mon
 """
 import argparse
 import ctypes
-import ctypes.util
+import gc
 import os
 import signal
 import sys
 import time
 
-from . import build, hidden
+from . import build, hidden, native
 
 #: The exit status when no OpenGL context can be had. The autostart services list it under
 #: RestartPreventExitStatus, so a machine without working OpenGL is not covered by an endless
@@ -45,6 +45,10 @@ def parse_args(argv=None):
                          "it (maximized, the default), only while a full-screen one does (fullscreen), or never")
     ap.add_argument("--pacing", choices=("refresh", "timer"), default="refresh",
                     help=argparse.SUPPRESS)        # timer: build 4's frame timing, for the power sweep's comparison
+    ap.add_argument("--host", choices=native.HOSTS, default="auto",
+                    help="what draws the wallpaper on Wayland: auto (the native program when it is built, "
+                         "else Python and GTK), native (the native program only) or gtk (Python and GTK, as on "
+                         "X11 and in a window)")
     ap.add_argument("--logo", choices=("white", "colours", "none"), help="NixOS logo variant (theme default otherwise)")
     ap.add_argument("--background", metavar="IMAGE", help="use an image as the background instead of the theme gradient")
     ap.add_argument("--mask", metavar="IMAGE", help="greyscale mask (same framing as --background): white = keep bright, no rain")
@@ -88,6 +92,7 @@ def _preload_layer_shell():
         return
     if "gtk4-layer-shell" in os.environ.get("LD_PRELOAD", ""):
         return
+    import ctypes.util                         # only here: it brings subprocess with it
     lib = ctypes.util.find_library("gtk4-layer-shell")
     if not lib:
         return
@@ -145,11 +150,12 @@ def gl_context_problem(ctx, Gdk):
     return es, None
 
 
-def describe_context(ctx, Gdk, GL):
+def describe_context(ctx, Gdk):
+    from . import gl
     es = ctx.get_api() == Gdk.GLAPI.GLES if hasattr(ctx, "get_api") else bool(ctx.get_use_es())
     major, minor = ctx.get_version()
     try:
-        renderer = GL.glGetString(GL.GL_RENDERER).decode(errors="replace")
+        renderer = gl.get_string(gl.GL_RENDERER) or "unknown renderer"
     except Exception:  # noqa: BLE001 - informational only
         renderer = "unknown renderer"
     return f"{'OpenGL ES' if es else 'OpenGL'} {major}.{minor} on {renderer}"
@@ -163,8 +169,45 @@ def use_gl_renderer():
     the processor, a full screen per frame per screen. Its OpenGL renderer uses the texture where it
     is. (GTK 4.14 spells its newer OpenGL renderer "ngl"; "gl" there is the older one, which also
     uses the texture as it is.) A GSK_RENDERER set by the user wins; the power sweep compares both.
+
+    With the OpenGL renderer, GTK's dmabuf support is turned off too (GDK_DISABLE=dmabuf, which
+    GTK 4.16 and later read). From 4.16 a GLArea hands each frame over as a dmabuf where the driver
+    can export one (NVIDIA's can, and Mesa's on real hardware), so that it could be given to the
+    compositor directly; syncrain's frames never are, so every frame was exported, wrapped and
+    imported back by the same renderer that could have drawn the texture itself, and the first one
+    made GTK start a whole Vulkan renderer beside it (`gdk_vulkan_init_dmabuf`), kept for the life
+    of the process. Without dmabufs the renderer draws the GLArea's texture as it is, as GTK 4.14
+    does and as every machine without the export already did.
     """
     os.environ.setdefault("GSK_RENDERER", "gl")
+    if os.environ["GSK_RENDERER"].strip().lower() in ("gl", "ngl", "opengl"):
+        disabled = [f.strip() for f in os.environ.get("GDK_DISABLE", "").split(",") if f.strip()]
+        if "dmabuf" not in disabled:
+            os.environ["GDK_DISABLE"] = ",".join(disabled + ["dmabuf"])
+
+
+def _libc_function(name):
+    """A glibc function by name, or None (another C library, or none of that name)."""
+    try:
+        return getattr(ctypes.CDLL(None), name)
+    except (OSError, AttributeError):
+        return None
+
+
+def settle_memory():
+    """After startup (and after the screens changed): give back what starting left behind.
+
+    Starting leaves garbage and freed memory inside the C heap: the decoded images uploaded to the
+    card, the shader compiler's working space, the import machinery, the old screens' objects after
+    a change. gc.collect frees what only cycles kept, and malloc_trim hands the free pages back to
+    the system (glibc; elsewhere nothing happens). A frame makes no cycles, so after this the
+    collector has nothing to do (none ran in 30 s of two screens at 30 fps).
+    """
+    gc.collect()
+    trim = _libc_function("malloc_trim")
+    if trim is not None:
+        trim.argtypes = [ctypes.c_size_t]
+        trim(0)
 
 
 def renderer_name(widget) -> str:
@@ -216,6 +259,23 @@ def main(argv=None):
         for name, th in load_meta()["themes"].items():
             print(f"{name:10s} {th['label']}")
         return 0
+    # Before GTK is imported: PyGObject initialises GTK on import, and GDK reads GDK_DISABLE then.
+    use_gl_renderer()
+    if args.host != "gtk" and not (args.power_sweep or args.benchmark or args.diagnose):
+        if native.applies(args):
+            path = native.binary()
+            if path:
+                why = native.run(args, sys.argv[1:] if argv is None else argv, path)   # returns only on failure
+                print(f"syncrain: {why}; the GTK host draws instead", file=sys.stderr, flush=True)
+            elif args.host == "native":
+                print("syncrain: the native wallpaper is not built here (install.sh builds it; "
+                      "`syncrain --diagnose` says what it needs)", file=sys.stderr)
+                return 1
+        elif args.host == "native":
+            print("syncrain: the native wallpaper draws only the wallpaper on a Wayland session, paced by the "
+                  "refresh; use --host gtk for X11, --window, --screenshot, --record and --pacing timer",
+                  file=sys.stderr)
+            return 1
     _preload_layer_shell()
     if args.power_sweep:
         from .power import run_sweep
@@ -232,17 +292,14 @@ def main(argv=None):
     gi.require_version("Gdk", "4.0")
     from gi.repository import Gdk, GLib, Gtk
 
-    use_gl_renderer()
     Gtk.init()
     display = Gdk.Display.get_default()
     if display is None:
         print("syncrain: no display (run it inside your desktop session)", file=sys.stderr)
         return 1
     backend = type(display).__name__          # GdkWaylandDisplay / GdkX11Display
-    if "Wayland" in backend:
-        os.environ.setdefault("PYOPENGL_PLATFORM", "egl")
+    from . import gl
     from .renderer import Renderer
-    from OpenGL import GL
 
     LayerShell = None
     if "Wayland" in backend and not (args.window or args.record):
@@ -282,6 +339,7 @@ def main(argv=None):
             self.hidden = False                # every screen it shows is covered: nothing is drawn
             self._due = None                   # the GLib source that asks for the next frame
             self._drawn_for = 0                # the monotonic moment the frame being drawn is drawn for
+            self.frames = 0                    # frames drawn since it was realized
             self._drawn = []                   # (GTK frame counter, target, drawn for) until GTK knows when shown
             self._shown = []                   # SYNCRAIN_DEBUG_FPS: (when shown, refresh interval, drawn for)
             # No set_required_version: see gl_context_problem. GTK's own minimums are GL 3.3 core
@@ -290,9 +348,10 @@ def main(argv=None):
             self.set_has_stencil_buffer(False)
             self.set_auto_render(False)
             self.connect("realize", self._realize)
+            self.connect("unrealize", self._unrealize)
             self.connect("resize", self._resize)
             self.connect("render", self._render)
-            self._off = {}
+            self._off = {}                     # (w, h) -> (framebuffer, texture) for --scale
             self.fb = None
 
         def _resize(self, _area, w, h):            # framebuffer size in device pixels
@@ -317,17 +376,35 @@ def main(argv=None):
                 app.fail(f"the shaders did not compile here: {e}")
                 return
             self.renderer = r
-            app.started(describe_context(ctx, Gdk, GL) + f", GTK renderer {renderer_name(self)}")
+            app.started(describe_context(ctx, Gdk) + f", GTK renderer {renderer_name(self)}")
+
+        def _unrealize(self, _area):
+            """The area is going (the screens changed, or the app stops): delete what was made for
+            its context. Textures belong to every context GTK shares objects between, so they would
+            outlive this one; the programs and textures every screen reads stay for the next one."""
+            if self.renderer is None and not self._off:
+                return
+            self.make_current()
+            # make_current does not say when it fails, and framebuffers and vertex arrays are each
+            # context's own: delete only with this area's context current, never in GTK's.
+            ctx = self.get_context()
+            if self.get_error() is None and ctx is not None and Gdk.GLContext.get_current() == ctx:
+                if self.renderer is not None:
+                    self.renderer.release()
+                gl.delete_framebuffers([fbo for fbo, _tex in self._off.values()])
+                gl.delete_textures([tex for _fbo, tex in self._off.values()])
+            self._off = {}
+            self.renderer = None
 
         def _offscreen(self, w, h):                # one reduced-size target per viewport size (--scale)
             if (w, h) not in self._off:
-                fbo, tex = GL.glGenFramebuffers(1), GL.glGenTextures(1)
-                GL.glBindTexture(GL.GL_TEXTURE_2D, tex)
-                GL.glTexImage2D(GL.GL_TEXTURE_2D, 0, GL.GL_RGBA8, w, h, 0, GL.GL_RGBA, GL.GL_UNSIGNED_BYTE, None)
-                GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, fbo)
-                GL.glFramebufferTexture2D(GL.GL_FRAMEBUFFER, GL.GL_COLOR_ATTACHMENT0, GL.GL_TEXTURE_2D, tex, 0)
-                self._off[(w, h)] = fbo
-            return self._off[(w, h)]
+                fbo, tex = gl.gen_framebuffer(), gl.gen_texture()
+                gl.glBindTexture(gl.GL_TEXTURE_2D, tex)
+                gl.glTexImage2D(gl.GL_TEXTURE_2D, 0, gl.GL_RGBA8, w, h, 0, gl.GL_RGBA, gl.GL_UNSIGNED_BYTE, None)
+                gl.glBindFramebuffer(gl.GL_FRAMEBUFFER, fbo)
+                gl.glFramebufferTexture2D(gl.GL_FRAMEBUFFER, gl.GL_COLOR_ATTACHMENT0, gl.GL_TEXTURE_2D, tex, 0)
+                self._off[(w, h)] = (fbo, tex)
+            return self._off[(w, h)][0]
 
         def _moment(self):
             """The stream time this frame is drawn for: the refresh it will be shown on, when known."""
@@ -441,20 +518,23 @@ def main(argv=None):
                 W, H = self.get_width() * s, self.get_height() * s
             if W <= 0 or H <= 0:
                 return False
-            out = int(GL.glGetIntegerv(GL.GL_FRAMEBUFFER_BINDING))
+            out = gl.get_integer(gl.GL_FRAMEBUFFER_BINDING)
             t = self._moment()
             for (x, y, w, h) in (self.rects(W, H) if self.rects else [(0, 0, W, H)]):
                 if args.scale < 0.999:
                     sw, sh = max(64, round(w * args.scale)), max(36, round(h * args.scale))
                     off = self._offscreen(sw, sh)
                     self.renderer.render(t, off, 0, 0, sw, sh)
-                    GL.glBindFramebuffer(GL.GL_READ_FRAMEBUFFER, off)
-                    GL.glBindFramebuffer(GL.GL_DRAW_FRAMEBUFFER, out)
-                    GL.glBlitFramebuffer(0, 0, sw, sh, x, y, x + w, y + h, GL.GL_COLOR_BUFFER_BIT, GL.GL_LINEAR)
-                    GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, out)
+                    gl.glBindFramebuffer(gl.GL_READ_FRAMEBUFFER, off)
+                    gl.glBindFramebuffer(gl.GL_DRAW_FRAMEBUFFER, out)
+                    gl.glBlitFramebuffer(0, 0, sw, sh, x, y, x + w, y + h, gl.GL_COLOR_BUFFER_BIT, gl.GL_LINEAR)
+                    gl.glBindFramebuffer(gl.GL_FRAMEBUFFER, out)
                 else:
                     self.renderer.render(t, out, x, y, w, h)
             self._note_presented()
+            self.frames += 1
+            if self.frames == 1:
+                app.settle_soon()
             if DEBUG_FPS:
                 now = time.monotonic()
                 self._frames = getattr(self, "_frames", 0) + 1
@@ -485,10 +565,9 @@ def main(argv=None):
         @staticmethod
         def _save(fbo, W, H, path):
             from PIL import Image
-            GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, fbo)
-            GL.glPixelStorei(GL.GL_PACK_ALIGNMENT, 1)
-            data = GL.glReadPixels(0, 0, W, H, GL.GL_RGBA, GL.GL_UNSIGNED_BYTE)
-            Image.frombytes("RGBA", (W, H), bytes(data)).transpose(Image.FLIP_TOP_BOTTOM).convert("RGB").save(path)
+            gl.glBindFramebuffer(gl.GL_FRAMEBUFFER, fbo)
+            data = gl.read_pixels(0, 0, W, H)
+            Image.frombytes("RGBA", (W, H), data).transpose(Image.FLIP_TOP_BOTTOM).convert("RGB").save(path)
 
     layer_name = args.layer or ("bottom" if "KDE" in os.environ.get("XDG_CURRENT_DESKTOP", "") else "background")
 
@@ -501,6 +580,8 @@ def main(argv=None):
             self.screens = 0
             self.watch = None
             self.watch_said = False
+            self._settle = None                # the GLib source that will settle memory, while it waits
+            self.settled = False               # memory settled since the screens were last built
 
         def do_activate(self):
             self.hold()
@@ -558,6 +639,17 @@ def main(argv=None):
                 self.watch.stop()
                 self.watch = None
 
+        def settle_soon(self):
+            """Once every screen has drawn its first frame, startup is over: settle_memory, once."""
+            if self._settle is None and not self.settled and self.areas and all(a.frames for a in self.areas):
+                self._settle = GLib.timeout_add(500, self._settle_now)
+
+        def _settle_now(self):
+            self._settle = None
+            self.settled = True
+            settle_memory()
+            return GLib.SOURCE_REMOVE
+
         def started(self, context):
             """One line when the first viewport is up: what draws, where (it lands in the journal)."""
             if not self.announced:
@@ -583,6 +675,10 @@ def main(argv=None):
             for w in self.windows:
                 w.destroy()
             self.windows, self.areas = [], []
+            if self._settle is not None:
+                GLib.source_remove(self._settle)
+                self._settle = None
+            self.settled = False                       # settle again once the new screens have drawn
             self.build()
             self.update_hidden()
             return False

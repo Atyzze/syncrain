@@ -75,6 +75,41 @@ def x_display():
             proc.kill()
 
 
+def native_build_tools() -> str | None:
+    """What building the native wallpaper lacks here, or None (syncrain/native/build.sh's needs)."""
+    for tool in (os.environ.get("CC", "cc"), "pkg-config"):
+        if not shutil.which(tool):
+            return f"no {tool}"
+    if not shutil.which("wayland-scanner"):
+        probe = subprocess.run(["pkg-config", "--variable=wayland_scanner", "wayland-scanner"], capture_output=True,
+                               text=True)
+        if probe.returncode != 0 or not probe.stdout.strip():
+            return "no wayland-scanner"
+    for lib in ("wayland-client", "wayland-egl", "dbus-1"):
+        if subprocess.run(["pkg-config", "--exists", lib]).returncode != 0:
+            return f"no {lib} headers (pkg-config {lib})"
+    return None
+
+
+@pytest.fixture(scope="session")
+def native_wallpaper(tmp_path_factory):
+    """The native wallpaper built from this tree, and SYNCRAIN_WALLPAPER naming it for every process
+    the tests start from here on, so `python -m syncrain` on a Wayland session draws with it."""
+    missing = native_build_tools()
+    need(missing is None, f"the native wallpaper cannot be built here: {missing}")
+    out = tmp_path_factory.mktemp("native") / "syncrain-wallpaper"
+    done = subprocess.run(["sh", str(ROOT / "syncrain" / "native" / "build.sh"), str(out)], capture_output=True,
+                          text=True, timeout=600)
+    assert done.returncode == 0, f"the native wallpaper did not build:\n{done.stdout[-2000:]}{done.stderr[-4000:]}"
+    before = os.environ.get("SYNCRAIN_WALLPAPER")
+    os.environ["SYNCRAIN_WALLPAPER"] = str(out)
+    yield out
+    if before is None:
+        os.environ.pop("SYNCRAIN_WALLPAPER", None)
+    else:
+        os.environ["SYNCRAIN_WALLPAPER"] = before
+
+
 def app_env(display: str, **extra: str) -> dict:
     """The environment the app runs in for a test: X11 on the given display, nothing inherited
     that would steer GTK's choice of OpenGL, so each case sets exactly what it tests."""

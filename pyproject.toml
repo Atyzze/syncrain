@@ -10,7 +10,7 @@ description = "Never-repeating, clock-synchronised code-rain live wallpaper (GTK
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
-dependencies = ["PyGObject", "PyOpenGL", "Pillow"]
+dependencies = ["PyGObject", "Pillow"]
 
 [project.urls]
 Homepage = "https://github.com/Atyzze/syncrain"
@@ -26,10 +26,12 @@ packages = ["syncrain"]
 version = { file = "BUILD_NUMBER" }
 
 [tool.setuptools.package-data]
-syncrain = ["data/*.png", "data/*.json", "data/shaders/*"]
+syncrain = ["data/*.png", "data/*.json", "data/shaders/*", "native/*.c", "native/*.h", "native/build.sh",
+            "native/protocols/*.xml"]
 
 [tool.pytest.ini_options]
 minversion = "7.0"
 addopts = "--strict-markers -p no:cacheprovider"
-testpaths = ["tests/unit", "tests/contract", "tests/render", "tests/wayland", "tests/kwin", "tests/browser", "tests/nix"]
+testpaths = ["tests/unit", "tests/contract", "tests/native", "tests/render", "tests/wayland", "tests/kwin", "tests/browser",
+             "tests/nix"]
 pythonpath = ["."]

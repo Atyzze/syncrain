@@ -17,7 +17,7 @@ esac
 
 if [ -n "$VENV" ]; then
   [ -x "$VENV/bin/python" ] || python3 -m venv "$VENV" || exit 1
-  "$VENV/bin/pip" install -q PyGObject PyOpenGL Pillow pycairo pytest pyflakes "setuptools>=64" wheel || exit 1
+  "$VENV/bin/pip" install -q PyGObject Pillow pycairo pytest pyflakes "setuptools>=64" wheel || exit 1
   export PATH="$VENV/bin:$PATH"
 fi
 
@@ -45,13 +45,20 @@ def gtk():
 def layer():
     import gi; gi.require_version("Gtk4LayerShell", "1.0")
 check("PyGObject with GTK 4", gtk, "every lane")
-for module, lane in (("OpenGL", "render"), ("PIL", "every lane"), ("cairo", "installer"), ("pytest", "every lane"),
+for module, lane in (("PIL", "every lane"), ("cairo", "installer"), ("pytest", "every lane"),
                      ("setuptools", "release"), ("wheel", "release")):
     check(module, lambda m=module: importlib.import_module(m), lane)
 check("gtk4-layer-shell typelib (GI_TYPELIB_PATH)", layer, "wayland")
 sys.exit(bad)
 PYCHECK
 
+check_bin "${CC:-cc}" native "apt install gcc / pacman -S gcc"
+check_bin pkg-config native "apt install pkg-config / pacman -S pkgconf"
+check_bin wayland-scanner native "apt install libwayland-bin / pacman -S wayland"
+for lib in wayland-client wayland-egl dbus-1; do
+  if pkg-config --exists "$lib" 2>/dev/null; then ok "$lib headers (native)"
+  else miss "$lib headers (native): apt install libwayland-dev libdbus-1-dev / pacman -S wayland dbus"; fi
+done
 check_bin Xvfb render "apt install xvfb / pacman -S xorg-server-xvfb"
 check_bin sway wayland "apt install sway / pacman -S sway"
 check_bin grim wayland "apt install grim / pacman -S grim"
