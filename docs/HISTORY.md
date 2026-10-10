@@ -43,7 +43,9 @@ showed within seconds, which is why syncrain draws every frame from the clock.
   hieroglyphs among the symbols (a new stream); freed memory handed back every five minutes, with a
   record `--diagnose` shows.
 * **13** (2026-10-10): the Plasma wallpaper (`--plasma`): desktop and lock screen, behind the icons,
-  drawn with the native wallpaper's passes inside Plasma.
+  drawn with the native wallpaper's passes inside Plasma. Not delivered: its review came first.
+* **14** (2026-10-10): build 13's review fixed (a crash when the wallpaper is switched away
+  mid-frame, KWin scripts left behind, a lock screen blank while its scene is made).
 
 ## The operator's words
 

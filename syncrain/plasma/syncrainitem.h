@@ -60,6 +60,7 @@ public:
     // from the render thread, queued
     Q_INVOKABLE void frameDrawn();
     Q_INVOKABLE void failed(const QString &why);
+    void sceneMissing(const QString &path);
 
 Q_SIGNALS:
     void argumentsChanged();
@@ -96,6 +97,7 @@ private:
     bool m_covered = false;
     int m_frames = 0;
     QProcess *m_process = nullptr;
+    QString m_processPath;
     QTimer m_prepare;                     // arguments settle before a scene is made
     QTimer m_tick;
     QElapsedTimer m_clock;

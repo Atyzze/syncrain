@@ -93,17 +93,30 @@ if [ "$UNINSTALL" = 1 ]; then
     if have_user_systemd; then systemctl --user daemon-reload || true; fi
     info "removed the autostart service"
   fi
+  keep_plasma=0
   if [ -d "$PLASMA_PACKAGE" ]; then
-    plasma_script "desktops().forEach(d => { if (d.wallpaperPlugin === '$WALLPAPER') d.wallpaperPlugin = 'org.kde.image'; });" &&
+    if plasma_script "desktops().forEach(d => { if (d.wallpaperPlugin === '$WALLPAPER') d.wallpaperPlugin = 'org.kde.image'; });"; then
       info "Plasma's desktops are back on their image wallpaper"
+    elif grep -qs "wallpaperplugin=$WALLPAPER" "${XDG_CONFIG_HOME:-$HOME/.config}/plasma-org.kde.plasma.desktop-appletsrc"; then
+      # without the shell nothing can switch them, and a removed wallpaper leaves the desktop black
+      keep_plasma=1
+      info "Plasma's shell did not answer and its desktops still show syncrain, so the Plasma wallpaper stays;"
+      info "run ./install.sh --uninstall again from inside your Plasma session to remove it"
+    fi
     if [ "$(kreadconfig6 --file kscreenlockerrc --group Greeter --key WallpaperPlugin 2>/dev/null || true)" = "$WALLPAPER" ]; then
       kwriteconfig6 --file kscreenlockerrc --group Greeter --key WallpaperPlugin --delete && info "the lock screen is back on its default wallpaper"
     fi
-    rm -rf "$PLASMA_PACKAGE" "$SCENES"
-    info "removed the Plasma wallpaper package"
+    if [ "$keep_plasma" = 0 ]; then
+      rm -rf "$PLASMA_PACKAGE" "$SCENES"
+      info "removed the Plasma wallpaper package"
+    fi
   fi
-  if [ -d "$(qml_dir)/org/syncrain" ]; then
+  if [ "$keep_plasma" = 0 ] && [ -d "$(qml_dir)/org/syncrain" ]; then
     "${SUDO[@]}" rm -rf "$(qml_dir)/org/syncrain" && info "removed $(qml_dir)/org/syncrain"
+  fi
+  if [ "$keep_plasma" = 1 ]; then
+    info "kept $APPDIR and $BINDIR/syncrain too: the Plasma wallpaper makes its scenes with them"
+    exit 0
   fi
   rm -rf "$APPDIR" "$BINDIR/syncrain"
   info "removed $APPDIR and $BINDIR/syncrain"

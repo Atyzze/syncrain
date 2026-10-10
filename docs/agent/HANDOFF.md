@@ -1,4 +1,4 @@
-# Handoff: the state of syncrain at build 13
+# Handoff: the state of syncrain at build 14
 
 What is true now, for a context that has just opened this tree. Where this page and the code
 disagree, the code is right; fix the page in the same build.
@@ -32,14 +32,14 @@ This page, `docs/agent/NEXT_BUILD.md`, `docs/agent/WORKING_WITH_THE_OPERATOR.md`
 * **Covered screens**: not drawn on KDE (a KWin script); 0 W there.
 * **Timing**: every frame on the refresh; 97 to 100% even and steady on their screens.
 * **Stream**: `c18f8be2` since build 12 (hieroglyphs in the atlas); `48e6bf9c` from build 3 to 11.
-* **GitHub**: `main` holds builds 7 to 12, one commit each (`syncrain build <N>`). Build 13 waits for
-  their trial, as build 8 did.
+* **GitHub**: `main` holds builds 7 to 12, one commit each (`syncrain build <N>`). Builds 13 and 14 are
+  committed locally and wait for their trial, as build 8 did.
 * **The Plasma wallpaper** ran in a real Plasma shell and lock screen only in an Arch root here
   (`docs/agent/ENVIRONMENT.md`); their desktop is its first with a screen and a card.
 
 ## Waits on the operator
 
-* Their trial of build 13's Plasma wallpaper (desktop, lock screen, the settings page).
+* Their trial of the Plasma wallpaper (build 14) (desktop, lock screen, the settings page).
 * The memory record after a few hours of build 12.
 * The time of the next glow flare-up: two hours of frames show none (build 12's notes).
 * The three questions in `docs/ROADMAP.md`.

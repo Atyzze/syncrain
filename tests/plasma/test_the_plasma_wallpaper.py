@@ -192,6 +192,18 @@ def test_install_sh_puts_it_where_plasma_and_the_lock_screen_look(root, built, t
     assert ("kwriteconfig6 --file kscreenlockerrc --group Greeter --group Wallpaper --group org.syncrain.wallpaper "
             "--group General --key Theme matrix") in calls
 
+    # without Plasma's shell to switch the desktops away from it, the wallpaper stays installed
+    (stubs / "dbus-send").write_text("#!/bin/sh\nexit 1\n")
+    applets = home / ".config/plasma-org.kde.plasma.desktop-appletsrc"
+    applets.parent.mkdir(parents=True, exist_ok=True)
+    applets.write_text("[Containments][1]\nwallpaperplugin=org.syncrain.wallpaper\n")
+    done = install("--uninstall")
+    assert done.returncode == 0 and "Plasma wallpaper stays" in done.stdout, done.stdout[-3000:]
+    assert module.exists() and package.exists() and (home / ".local/bin/syncrain").exists()
+    done = install("--plasma")
+    assert done.returncode == 0, done.stdout[-3000:] + done.stderr[-3000:]
+
+    (stubs / "dbus-send").write_text(f'#!/bin/sh\necho "dbus-send $*" >> "{log}"\n')
     log.write_text("")
     done = install("--uninstall")
     assert done.returncode == 0, done.stdout[-3000:] + done.stderr[-3000:]

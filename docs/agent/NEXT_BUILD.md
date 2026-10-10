@@ -1,11 +1,12 @@
-# The next build is 14
+# The next build is 15
 
 The first line is parsed: `# The next build is <N>`, exactly one above `BUILD_NUMBER`.
 
-## Build 14: their trial, then the login screen
+## Build 15: their trial, then the login screen
 
-* Read what the operator sent last, and answer it in one plain sentence first. Build 13 goes to
-  GitHub only once they say the Plasma wallpaper works; what they report about it comes first.
+* Read what the operator sent last, and answer it in one plain sentence first. Builds 13 and 14 go
+  to GitHub (committed, not pushed) only once they say the Plasma wallpaper works; what they report
+  about it comes first.
 * **The login screen**: an SDDM theme that keeps Breeze's login form (`/usr/share/sddm/themes/breeze`)
   with the `SyncRain` item behind it (the module is in Qt's QML folder already; SDDM runs as its
   own user, so its scene goes somewhere it can read). Test it with `sddm-greeter-qt6 --test-mode`

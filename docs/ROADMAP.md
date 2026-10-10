@@ -13,7 +13,7 @@ Open questions, planned builds, the cadence and the constraints. What shipped: `
 ## Decisions answered
 
 * **2026-10-10 13:38**: "yes make build 13, the plasma plugin" (asked at 13:28 for a way to start it
-  without a terminal, and for the lock and login screens). Build 13; the login screen is next.
+  without a terminal, and for the lock and login screens). Builds 13 and 14; the login screen is next.
 * **2026-10-10 12:29**: a darker background and less glow in the centre, parameters for speed and
   for how many lanes spawn, the snow off, Egyptian hieroglyphs; a rare glow flare-up; memory "a
   slowdown/plateau ... is this a non issue?", then "dropped back to 170MiB". Build 12.

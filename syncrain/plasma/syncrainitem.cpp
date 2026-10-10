@@ -69,13 +69,27 @@ QString scenePathFor(const QString &command, const QStringList &arguments)
            + QStringLiteral(".bin");
 }
 
-// A scene is about 19 MiB: the eight used last stay.
+// A scene is about 19 MiB: the eight used last stay, and half-written ones (a `--write-scene` that
+// was stopped) go after ten minutes.
 void pruneScenes()
 {
     QDir dir(sceneDirectory());
     const QFileInfoList all = dir.entryInfoList({ QStringLiteral("scene-*.bin") }, QDir::Files, QDir::Time);
     for (int i = 8; i < all.size(); i++)
         QFile::remove(all[i].absoluteFilePath());
+    const QDateTime old = QDateTime::currentDateTime().addSecs(-600);
+    for (const QFileInfo &f : dir.entryInfoList({ QStringLiteral("scene-*.tmp") }, QDir::Files))
+        if (f.lastModified() < old)
+            QFile::remove(f.absoluteFilePath());
+}
+
+// The scene used last, whatever its options: something to draw at once while the right one is made
+// (the lock screen, whose own options rarely have a scene yet).
+QString newestScene()
+{
+    const QFileInfoList all = QDir(sceneDirectory()).entryInfoList({ QStringLiteral("scene-*.bin") }, QDir::Files,
+                                                                   QDir::Time);
+    return all.isEmpty() ? QString() : all.first().absoluteFilePath();
 }
 
 void touch(const QString &path)
@@ -112,11 +126,32 @@ public:
         return &w;
     }
 
-    void want(const QString &script)
+    void want(const QString &script, bool again = false)
     {
-        if (script.isEmpty() || (script == m_script && (m_watch || m_failed)))
+        if (script.isEmpty() || (!again && script == m_script && (m_watch || m_failed)))
             return;
         stop();
+        if (!m_armed) {
+            m_armed = true;
+            // the script goes with the shell: KWin would otherwise keep calling a name that is gone
+            if (QCoreApplication::instance())
+                QObject::connect(QCoreApplication::instance(), &QCoreApplication::aboutToQuit, &m_context,
+                                 [this] { m_kwin.stop(); stop(); });
+            m_kwin.setInterval(30000);
+            QObject::connect(&m_kwin, &QTimer::timeout, &m_context, [this] {
+                if (m_watch) {
+                    const bool current = watch_current(m_watch);
+                    watch_dispatch(m_watch);                    // what arrived during the call
+                    if (current)
+                        return;
+                } else if (!m_failed || m_script.isEmpty()) {
+                    return;
+                }
+                want(m_script, true);           // KWin restarted (its script is gone), or was not there
+                changed();
+            });
+            m_kwin.start();
+        }
         m_script = script;
         m_failed = false;
         m_watch = watch_new_named(&Watch::changed, "syncrain-plasma-watch");
@@ -184,6 +219,8 @@ private:
     }
 
     QObject m_context;
+    QTimer m_kwin;
+    bool m_armed = false;
     struct watch *m_watch = nullptr;
     QSocketNotifier *m_notifier = nullptr;
     QString m_script;
@@ -245,15 +282,22 @@ public:
         const double t = std::isnan(m_fixedTime) ? nowSeconds() + m_lead : m_fixedTime;
         passes_draw(m_passes, t, fbo->handle(), 0, 0, fbo->width(), fbo->height());
         QQuickOpenGLUtils::resetOpenGLState();
-        if (m_item)
-            QMetaObject::invokeMethod(m_item, "frameDrawn", Qt::QueuedConnection);
+        tell([](SyncRain *item) { item->frameDrawn(); });
     }
 
 private:
+    // The item lives on the GUI thread, which may delete it while this thread draws: it is only
+    // looked at there.
+    template <typename F> void tell(F f)
+    {
+        QPointer<SyncRain> item = m_item;
+        QMetaObject::invokeMethod(QCoreApplication::instance(), [item, f] { if (item) f(item.data()); },
+                                  Qt::QueuedConnection);
+    }
+
     void fail(const QString &why)
     {
-        if (m_item)
-            QMetaObject::invokeMethod(m_item, "failed", Qt::QueuedConnection, Q_ARG(QString, why));
+        tell([why](SyncRain *item) { item->failed(why); });
     }
 
     void load()
@@ -266,12 +310,20 @@ private:
         static std::once_flag once;
         static bool loaded = false;
         static char loadWhy[256] = "";
+        if (!QOpenGLContext::currentContext()) {
+            fail(QStringLiteral("Qt Quick draws without OpenGL here (QSG_RHI_BACKEND?); syncrain needs OpenGL"));
+            return;
+        }
         std::call_once(once, [] { loaded = passes_load_gl(glAddress, loadWhy, sizeof loadWhy); });
         if (!loaded) {
             fail(QString::fromUtf8(loadWhy));
             return;
         }
         QOpenGLContext *ctx = QOpenGLContext::currentContext();
+        if (!ctx) {
+            fail(QStringLiteral("Qt Quick draws without OpenGL here (QSG_RHI_BACKEND?); syncrain needs OpenGL"));
+            return;
+        }
         const bool es = ctx->isOpenGLES();
         int major = 0, minor = 0;
         const char *renderer = nullptr;
@@ -283,8 +335,9 @@ private:
             return;
         }
         const int fd = open(QFile::encodeName(m_wantPath).constData(), O_RDONLY | O_CLOEXEC);
-        if (fd < 0) {
-            fail(QStringLiteral("the scene %1 cannot be read").arg(m_wantPath));
+        if (fd < 0) {                         // pruned or cleared since: made again
+            const QString path = m_wantPath;
+            tell([path](SyncRain *item) { item->sceneMissing(path); });
             return;
         }
         const bool ok = scene_load(&m_scene, fd, why, sizeof why);
@@ -313,7 +366,7 @@ private:
         m_hasScene = false;
     }
 
-    QPointer<SyncRain> m_item;
+    QPointer<SyncRain> m_item;                // set in synchronize, while the GUI thread waits
     QString m_wantPath;
     int m_wantGeneration = 0, m_generation = 0;
     double m_fixedTime = NAN, m_lead = 0.0, m_scale = 1.0;
@@ -350,7 +403,7 @@ SyncRain::SyncRain(QQuickItem *parent)
         QObject::connect(trim, &QTimer::timeout, [] { malloc_trim(0); });
         trim->start();
     }
-    m_prepare.start(0);
+    QTimer::singleShot(0, this, &SyncRain::prepareScene);
 }
 
 SyncRain::~SyncRain()
@@ -446,6 +499,18 @@ void SyncRain::frameDrawn()
     }
 }
 
+void SyncRain::sceneMissing(const QString &path)
+{
+    if (path != m_scenePath)                  // an older scene's news
+        return;
+    if (QFileInfo::exists(path)) {
+        failed(QStringLiteral("the scene %1 cannot be read").arg(path));
+        return;
+    }
+    m_scenePath.clear();
+    prepareScene();
+}
+
 void SyncRain::failed(const QString &why)
 {
     qWarning("syncrain: %s", qPrintable(why));
@@ -455,6 +520,7 @@ void SyncRain::failed(const QString &why)
 // The scene for these options: from the cache, else made by `syncrain --write-scene`.
 void SyncRain::prepareScene()
 {
+    m_prepare.stop();                         // one call for everything that changed before it
     const QStringList args = m_arguments + QStringList{ QStringLiteral("--pause-under"), m_pauseUnder };
     const QString command = syncrainCommand();
     if (command.isEmpty()) {
@@ -467,13 +533,21 @@ void SyncRain::prepareScene()
         sceneReady(path);
         return;
     }
+    if (m_process && m_processPath == path)  // already being made
+        return;
     if (m_process) {
         m_process->disconnect(this);
         m_process->kill();
         m_process->deleteLater();
     }
+    if (m_scenePath.isEmpty()) {              // nothing on screen yet: the last scene made, until then
+        const QString last = newestScene();
+        if (!last.isEmpty())
+            sceneReady(last);
+    }
     QDir().mkpath(sceneDirectory());
     m_process = new QProcess(this);
+    m_processPath = path;
     m_process->setProcessChannelMode(QProcess::MergedChannels);
     QProcess *p = m_process;
     connect(p, &QProcess::finished, this, [this, p, path](int code, QProcess::ExitStatus how) {
@@ -555,9 +629,13 @@ void SyncRain::tick()
 {
     if (m_covered)
         return;
-    if (isVisible() && window() && window()->isExposed())
+    if (isVisible() && window() && window()->isExposed()) {
         update();
-    schedule();
+        schedule();
+    } else {                                  // not on screen: look again soon, not at fps
+        m_next = 0.0;
+        m_tick.start(250);
+    }
 }
 
 void SyncRain::itemChange(ItemChange change, const ItemChangeData &value)

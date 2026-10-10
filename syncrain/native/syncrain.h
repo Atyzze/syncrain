@@ -162,6 +162,7 @@ void watch_retry(struct watch *w);
 int watch_fd(const struct watch *w);
 void watch_dispatch(struct watch *w);
 bool watch_answered(const struct watch *w);
+bool watch_current(struct watch *w);
 bool watch_hidden(const struct watch *w, const char *screen);
 bool is_syncrain_command(char **argv, int argc);
 
