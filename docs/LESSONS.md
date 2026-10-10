@@ -64,6 +64,8 @@ Rules learned by shipping their opposite, one line each. When and how: `docs/HIS
 * **Atlas lookups need explicit gradients**, or cell edges pick the wrong mip level.
 * **Integer hashing is the only randomness bit-exact on every GPU.**
 * **A loop shows on a wallpaper within seconds** (the GIFs before build 1).
+* **One set of passes, many hosts**: the Plasma item reuses `passes.c` and the scene, so its frames
+  are the others' without a second copy of anything.
 
 ## The sandbox
 
@@ -73,3 +75,4 @@ Rules learned by shipping their opposite, one line each. When and how: `docs/HIS
 * A heredoc ends at its terminator, even inside the text; tool parameters decode JSON escapes.
 * Two cores and software rendering: keep timing tests small.
 * A Unix socket path over 108 bytes fails: keep runtime directories short.
+* A clean Arch has no `make`: CMake needs it named (build 13 found it in an Arch root).

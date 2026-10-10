@@ -42,6 +42,8 @@ showed within seconds, which is why syncrain draws every frame from the clock.
 * **12** (2026-10-10): picture options (glow, bloom, background, speed, density, snow), Egyptian
   hieroglyphs among the symbols (a new stream); freed memory handed back every five minutes, with a
   record `--diagnose` shows.
+* **13** (2026-10-10): the Plasma wallpaper (`--plasma`): desktop and lock screen, behind the icons,
+  drawn with the native wallpaper's passes inside Plasma.
 
 ## The operator's words
 
@@ -68,4 +70,8 @@ showed within seconds, which is why syncrain draws every frame from the clock.
 * **After 11**: "I want to be able to make the background more black!"; a parameter for the speed,
   for how many lanes spawn, the snow off; "include egyptian hyroglyphs in the symbols as well";
   "suddenly it dropped back to 170MiB?".
+* **After 12**: "shouldnt there be a way to install it as a default theme instead of needing to
+  run/trigger it in a console to start?"; "could we apply it to the background of the login/lock
+  screen as well? (Without disabling the current login window)"; "yes make build 13, the plasma
+  plugin".
 * **Standing**: no long dashes in anything written to them.

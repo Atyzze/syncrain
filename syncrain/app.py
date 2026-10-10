@@ -85,6 +85,7 @@ def parse_args(argv=None):
     ap.add_argument("--size", help="window size for --window / --record (default 1280x720), or the size "
                                    "--benchmark draws at (default: the first screen), e.g. 1920x1080")
     ap.add_argument("--list-themes", action="store_true")
+    ap.add_argument("--write-scene", metavar="PATH", help=argparse.SUPPRESS)   # the Plasma wallpaper's scene
     ap.add_argument("--benchmark", action="store_true",
                     help="time each pass on this machine's graphics card, print the table, exit")
     ap.add_argument("--power-sweep", action="store_true",
@@ -297,6 +298,8 @@ def main(argv=None):
         for name, th in load_meta()["themes"].items():
             print(f"{name:10s} {th['label']}")
         return 0
+    if args.write_scene:                      # for the Plasma wallpaper: no window, no GTK
+        return native.write_scene(args, args.write_scene)
     # Before GTK is imported: PyGObject initialises GTK on import, and GDK reads GDK_DISABLE then.
     use_gl_renderer()
     avoid_the_explicit_sync_leak()

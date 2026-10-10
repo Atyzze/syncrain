@@ -122,7 +122,7 @@ function motion() {                          // same as engine.motion() in the n
 }
 // the picture options, as engine.look() in the native app makes them
 const LOOK = { speed: [0.25, 4], density: [0, 2.3], glow: [0, 2], bloom: [0, 2], hieroglyphs: [0, 1] };
-function look() {
+function readLook() {
   const out = {};
   for (const [k, [lo, hi]] of Object.entries(LOOK)) {
     const v = P.has(k) && P.get(k) !== '' && !isNaN(Number(P.get(k))) ? Number(P.get(k))
@@ -132,6 +132,8 @@ function look() {
   out.snow = P.get('snow') !== 'off';
   return out;
 }
+let LOOKED = null;                           // the URL does not change while the page runs
+const look = () => LOOKED || (LOOKED = readLook());
 const bgGain = P.has('bg-gain') && !isNaN(Number(P.get('bg-gain'))) && P.get('bg-gain') !== '' ? Number(P.get('bg-gain')) : 1;
 const fixedT = P.has('t') ? Number(P.get('t')) : null;
 const showHud = P.get('hud') !== '0';

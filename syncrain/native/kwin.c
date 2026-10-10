@@ -49,10 +49,17 @@ static const char *const MATCH =
 
 struct watch *watch_new(void (*on_change)(void))
 {
+	return watch_new_named(on_change, "syncrain-watch");
+}
+
+/* The Plasma wallpaper names its script otherwise ("syncrain-plasma-watch"): a syncrain that
+ * unloads the scripts of dead syncrains (unload_leftovers) must not take plasmashell's for one. */
+struct watch *watch_new_named(void (*on_change)(void), const char *prefix)
+{
 	struct watch *w = calloc(1, sizeof *w);
 	if (w) {
 		w->on_change = on_change;
-		snprintf(w->plugin, sizeof w->plugin, "syncrain-watch-%d", (int)getpid());
+		snprintf(w->plugin, sizeof w->plugin, "%s-%d", prefix, (int)getpid());
 	}
 	return w;
 }

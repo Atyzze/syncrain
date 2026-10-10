@@ -65,16 +65,18 @@ def memory_record_path() -> str:
 
 
 def _read(path, mode="r"):
+    """A /proc file, or None: gone, another user's, or not text (a process may name itself anything)."""
     try:
         with open(path, mode) as fh:
             return fh.read()
-    except OSError:
+    except (OSError, ValueError):
         return None
 
 
 def running_lines(record_lines=8) -> list[str]:
     """The wallpapers running now (this user's): which host, how long, their memory, and the
     environment they really got; then the end of the memory record."""
+    from .power import is_syncrain_command
     lines = []
     uptime = float((_read("/proc/uptime") or "0").split()[0])
     tick = os.sysconf("SC_CLK_TCK")
@@ -86,9 +88,13 @@ def running_lines(record_lines=8) -> list[str]:
         argv = [a.decode(errors="replace") for a in raw.split(b"\0") if a]
         if comm == "syncrain-wallpa":
             what = "the native wallpaper"
-        elif argv and "python" in os.path.basename(argv[0]) and (
-                any(a.endswith("/syncrain") for a in argv[1:3]) or argv[1:3] == ["-m", "syncrain"]):
-            if any(a in argv for a in ("--diagnose", "--power-sweep", "--benchmark", "--screenshot", "--record")):
+        elif comm in ("plasmashell", "kscreenlocker_g"):
+            if "libsyncrainplugin" not in (_read(d + "/maps") or ""):
+                continue
+            what = f"the Plasma wallpaper, in {comm} (its memory is the whole {comm}'s)"
+        elif is_syncrain_command(argv):           # the launcher's python -m syncrain, or Nix's wrapped script
+            if any(a in argv for a in ("--diagnose", "--power-sweep", "--benchmark", "--screenshot", "--record",
+                                       "--write-scene")):
                 continue
             what = "the GTK host"
         else:

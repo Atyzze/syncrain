@@ -9,13 +9,11 @@ Open questions, planned builds, the cadence and the constraints. What shipped: `
   then. Recommended: `syncrain --fps 20` for a day, then judge by eye.
 * **Pause behind maximized windows too, or only full-screen ones?** (2026-10-07) Both now; behind a
   see-through window the rain then stands still. Recommended: both.
-* **Desktop icons on KDE** (since build 3): syncrain covers them, and "show desktop" hides it.
-  (a) keep; (b) a Plasma wallpaper plugin, behind the icons (a build of its own; the operator's
-  machine is its first test); (c) the web page in a web-wallpaper plugin. Recommended: (b), with
-  (c) meanwhile.
 
 ## Decisions answered
 
+* **2026-10-10 13:38**: "yes make build 13, the plasma plugin" (asked at 13:28 for a way to start it
+  without a terminal, and for the lock and login screens). Build 13; the login screen is next.
 * **2026-10-10 12:29**: a darker background and less glow in the centre, parameters for speed and
   for how many lanes spawn, the snow off, Egyptian hieroglyphs; a rare glow flare-up; memory "a
   slowdown/plateau ... is this a non issue?", then "dropped back to 170MiB". Build 12.
@@ -33,9 +31,8 @@ Open questions, planned builds, the cadence and the constraints. What shipped: `
 
 ## Planned builds
 
-1. **The operator's answers** above, and the flare-up once they note its time
-   (`docs/agent/NEXT_BUILD.md`).
-2. **The Plasma wallpaper plugin**, if chosen.
+1. **Their trial of the Plasma wallpaper**, and the two questions above (`docs/agent/NEXT_BUILD.md`).
+2. **The login screen**: an SDDM theme that keeps Breeze's login form, with the rain behind it.
 3. **A NixOS image** with syncrain as its wallpaper.
 
 ## Build cadence
@@ -53,7 +50,7 @@ Next consolidation: 20
 * **Release**: only `tools/package_release.py` makes an archive and writes `BUILD_NUMBER`; notes in
   the same pass, ending in GATE_RESULT; the gate runs every lane; generated pages are regenerated
   and compared.
-* **Picture**: the stream changes only on purpose; the three hosts draw the same frame; nothing
+* **Picture**: the stream changes only on purpose; the hosts draw the same frame; nothing
   flashes (the fastest colour cycle is 90 s).
 * **OpenGL**: never ask GTK for a version; take what it hands out and check it.
 * **Writing**: short and plain; no long dashes; "the operator" or "they"; comments say why, not

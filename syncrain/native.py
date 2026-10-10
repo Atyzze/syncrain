@@ -94,6 +94,19 @@ def scene_bytes(args, fallback: list[str] | None) -> bytes:
     return ("\n".join(header) + "\n").encode() + b"".join(blobs)
 
 
+def write_scene(args, path: str) -> int:
+    """`syncrain --write-scene PATH`: the scene for these options as a file, for the Plasma wallpaper
+    (syncrain/plasma/), which draws it with the native wallpaper's passes. Written whole, then
+    renamed, so a reader never sees half of one."""
+    data = scene_bytes(args, None)
+    tmp = f"{path}.{os.getpid()}.tmp"
+    os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+    with open(tmp, "wb") as fh:
+        fh.write(data)
+    os.replace(tmp, path)
+    return 0
+
+
 def gtk_host_command(user_args) -> list[str]:
     """The command that started this process, with the same options and --host gtk: what the native
     program runs when it cannot draw. sys.orig_argv keeps the interpreter's own part (`python3 -m

@@ -28,7 +28,7 @@ Data: `syncrain/data/themes.json`, `syncrain/data/atlas.png` (code glyphs, then 
 hieroglyphs), the NixOS logos (CC BY 4.0), all made by `tools/build_assets.py`. The logo turns,
 drifts and cycles colour, against burn-in; nothing flashes.
 
-## Three hosts
+## Four hosts
 
 * **Native wallpaper** (`syncrain/native/`, C), on Wayland. `syncrain` (Python) prepares the scene
   (shaders, textures, fixed uniforms, the KWin script, the fallback command) in a memfd and
@@ -37,13 +37,18 @@ drifts and cycles colour, against burn-in; nothing flashes.
   frame computes on the processor is ported from Python bit for bit (`tests/native/`). A failure
   before the first frame hands over to the GTK host; a lost compositor, or 5 s without a frame
   shown, exits with status 1 so the service restarts it.
+* **Plasma wallpaper** (`syncrain/plasma/`, C++ and QML): a Qt Quick item, `SyncRain`, inside
+  Plasma's shell and lock screen. It draws with the native wallpaper's passes (`passes.c`) into its
+  own framebuffer on Qt's OpenGL context; its scene is `syncrain --write-scene`, cached in
+  `~/.cache/syncrain/`. On the desktop it asks KWin about covering windows through `kwin.c`.
 * **GTK host** (`syncrain/app.py`, `syncrain/renderer.py`): X11, windows, `--screenshot`,
   `--record`, and the fallback. A GLArea per viewport, OpenGL through libepoxy (`syncrain/gl.py`),
   `GSK_RENDERER=gl` and `GDK_DISABLE=dmabuf`.
 * **Web page** (`web/template.html`): WebGL2; `tools/build_web.py` generates `web/index.html` and
   `web/artifact.html`.
 
-The lanes compare them: native and GTK host to the pixel (at whole-number scales; at 125% or 150%
+The lanes compare them: native and GTK host to the pixel, the Plasma item within a level (another
+Mesa) (at whole-number scales; at 125% or 150%
 GTK draws more pixels and scales them down), the page within texture filtering.
 
 ## When a frame is drawn (`syncrain/pacing.py`, `syncrain/native/timing.c`)

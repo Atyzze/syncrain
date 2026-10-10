@@ -1,0 +1,17 @@
+{
+    "KPackageStructure": "Plasma/Wallpaper",
+    "KPlugin": {
+        "Authors": [
+            {
+                "Name": "syncrain"
+            }
+        ],
+        "Description": "Never-repeating code rain, in sync with every machine on its channel",
+        "Icon": "preferences-desktop-wallpaper",
+        "Id": "org.syncrain.wallpaper",
+        "License": "MIT",
+        "Name": "syncrain",
+        "Website": "https://github.com/Atyzze/syncrain"
+    },
+    "X-Plasma-API-Minimum-Version": "6.0"
+}

@@ -1,22 +1,17 @@
-# The next build is 13
+# The next build is 14
 
 The first line is parsed: `# The next build is <N>`, exactly one above `BUILD_NUMBER`.
 
-## Build 13: the operator's answers
+## Build 14: their trial, then the login screen
 
-* Read what the operator sent last, and answer it in one plain sentence first. If memory still
-  grows with build 12, that comes first: their `syncrain --diagnose` shows the memory record and
-  the environment the running wallpaper got.
-* **The glow flare-up**: with the time they saw it, draw that moment (`--time`, their options, both
-  screens' sizes) and look at the frames around it.
-* **The three questions** in `docs/ROADMAP.md`. A default frame rate of 20 or 15 lives in four
-  places: `--fps` in `syncrain/app.py`, `fps` in `nix/options.nix`, `base_args` in
-  `syncrain/power.py` and the options table in `docs/OPERATIONS.md`. Pausing only under full-screen
-  windows: `--pause-under` in `syncrain/app.py`, `pauseUnder` in `nix/options.nix` and
-  `nix/args.nix`, `syncrain/power.py`, `docs/OPERATIONS.md`.
-* **The Plasma wallpaper plugin**, if chosen: a Plasma 6 wallpaper package drawing the web page or
-  the shaders behind the icons, installed by `install.sh`; it keeps both power savings (no frames
-  for covered screens, frames on the refresh).
+* Read what the operator sent last, and answer it in one plain sentence first. Build 13 goes to
+  GitHub only once they say the Plasma wallpaper works; what they report about it comes first.
+* **The login screen**: an SDDM theme that keeps Breeze's login form (`/usr/share/sddm/themes/breeze`)
+  with the `SyncRain` item behind it (the module is in Qt's QML folder already; SDDM runs as its
+  own user, so its scene goes somewhere it can read). Test it with `sddm-greeter-qt6 --test-mode`
+  in the Arch root.
+* **The glow flare-up**, with the time they saw it: draw that moment and look.
+* **The two questions** in `docs/ROADMAP.md` (default frame rate, what pauses).
 
 **Known blockers**: watts, NVIDIA's driver and Plasma's shell exist only on the operator's machine.
 

@@ -6,6 +6,10 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 struct wl_display;
 struct wl_surface;
 
@@ -63,6 +67,7 @@ struct scene {
 const char *scene_program_name(enum program program);
 bool scene_load(struct scene *scene, int fd, char *why, size_t why_size);
 void scene_unmap(struct scene *scene);  /* the sources and pixels, once they are on the card */
+void scene_free(struct scene *scene);   /* and the rest */
 
 /* ------------------------------------------------------------------ arithmetic (timing.c)
  * Every value here must equal what the Python host computes (renderer.py, engine.py, pacing.py),
@@ -102,6 +107,20 @@ void pacer_restart(struct pacer *p);
 int spacing(const double *presented, int n, double refresh, int *steps);
 double steady(const double *delays, int n);
 
+/* ------------------------------------------------------------------ the passes (passes.c)
+ * On whatever OpenGL context is current; a `struct passes` belongs to the context it was made in. */
+
+struct passes;
+
+bool passes_load_gl(void *(*address)(const char *name), char *why, size_t why_size);   /* once */
+void passes_gl_version(int *major, int *minor, const char **renderer);
+/* The programs and textures; `scene` must outlive it, its sources and pixels only this call. */
+struct passes *passes_create(const struct scene *scene, bool es, char *why, size_t why_size);
+/* One viewport (x, y, w, h, origin bottom-left) of framebuffer `out`. */
+void passes_draw(struct passes *p, double unix_time, unsigned out, int x, int y, int w, int h);
+void passes_draw_scaled(struct passes *p, double unix_time, unsigned out, int w, int h, double scale);
+void passes_destroy(struct passes *p);
+
 /* ------------------------------------------------------------------ drawing (render.c) */
 
 struct gl_info {
@@ -135,6 +154,7 @@ void render_shutdown(void);
 struct watch;
 
 struct watch *watch_new(void (*on_change)(void));
+struct watch *watch_new_named(void (*on_change)(void), const char *prefix);
 const char *watch_start(struct watch *w, const char *script_template, bool maximized); /* NULL: running */
 void watch_stop(struct watch *w);
 void watch_free(struct watch *w);
@@ -144,5 +164,9 @@ void watch_dispatch(struct watch *w);
 bool watch_answered(const struct watch *w);
 bool watch_hidden(const struct watch *w, const char *screen);
 bool is_syncrain_command(char **argv, int argc);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

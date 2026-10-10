@@ -251,6 +251,15 @@ fail:
 	return false;
 }
 
+void scene_free(struct scene *scene)
+{
+	scene_unmap(scene);
+	free(scene->kwin_script);
+	free(scene->fallback);
+	scene->kwin_script = NULL;
+	scene->fallback = NULL;
+}
+
 void scene_unmap(struct scene *scene)
 {
 	if (scene->map)
