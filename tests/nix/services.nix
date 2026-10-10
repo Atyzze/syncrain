@@ -12,7 +12,8 @@ let
         boot.isContainer = true;
         system.stateVersion = "25.11";
         services.syncrain = { enable = true; inherit channel; rainbow = "all"; spin = 240; drift = 0.05;
-                              pauseUnder = "fullscreen"; };
+                              pauseUnder = "fullscreen"; speed = 0.5; glow = 0.0; snow = false;
+                              hieroglyphs = 0.3; };
       }
     ];
   };

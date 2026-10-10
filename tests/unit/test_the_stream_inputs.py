@@ -75,3 +75,49 @@ def test_the_lookup_tables_have_the_shapes_the_shaders_read():
     assert len(engine.lut_bytes(theme)) == 256 * 4
     data, rows = engine.words_bytes(theme)
     assert rows == len(theme["words"]) and len(data) == 16 * rows * 4
+
+
+def test_the_picture_options_are_multiples_of_the_theme_s_own_values():
+    theme = engine.load_meta()["themes"]["nixos"]
+    assert engine.look(theme) == {"speed": 1.0, "density": 1.0, "glow": 1.0, "bloom": 1.0, "hieroglyphs": 0.15,
+                                  "snow": True}
+    assert engine.look(theme, speed=9, density=-1, glow=0, bloom=3, hieroglyphs=2, snow="off") == {
+        "speed": 4.0, "density": 0.0, "glow": 0.0, "bloom": 2.0, "hieroglyphs": 1.0, "snow": False}
+
+
+def uniforms(**look):
+    from syncrain.renderer import Renderer, static_uniforms
+    return {(p, n): v for p, n, _, v in static_uniforms(Renderer(theme="nixos", **look))}
+
+
+def test_the_defaults_draw_the_theme_as_it_was():
+    """Every option at its default sets the uniforms build 11 set (and the hieroglyphs a share)."""
+    theme = engine.load_meta()["themes"]["nixos"]
+    u = uniforms()
+    assert u[("state", "uDensity")] == (theme["rain"]["density"],) and u[("state", "uSpeed")] == (1.0,)
+    assert u[("composite", "uBloomK")] == (theme["rain"]["bloom"],)
+    assert u[("composite", "uLogoGlowK")] == (theme["logo"]["glowStrength"],)
+    assert u[("composite", "uCentreGlow")] == (1.0,) and u[("composite", "uBgGain")] == (1.0,)
+    assert u[("composite", "uSnowN")] == (len(theme["snow"]),)
+    assert u[("state", "uHiero")] == (0.15,)
+
+
+def test_each_option_reaches_its_uniform():
+    theme = engine.load_meta()["themes"]["nixos"]
+    u = uniforms(speed=0.5, density=2.0, glow=0.0, bloom=0.5, bg_gain=0.4, snow="off", hieroglyphs=1.0)
+    assert u[("state", "uSpeed")] == (0.5,)
+    assert u[("state", "uDensity")] == (theme["rain"]["density"] * 2.0,)
+    assert u[("composite", "uCentreGlow")] == (0.0,) and u[("composite", "uLogoGlowK")] == (0.0,)
+    assert u[("composite", "uBloomK")] == (theme["rain"]["bloom"] * 0.5,)
+    assert u[("composite", "uBgGain")] == (0.4,) and u[("composite", "uSnowN")] == (0,)
+    assert u[("state", "uHiero")] == (1.0,)
+
+
+def test_the_hieroglyphs_follow_every_older_glyph_in_the_atlas():
+    """They were added after the others, so no older glyph moved; the shader draws them from there."""
+    meta = engine.load_meta()
+    first, count = meta["atlas"]["hieroglyphs"]
+    assert first == 125 and count >= 64 and first + count == meta["atlas"]["glyphs"] <= 256
+    assert all(0x13000 <= ord(g) <= 0x1342F for g in meta["glyphs"][first:first + count])
+    u = uniforms()
+    assert u[("state", "uHieroFirst")] == (first,) and u[("state", "uHieroCount")] == (count,)

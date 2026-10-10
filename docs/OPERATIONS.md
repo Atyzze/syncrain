@@ -26,7 +26,8 @@ git clone https://github.com/Atyzze/syncrain && cd syncrain   # or unpack SYNCRA
 **NixOS** (flake): `services.syncrain = { enable = true; theme = "nixos"; channel = "public"; };`
 with `syncrain.nixosModules.default` (or `homeManagerModules.default`). Options: `enable`,
 `package`, `theme`, `channel`, `fps`, `logo`, `background`, `mask`, `rainbow`, `spin`, `drift`,
-`scale`, `pauseUnder`, `layer`, `extraArgs` (`nix/options.nix`). Without installing:
+`speed`, `density`, `glow`, `bloom`, `bgGain`, `snow`, `hieroglyphs`, `scale`, `pauseUnder`, `layer`,
+`extraArgs` (`nix/options.nix`). Without installing:
 `nix run github:Atyzze/syncrain -- --window`.
 
 **Other systems**: GTK 4, gtk4-layer-shell, PyGObject, pycairo and Pillow, then `pip install .`.
@@ -34,8 +35,9 @@ For the native wallpaper: `sh syncrain/native/build.sh <path>` and `SYNCRAIN_WAL
 the session's environment.
 
 **Browser**: `web/index.html`, one self-contained file. URL parameters: `theme`, `channel`, `fps`,
-`logo`, `rainbow`, `spin`, `drift`, `scale`, `hud=0` (no control strip), `t=<unix seconds>`
-(frozen clock). A Plasma web-wallpaper plugin can host it, behind the desktop icons.
+`logo`, `rainbow`, `spin`, `drift`, `speed`, `density`, `glow`, `bloom`, `bg-gain`, `snow=off`,
+`hieroglyphs`, `scale`, `hud=0` (no control strip), `t=<unix seconds>` (frozen clock). A Plasma
+web-wallpaper plugin can host it, behind the desktop icons.
 
 ## Options
 
@@ -52,6 +54,13 @@ the session's environment.
 | `--rainbow` | `logo` | `logo`, `all` (the rain too) or `off` |
 | `--spin S` | `180` | Seconds per logo turn; 0 = still |
 | `--drift F` | `0.03` | Logo orbit (or image pan) in screen heights; 0 = fixed |
+| `--bg-gain F` | `1` | Background brightness; lower is darker (0.42 with `--background`) |
+| `--glow F` | `1` | Glow around the centre and the logo; 0 = none |
+| `--bloom F` | `1` | Glow around the falling symbols; 0 = none |
+| `--speed F` | `1` | Fall speed, 0.25 to 4 |
+| `--density F` | `1` | How often a column starts a stream, 0 to 2.3 |
+| `--snow` | `on` | `off`: no falling snowflakes |
+| `--hieroglyphs F` | `0.15` | Share of the changing symbols that are Egyptian hieroglyphs; 0 = none |
 | `--scale` | `1.0` | Render resolution scale (0.75 on a weak GPU) |
 | `--layer` | auto | `background` or `bottom`; auto is `bottom` on KDE |
 | `--window` | - | A normal window instead of the wallpaper |
@@ -90,7 +99,9 @@ OpenGL cannot start, syncrain exits with status 69 and the service does not retr
   `SYNCRAIN_POWER_COMMAND`.
 * **The last two phases turn every screen black** for about a minute (a covering window). The sweep
   warns first. To get the screens back sooner, Alt+Tab to its terminal and press Ctrl+C.
-* Memory: the native wallpaper keeps about 123 MiB on that card, the GTK host 205.
+* Memory: the native wallpaper keeps about 123 MiB on that card, the GTK host 205. Both hand freed
+  memory back every five minutes. The native one writes `~/.local/state/syncrain/memory.log` (a line
+  an hour); `syncrain --diagnose` shows its end and every running wallpaper.
 
 ## Desktops
 
@@ -109,12 +120,14 @@ OpenGL cannot start, syncrain exits with status 69 and the service does not retr
   `GDK_BACKEND=x11`, `syncrain --window --size 1600x900 --time 1791331207 --screenshot nixos.png`
   (and `--theme matrix`); save as JPEG with Pillow, `quality=90, subsampling=0, progressive=True`.
 * **The CachyOS look**: `syncrain --theme matrix --background <nebula.png> --mask extras/cachyos-logo-mask.png`.
-* **New assets**: `python3 tools/build_assets.py --nixos-artwork <checkout>`, then
-  `python3 tools/build_web.py`; a new atlas or theme changes the stream.
+* **New assets**: `python3 tools/build_assets.py --hieroglyph-font <NotoSansEgyptianHieroglyphs.ttf>`
+  (add `--nixos-artwork <checkout>` to redraw the logos), then `python3 tools/build_web.py`; a new
+  atlas or theme changes the stream.
 
 ## Credits and licences
 
 Code: MIT (`LICENSE`). The NixOS snowflake: Simon Frankau and Tim Cuthbertson (NixOS/nixos-artwork),
 CC BY 4.0; NixOS is a trademark of the NixOS Foundation. Glyphs from Noto Sans Mono CJK JP (OFL 1.1)
-and DejaVu Sans. Wayland protocol files in `syncrain/native/protocols/`: wayland-protocols and
-wlr-protocols, MIT-style, as each file says.
+and DejaVu Sans; Egyptian hieroglyphs from Noto Sans Egyptian Hieroglyphs (OFL 1.1). Wayland
+protocol files in `syncrain/native/protocols/`: wayland-protocols and wlr-protocols, MIT-style, as
+each file says.

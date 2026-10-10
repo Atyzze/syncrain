@@ -220,7 +220,12 @@ def static_uniforms(r):
     put("state", "uSeed", "ui", r.seed)
     put("state", "uLUT", "i", UNIT["lut"]); put("state", "uWords", "i", UNIT["words"])
     put("state", "uNumWords", "i", len(th["words"]))
-    put("state", "uDensity", "f", rain["density"]); put("state", "uWordRate", "f", rain["wordRate"])
+    put("state", "uDensity", "f", min(1.0, rain["density"] * r.look["density"]))
+    put("state", "uWordRate", "f", rain["wordRate"])
+    put("state", "uSpeed", "f", r.look["speed"])
+    first, count = r.meta["atlas"].get("hieroglyphs", (0, 0))
+    put("state", "uHiero", "f", r.look["hieroglyphs"] if count else 0.0)
+    put("state", "uHieroFirst", "i", first); put("state", "uHieroCount", "i", max(1, count))
     put("state", "uGlintRate", "f", rain["glintRate"])
     put("state", "uContrast", "i", rain["contrast"])
 
@@ -241,14 +246,16 @@ def static_uniforms(r):
     put("composite", "bgTop", "f3", *bg["top"]); put("composite", "bgBot", "f3", *bg["bottom"])
     put("composite", "bgCenter", "f3", *bg["center"]); put("composite", "bgVignette", "f", bg["vignette"])
     put("composite", "uBgGamma", "f", r.bg_gamma); put("composite", "uBgGain", "f", r.bg_gain)
+    put("composite", "uCentreGlow", "f", r.look["glow"])
     put("composite", "uHasLogo", "i", 1 if (r.logo_choice != "none" and not r.background) else 0)
     put("composite", "uHasMask", "i", 1 if r.mask else 0)
     put("composite", "cGlow", "f3", *c["glow"]); put("composite", "cLogoGlow", "f3", *th["logo"]["glow"])
-    put("composite", "uBloomK", "f", rain["bloom"]); put("composite", "uVeil", "f", rain["veil"])
-    put("composite", "uLogoSize", "f", th["logo"]["size"]); put("composite", "uLogoGlowK", "f", th["logo"]["glowStrength"])
+    put("composite", "uBloomK", "f", rain["bloom"] * r.look["bloom"]); put("composite", "uVeil", "f", rain["veil"])
+    put("composite", "uLogoSize", "f", th["logo"]["size"])
+    put("composite", "uLogoGlowK", "f", th["logo"]["glowStrength"] * r.look["glow"])
     for k, v in r.motion.items():
         put("composite", k, "f", v)
-    snow = th["snow"][:4]
+    snow = th["snow"][:4] if r.look["snow"] else []
     pad = [None] * (4 - len(snow))
     put("composite", "uSnowN", "i", len(snow))
     put("composite", "uSnowA", "f4v", *sum(([s["cell"], s["speed"], s["density"], s["bright"]] if s else [0] * 4
@@ -360,9 +367,22 @@ class Shared:
         return bool(gl.glIsProgram(self.prog["composite"].id)) and bool(gl.glIsTexture(self.tex["atlas"]))
 
 
+#: The Renderer's keywords that come straight from the command line's options of the same names.
+OPTIONS = ("theme", "channel", "logo", "background", "mask", "bg_gamma", "bg_gain", "rainbow", "spin", "drift",
+           "speed", "density", "snow", "glow", "bloom", "hieroglyphs")
+
+
+def from_args(args, **override):
+    """A Renderer for the command line's picture options."""
+    kw = {k: getattr(args, k, None) for k in OPTIONS}
+    kw.update(override)
+    return Renderer(**{k: v for k, v in kw.items() if v is not None})
+
+
 class Renderer:
     def __init__(self, theme="nixos", channel="public", logo=None, background=None, mask=None,
-                 bg_gamma=None, bg_gain=None, rainbow=None, spin=None, drift=None, data_dir=engine.DATA_DIR):
+                 bg_gamma=None, bg_gain=None, rainbow=None, spin=None, drift=None, speed=None, density=None,
+                 snow=None, glow=None, bloom=None, hieroglyphs=None, data_dir=engine.DATA_DIR):
         self.meta = engine.load_meta(data_dir)
         if theme not in self.meta["themes"]:
             raise SystemExit(f"unknown theme {theme!r}; available: {', '.join(self.meta['themes'])}")
@@ -375,6 +395,8 @@ class Renderer:
         self.bg_gamma = bg_gamma if bg_gamma is not None else (2.0 if dark else 1.0)
         self.bg_gain = bg_gain if bg_gain is not None else (0.42 if dark else 1.0)
         self.motion = engine.motion(self.th, rainbow=rainbow, spin=spin, drift=drift)
+        self.look = engine.look(self.th, speed=speed, density=density, snow=snow, glow=glow, bloom=bloom,
+                                hieroglyphs=hieroglyphs)
         self.data_dir = data_dir
         self.epoch0, self.cols = self.meta["epoch0"], self.meta["cols"]
         self.targets = {}
@@ -387,7 +409,7 @@ class Renderer:
         """Everything the shared programs and textures depend on: two renderers with the same key
         draw with the same objects."""
         return (use_es, self.data_dir, self.theme_name, self.seed, self.logo_choice, self.background, self.mask,
-                self.bg_gamma, self.bg_gain, tuple(sorted(self.motion.items())))
+                self.bg_gamma, self.bg_gain, tuple(sorted(self.motion.items())), tuple(sorted(self.look.items())))
 
     def keep_mode(self):
         """Which cells the hidden words keep clear of, as the native scene says it:

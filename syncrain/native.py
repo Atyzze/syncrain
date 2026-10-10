@@ -22,7 +22,7 @@ import sys
 from pathlib import Path
 
 from . import build, hidden
-from .renderer import STATIC_TEXTURES, Renderer, rgba_pil, shader_bodies, static_uniforms, texture_sources
+from .renderer import STATIC_TEXTURES, from_args, rgba_pil, shader_bodies, static_uniforms, texture_sources
 
 NAME = "syncrain-wallpaper"
 SCENE_CONTRACT = "syncrain-scene-1"
@@ -57,9 +57,7 @@ def _number(kind, value) -> str:
 
 def scene_bytes(args, fallback: list[str] | None) -> bytes:
     """The scene, as syncrain/native/scene.c reads it."""
-    r = Renderer(theme=args.theme, channel=args.channel, logo=args.logo, background=args.background,
-                 mask=args.mask, bg_gamma=args.bg_gamma, bg_gain=args.bg_gain, rainbow=args.rainbow,
-                 spin=args.spin, drift=args.drift)
+    r = from_args(args)
     sources, r.bg_size, r.mask_bbox = texture_sources(r, rgba_pil)
     header = [SCENE_CONTRACT, f"describe {build.describe()}", f"epoch0 {int(r.epoch0)}", f"cols {int(r.cols)}"]
     keep = r.keep_mode()

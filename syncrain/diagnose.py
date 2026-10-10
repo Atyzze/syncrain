@@ -57,6 +57,63 @@ def session_lines() -> list[str]:
     return lines
 
 
+def memory_record_path() -> str:
+    """Where the native wallpaper keeps its memory record (syncrain/native/wallpaper.c, record_memory)."""
+    state = os.environ.get("XDG_STATE_HOME", "")
+    base = state if state.startswith("/") else os.path.join(os.path.expanduser("~"), ".local", "state")
+    return os.path.join(base, "syncrain", "memory.log")
+
+
+def _read(path, mode="r"):
+    try:
+        with open(path, mode) as fh:
+            return fh.read()
+    except OSError:
+        return None
+
+
+def running_lines(record_lines=8) -> list[str]:
+    """The wallpapers running now (this user's): which host, how long, their memory, and the
+    environment they really got; then the end of the memory record."""
+    lines = []
+    uptime = float((_read("/proc/uptime") or "0").split()[0])
+    tick = os.sysconf("SC_CLK_TCK")
+    for d in sorted(glob.glob("/proc/[0-9]*"), key=lambda p: int(p[6:])):
+        pid = int(d[6:])
+        if pid == os.getpid():
+            continue
+        comm, raw = (_read(d + "/comm") or "").strip(), _read(d + "/cmdline", "rb") or b""
+        argv = [a.decode(errors="replace") for a in raw.split(b"\0") if a]
+        if comm == "syncrain-wallpa":
+            what = "the native wallpaper"
+        elif argv and "python" in os.path.basename(argv[0]) and (
+                any(a.endswith("/syncrain") for a in argv[1:3]) or argv[1:3] == ["-m", "syncrain"]):
+            if any(a in argv for a in ("--diagnose", "--power-sweep", "--benchmark", "--screenshot", "--record")):
+                continue
+            what = "the GTK host"
+        else:
+            continue
+        environ = _read(d + "/environ", "rb")
+        if environ is None:                  # another user's
+            continue
+        env = dict(e.decode(errors="replace").split("=", 1) for e in environ.split(b"\0") if b"=" in e)
+        rss = next((int(line.split()[1]) / 1024 for line in (_read(d + "/status") or "").splitlines()
+                    if line.startswith("VmRSS:")), 0.0)
+        stat = (_read(d + "/stat") or "").rsplit(")", 1)[-1].split()
+        hours = (uptime - int(stat[19]) / tick) / 3600 if len(stat) > 19 else 0.0
+        said = ", ".join(f"{k}={env[k]}" for k in ("__NV_DISABLE_EXPLICIT_SYNC", "__GL_YIELD") if k in env)
+        lines.append(f"pid {pid}: {what}, up {hours:.1f} h, {rss:.0f} MiB resident"
+                     + (f", {said}" if said else ", explicit sync as the driver chooses"))
+    if not lines:
+        lines.append("none running")
+    path = memory_record_path()
+    record = (_read(path) or "").splitlines()
+    if record:
+        lines.append(f"memory record ({path.replace(os.path.expanduser('~'), '~', 1)}), the last lines:")
+        lines.extend("  " + line for line in record[-record_lines:])
+    return lines
+
+
 def library_lines(Gtk) -> tuple[list[str], bool | None]:
     """The versions that matter, and whether the compositor offers a wallpaper layer (None: not asked)."""
     import gi
@@ -78,10 +135,9 @@ def library_lines(Gtk) -> tuple[list[str], bool | None]:
 
 def draw_one_frame(args, use_es, gl):
     """Compile everything and draw the theme offscreen at a fixed moment; return (mean, lit share)."""
-    from .renderer import Renderer
+    from .renderer import from_args
     w, h = 640, 360
-    r = Renderer(theme=args.theme, channel=args.channel, logo=args.logo,
-                 rainbow=args.rainbow, spin=args.spin, drift=args.drift)
+    r = from_args(args, background=None, mask=None, bg_gamma=None, bg_gain=None)
     r.init(use_es)
     fbo, tex = gl.gen_framebuffer(), gl.gen_texture()
     gl.glBindTexture(gl.GL_TEXTURE_2D, tex)
@@ -191,6 +247,7 @@ def run(args) -> int:
         out.extend(f"  {line}" for line in lines)
 
     section("session", session_lines())
+    section("running wallpaper", running_lines())
     section("graphics cards", graphics_cards())
     from .app import avoid_the_explicit_sync_leak, use_gl_renderer
     use_gl_renderer()                        # what the wallpaper itself does, so the answer is about it

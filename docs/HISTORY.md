@@ -39,6 +39,9 @@ showed within seconds, which is why syncrain draws every frame from the clock.
 * **10** (2026-10-09): consolidation. The documents made short; builds 1 to 8 folded in here.
 * **11** (2026-10-09): no memory creep on NVIDIA (explicit sync off for syncrain's own process);
   build 9's review fixed.
+* **12** (2026-10-10): picture options (glow, bloom, background, speed, density, snow), Egyptian
+  hieroglyphs among the symbols (a new stream); freed memory handed back every five minutes, with a
+  record `--diagnose` shows.
 
 ## The operator's words
 
@@ -62,4 +65,7 @@ showed within seconds, which is why syncrain draws every frame from the clock.
   github please"; a warning that the sweep's last two phases turn the screens black.
 * **After 9**: "Will it ever gc and go back down or?"; "Keep it minimal please, walls of text arent
   inviting to read :)".
+* **After 11**: "I want to be able to make the background more black!"; a parameter for the speed,
+  for how many lanes spawn, the snow off; "include egyptian hyroglyphs in the symbols as well";
+  "suddenly it dropped back to 170MiB?".
 * **Standing**: no long dashes in anything written to them.

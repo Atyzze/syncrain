@@ -1,4 +1,4 @@
-# Where we are, at build 11
+# Where we are, at build 12
 
 The project on one page. Detail: `docs/agent/HANDOFF.md`.
 
@@ -14,14 +14,18 @@ name, so everyone on a channel sees the same rain. Linux (Wayland, X11) and the 
 * **Power**: about 11 W at 30 fps; the watts follow the frames, not the language.
 * **Covered screens are not drawn** (0 W behind a full-screen window), and every frame lands on
   the refresh.
-* **Memory creep fixed, to be confirmed**: builds 8 to 10 grew about 0.9 MiB a minute while
-  drawing, because NVIDIA's Wayland driver leaks a little per frame with explicit sync on. Build 11
-  turns explicit sync off for syncrain only. Watch btop: it should stay near 123 MiB.
+* **Memory**: build 11 grew from 110 to 225 MiB in 18 h, slowing, then fell to 170 by itself: freed
+  memory not yet handed back, not a leak. Build 12 hands it back every five minutes and keeps a
+  record; `syncrain --diagnose` shows it.
+* **Your picture options** (build 12): `--glow`, `--bloom`, `--bg-gain` (darker), `--speed`,
+  `--density`, `--snow off`, `--hieroglyphs` (0.15 by default).
+* **The glow flare-up**: not in the frames syncrain computes (two hours checked). Note the time
+  when you see it, and that moment can be drawn again.
 * **On GitHub**: github.com/Atyzze/syncrain, one commit per build.
 
 ## What comes next
 
-* **Build 12**: your answers below.
+* **Build 13**: your answers below, and the flare-up if you catch its time.
 * **Then**: the KDE plugin if you want it; a NixOS image.
 
 ## The decision in front of you

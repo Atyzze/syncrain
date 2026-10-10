@@ -134,3 +134,14 @@ def test_diagnose_without_opengl_says_so_first(app):
     done = app(["--diagnose"], **GL_NONE)
     assert done.returncode == 69
     assert done.stdout.splitlines()[1].startswith("verdict: no OpenGL context:"), done.stdout
+
+
+@pytest.mark.parametrize("option", [["--speed", "2"], ["--density", "2"], ["--glow", "0"], ["--bloom", "0"],
+                                    ["--bg-gain", "0.3"], ["--snow", "off"], ["--hieroglyphs", "0"]],
+                         ids=lambda o: o[0][2:])
+def test_each_picture_option_changes_the_picture(app, tmp_path, option):
+    plain, changed = tmp_path / "plain.png", tmp_path / "changed.png"
+    for path, extra in ((plain, []), (changed, option)):
+        done = app(["--window", "--size", "640x360", "--time", str(MOMENT), "--screenshot", str(path), *extra])
+        assert done.returncode == 0, done.stderr
+    assert mean_abs_diff(plain, changed) > 0.05

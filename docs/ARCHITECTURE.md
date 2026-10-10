@@ -24,9 +24,9 @@ Machines with synced clocks and the same stream id draw the same frame.
 5. **blur**, vertical.
 6. **composite**: background, snow, glyphs, bloom, logo, front snow.
 
-Data: `syncrain/data/themes.json`, `syncrain/data/atlas.png`, the NixOS logos (CC BY 4.0), all made
-by `tools/build_assets.py`. The logo turns, drifts and cycles colour, against burn-in; nothing
-flashes.
+Data: `syncrain/data/themes.json`, `syncrain/data/atlas.png` (code glyphs, then 95 Egyptian
+hieroglyphs), the NixOS logos (CC BY 4.0), all made by `tools/build_assets.py`. The logo turns,
+drifts and cycles colour, against burn-in; nothing flashes.
 
 ## Three hosts
 
@@ -64,6 +64,9 @@ which screens a maximized or full-screen window covers; those stop drawing until
 * The watts follow the frames (about 0.17 J a frame per screen), not the pixels or the language.
 * NVIDIA's Wayland driver leaks a fixed amount per frame with explicit sync on, so syncrain turns
   it off for its own process (`syncrain/app.py`, `avoid_the_explicit_sync_leak`).
+* The C heap keeps what is freed until asked: both hosts hand it back after the first frames and
+  every five minutes after. The native wallpaper keeps a record (`record_memory`).
+* The picture options (`--speed`, `--glow` and the rest, `engine.look`) are uniforms set once.
 
 ## Builds and the stream (`syncrain/build.py`)
 

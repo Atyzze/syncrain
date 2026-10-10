@@ -102,13 +102,16 @@ def test_without_opengl_the_desktop_is_given_back(root, sway, tmp_path):
     assert mean_abs_diff(after, empty) < 1, "something is still covering the desktop"
 
 
-def test_the_native_wallpaper_draws_the_gtk_host_s_frame(root, sway, tmp_path):
+@pytest.mark.parametrize("look", [[], ["--speed", "2", "--density", "0.5", "--glow", "0", "--bloom", "1.5",
+                                        "--bg-gain", "0.5", "--snow", "off", "--hieroglyphs", "1"]],
+                         ids=["defaults", "every-option"])
+def test_the_native_wallpaper_draws_the_gtk_host_s_frame(root, sway, tmp_path, look):
     """The same moment, drawn by each host on the same screen, is the same picture to the pixel."""
     session, _ = sway
     shots = {}
     for host in ("native", "gtk"):
         proc, line = start(root, wallpaper_env(root, session), "--time", str(MOMENT), "--host",
-                           "auto" if host == "native" else "gtk")
+                           "auto" if host == "native" else "gtk", *look)
         try:
             assert HOSTS[host] in line, line + proc.stderr.read()
             time.sleep(2.0)
@@ -274,6 +277,37 @@ def test_memory_is_handed_back_after_the_first_frames_and_after_a_screen_change(
             assert wait_for_settles(1) == 1, "".join(lines)
             subprocess.run(["swaymsg", "-q", "create_output"], env=dict(os.environ, **session), check=True)
             assert wait_for_settles(2) == 2, "".join(lines)
+        finally:
+            proc.send_signal(signal.SIGTERM)
+            proc.wait(timeout=30)
+    assert proc.returncode == 0
+
+
+def test_the_native_wallpaper_keeps_a_memory_record_and_trims_as_it_goes(root, tmp_path):
+    """Freed memory goes back every few minutes (here half a second), and the record says how it went:
+    a line once the first frames are drawn, then one every twelfth time. --diagnose shows the
+    running wallpaper with the environment it got, and the record's end."""
+    need(shutil.which("sway") is not None, "no sway")
+    state = tmp_path / "state"
+    with headless_sway(tmp_path / "run", screen="320x180") as session:
+        env = wallpaper_env(root, session, SYNCRAIN_MEMORY_SECONDS="0.5", XDG_STATE_HOME=str(state))
+        proc, line = start(root, env)
+        record = state / "syncrain" / "memory.log"
+        try:
+            assert HOSTS["native"] in line, line + proc.stderr.read()
+            deadline = time.monotonic() + 40
+            while time.monotonic() < deadline and len(record.read_text().splitlines() if record.exists() else []) < 2:
+                time.sleep(0.5)
+            lines = record.read_text().splitlines()
+            assert len(lines) >= 2, lines
+            assert all(re.search(r"pid \d+, up \d+ min, \d+ frames: [\d.]+ MiB resident \([\d.]+ before handing back\), "
+                                 r"malloc [\d.]+ MiB in use$", text) for text in lines), lines
+            report = subprocess.run([sys.executable, "-c", "from syncrain import diagnose; "
+                                     "print(chr(10).join(diagnose.running_lines()))"],
+                                    cwd=root, env=env, capture_output=True, text=True, timeout=60).stdout
+            assert re.search(rf"pid {proc.pid}: the native wallpaper, up [\d.]+ h, \d+ MiB resident, "
+                             r"__NV_DISABLE_EXPLICIT_SYNC=1, __GL_YIELD=USLEEP", report), report
+            assert "memory record (" in report and lines[-1] in report, report
         finally:
             proc.send_signal(signal.SIGTERM)
             proc.wait(timeout=30)

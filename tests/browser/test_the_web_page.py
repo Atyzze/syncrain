@@ -38,10 +38,17 @@ def page(root):
     return run
 
 
-def test_the_page_and_the_app_draw_the_same_frame(page, app, tmp_path):
+#: Every picture option, as the page's URL says it and as the command line does.
+LOOK = {"speed": "0.5", "density": "1.7", "glow": "0.3", "bloom": "0.5", "bg-gain": "0.6", "snow": "off",
+        "hieroglyphs": "0.6"}
+
+
+@pytest.mark.parametrize("look", [{}, LOOK], ids=["defaults", "every-option"])
+def test_the_page_and_the_app_draw_the_same_frame(page, app, tmp_path, look):
     web, native = tmp_path / "web.png", tmp_path / "native.png"
-    page("shot", web, 1280, 720, f"t={MOMENT}&hud=0")
-    done = app(["--window", "--size", "1280x720", "--time", str(MOMENT), "--screenshot", str(native)])
+    page("shot", web, 1280, 720, f"t={MOMENT}&hud=0" + "".join(f"&{k}={v}" for k, v in look.items()))
+    options = [x for k, v in look.items() for x in ("--" + k, v)]
+    done = app(["--window", "--size", "1280x720", "--time", str(MOMENT), "--screenshot", str(native), *options])
     assert done.returncode == 0, done.stderr
     assert mean_abs_diff(web, native) < 1.0
 

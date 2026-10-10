@@ -53,12 +53,25 @@ def parse_args(argv=None):
     ap.add_argument("--background", metavar="IMAGE", help="use an image as the background instead of the theme gradient")
     ap.add_argument("--mask", metavar="IMAGE", help="greyscale mask (same framing as --background): white = keep bright, no rain")
     ap.add_argument("--bg-gamma", type=float, help="darkening curve for --background (default 2.0; 1 = unchanged)")
-    ap.add_argument("--bg-gain", type=float, help="brightness for --background (default 0.42; 1 = unchanged)")
+    ap.add_argument("--bg-gain", type=float,
+                    help="background brightness: the gradient's (default 1; lower is darker) or --background's "
+                         "(default 0.42; 1 = unchanged)")
     ap.add_argument("--rainbow", choices=("logo", "all", "off"),
                     help="colour cycling: logo (default), all (the rain too) or off")
     ap.add_argument("--spin", type=float, metavar="SECONDS", help="seconds per logo revolution (default 180, 0 = still)")
     ap.add_argument("--drift", type=float, metavar="FRACTION",
                     help="slow orbit of the logo / pan of the image, in screen heights (default 0.03, 0 = fixed)")
+    ap.add_argument("--speed", type=float, metavar="F",
+                    help="how fast the symbols fall, times the theme's (default 1; 0.25 to 4)")
+    ap.add_argument("--density", type=float, metavar="F",
+                    help="how often a column starts a new stream, times the theme's (default 1; 0 to 2.3)")
+    ap.add_argument("--glow", type=float, metavar="F",
+                    help="the glow around the centre and the logo, times the theme's (default 1; 0 = none)")
+    ap.add_argument("--bloom", type=float, metavar="F",
+                    help="the glow around the falling symbols, times the theme's (default 1; 0 = none)")
+    ap.add_argument("--snow", choices=("on", "off"), help="the falling snowflakes (default on, where the theme has them)")
+    ap.add_argument("--hieroglyphs", type=float, metavar="SHARE",
+                    help="share of the changing symbols that are Egyptian hieroglyphs (default 0.15; 0 = none, 1 = only)")
     ap.add_argument("--scale", type=float, default=1.0, help="render resolution scale, e.g. 0.75 on weak GPUs")
     ap.add_argument("--layer", choices=("background", "bottom"),
                     help="Wayland layer (default: bottom on KDE Plasma, whose own desktop sits on the background layer)")
@@ -206,6 +219,10 @@ def _libc_function(name):
         return None
 
 
+#: How often freed memory goes back to the system while syncrain runs.
+TRIM_SECONDS = 300
+
+
 def settle_memory():
     """After startup (and after the screens changed): give back what starting left behind.
 
@@ -321,7 +338,7 @@ def main(argv=None):
         return 1
     backend = type(display).__name__          # GdkWaylandDisplay / GdkX11Display
     from . import gl
-    from .renderer import Renderer
+    from .renderer import from_args as renderer_from_args
 
     LayerShell = None
     if "Wayland" in backend and not (args.window or args.record):
@@ -390,9 +407,7 @@ def main(argv=None):
                 app.fail(problem)
                 return
             try:
-                r = Renderer(theme=args.theme, channel=args.channel, logo=args.logo, background=args.background,
-                             mask=args.mask, bg_gamma=args.bg_gamma, bg_gain=args.bg_gain,
-                             rainbow=args.rainbow, spin=args.spin, drift=args.drift)
+                r = renderer_from_args(args)
                 r.init(use_es)
             except RuntimeError as e:          # a shader this driver will not compile
                 app.fail(f"the shaders did not compile here: {e}")
@@ -673,7 +688,14 @@ def main(argv=None):
             if DEBUG_FPS:
                 print(f"syncrain: memory handed back after the first frames ({resident_mib():.0f} MiB resident)",
                       flush=True)
+            if not getattr(self, "_trimming", None):     # and again every five minutes, as the native one does
+                self._trimming = GLib.timeout_add_seconds(TRIM_SECONDS, self._trim)
             return GLib.SOURCE_REMOVE
+
+        @staticmethod
+        def _trim():
+            settle_memory()
+            return GLib.SOURCE_CONTINUE
 
         def started(self, context):
             """One line when the first viewport is up: what draws, where (it lands in the journal)."""

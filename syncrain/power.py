@@ -260,7 +260,7 @@ def interrupted_by_hangup():
         raise KeyboardInterrupt
 
     before = {sig: signal.getsignal(sig) for sig in STOPPING}
-    for sig in (signal.SIGHUP, signal.SIGTERM):
+    for sig in STOPPING:                      # Ctrl+C too, so the very first signal already holds the rest
         if before[sig] is not signal.SIG_IGN:
             signal.signal(sig, interrupt)
     try:
@@ -272,7 +272,7 @@ def interrupted_by_hangup():
 
 #: The wallpaper options a sweep passes on to every phase (the rest are the phase's own).
 PASS_ON = ("theme", "channel", "logo", "background", "mask", "bg_gamma", "bg_gain", "rainbow", "spin", "drift",
-           "layer", "scale", "fps", "pause_under", "host")
+           "speed", "density", "glow", "bloom", "snow", "hieroglyphs", "layer", "scale", "fps", "pause_under", "host")
 
 
 def base_args(args) -> list[str]:
@@ -393,7 +393,8 @@ def run_sweep(args) -> int:
               "amdgpu power sensor. `syncrain --benchmark` still shows what each pass costs the card.")
         return 1
     plan = phases(seconds)
-    print(f"power from {source.name}: {source.describe()}")
+    described = source.describe()
+    print(f"power from {source.name}: {described}")
     print(f"{len(plan)} phases of {seconds} s (the first {settle} s of each let the card settle), about "
           f"{len(plan) * (seconds + 3) // 60 + 1} minutes. For a fair 'nothing', give Plasma a still picture as "
           "its wallpaper first. Ctrl+C stops early and still prints what was measured.")
@@ -463,7 +464,7 @@ def run_sweep(args) -> int:
                 if c:
                     c.stop()
             source.stop()
-    report(results, source, interrupted)
+        report(results, described, interrupted)      # still held: the record is kept whatever comes now
     return 0 if not interrupted else 130
 
 
@@ -475,10 +476,10 @@ def drawn_by(startup: str) -> str:
     return found.group(1) if found else ""
 
 
-def report(results, source, interrupted) -> None:
+def report(results, described, interrupted) -> None:
     """The record goes to its file before anything is printed: a sweep whose terminal was closed
     cannot print, but still keeps what it measured."""
-    saved = save_record(results, source, interrupted)
+    saved = save_record(results, described, interrupted)
     idle = next((r["watts"] for r in results if r["phase"].startswith("nothing") and r.get("watts")), None)
     print()
     print(f"{'phase':30s} {'card W':>7s} {'above':>7s} {'frames/s':>9s} {'even':>5s} {'steady':>6s} "
@@ -509,10 +510,12 @@ def report(results, source, interrupted) -> None:
     print(saved)
 
 
-def save_record(results, source, interrupted) -> str:
-    """~/syncrain-power-<utc>.json; returns the line that says where it went, or why it did not."""
+def save_record(results, described, interrupted) -> str:
+    """~/syncrain-power-<utc>.json; returns the line that says where it went, or why it did not.
+    `described` is what the power source said of itself at the start (asking again would start
+    nvidia-smi once more, here, where nothing may wait)."""
     record = {"contract": "syncrain-power-sweep-1", "build": build.BUILD_NUMBER, "stream": build.stream_id(),
-              "source": source.describe(), "when_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+              "source": described, "when_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
               "interrupted": interrupted, "phases": results}
     out = Path.home() / f"syncrain-power-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}.json"
     try:

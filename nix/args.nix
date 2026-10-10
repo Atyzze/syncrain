@@ -12,4 +12,11 @@ in
 ++ optionals (cfg.rainbow != null) [ "--rainbow" cfg.rainbow ]
 ++ optionals (cfg.spin != null) [ "--spin" (toString cfg.spin) ]
 ++ optionals (cfg.drift != null) [ "--drift" (toString cfg.drift) ]
+++ optionals (cfg.speed != null) [ "--speed" (toString cfg.speed) ]
+++ optionals (cfg.density != null) [ "--density" (toString cfg.density) ]
+++ optionals (cfg.glow != null) [ "--glow" (toString cfg.glow) ]
+++ optionals (cfg.bloom != null) [ "--bloom" (toString cfg.bloom) ]
+++ optionals (cfg.bgGain != null) [ "--bg-gain" (toString cfg.bgGain) ]
+++ optionals (!cfg.snow) [ "--snow" "off" ]
+++ optionals (cfg.hieroglyphs != null) [ "--hieroglyphs" (toString cfg.hieroglyphs) ]
 ++ cfg.extraArgs

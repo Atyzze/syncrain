@@ -72,6 +72,26 @@ def motion(theme, rainbow=None, spin=None, drift=None):
     }
 
 
+#: Each picture option's range, and what the theme says when the option is not given.
+LOOK = {"speed": (0.25, 4.0), "density": (0.0, 2.3), "glow": (0.0, 2.0), "bloom": (0.0, 2.0),
+        "hieroglyphs": (0.0, 1.0)}
+
+
+def look(theme, speed=None, density=None, snow=None, glow=None, bloom=None, hieroglyphs=None):
+    """The picture options as multipliers of the theme's own values (1: as the theme has it), the
+    share of hieroglyphs among the changing glyphs, and whether the snow falls."""
+    rain = theme["rain"]
+    given = dict(speed=speed, density=density, glow=glow, bloom=bloom, hieroglyphs=hieroglyphs)
+    out = {}
+    for key, value in given.items():
+        lo, hi = LOOK[key]
+        if value is None:
+            value = rain.get("hieroglyphs", 0.0) if key == "hieroglyphs" else 1.0
+        out[key] = float(min(hi, max(lo, value)))
+    out["snow"] = snow if isinstance(snow, bool) else snow != "off"
+    return out
+
+
 def lut_bytes(theme) -> bytes:
     out = bytearray(256 * 4)
     for i, g in enumerate(theme["lut"]):

@@ -57,10 +57,13 @@ def test_the_services_pass_the_channel_through_systemd_intact(evaluated, which):
     assert words[0].endswith("/bin/syncrain")
     assert words[words.index("--channel") + 1] == CHANNEL, words
     assert service["prevent"] == 69
-    if which == "nixos":                      # set there; the home-manager service keeps the default
+    if which == "nixos":                      # set there; the home-manager service keeps the defaults
         assert words[words.index("--pause-under") + 1] == "fullscreen", words
+        assert [words[words.index(o) + 1] for o in ("--speed", "--glow", "--snow", "--hieroglyphs")] == \
+            ["0.500000", "0.000000", "off", "0.300000"], words
     else:
-        assert "--pause-under" not in words, words
+        for o in ("--pause-under", "--speed", "--glow", "--snow", "--hieroglyphs"):
+            assert o not in words, words
 
 
 @pytest.fixture(scope="module")

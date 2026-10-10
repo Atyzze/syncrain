@@ -5,8 +5,8 @@ function of the UTC clock and a channel name. Two themes, **nixos** (blue rain, 
 snowflake) and **matrix** (green). A wallpaper on Linux (Wayland, X11) and a web page.
 
 <p align="center">
-  <img src="docs/images/nixos.jpg" width="49%" alt="The nixos theme: pale blue characters falling in columns over dark blue, with snowflakes and the NixOS snowflake in rainbow colours in the middle">
-  <img src="docs/images/matrix.jpg" width="49%" alt="The matrix theme: green katakana, digits and letters falling in columns over black">
+  <img src="docs/images/nixos.jpg" width="49%" alt="The nixos theme: pale blue characters and Egyptian hieroglyphs falling in columns over dark blue, with snowflakes and the NixOS snowflake in rainbow colours in the middle">
+  <img src="docs/images/matrix.jpg" width="49%" alt="The matrix theme: green katakana, digits, letters and hieroglyphs falling in columns over black">
 </p>
 <p align="center"><sub>The channel <code>public</code> at 2026-10-07 00:00:07 UTC.
 <code>syncrain --window --time 1791331207</code> draws that moment on any machine.</sub></p>

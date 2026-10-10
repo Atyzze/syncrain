@@ -89,6 +89,7 @@
 // As a wallpaper page, URL parameters (when the host passes them):
 //   theme=nixos|matrix  channel=<name>  fps=30  logo=white|colours|none  hud=0  scale=1  t=<unix seconds, frozen>
 //   rainbow=logo|all|off  spin=<seconds per logo turn, 0 = still>  drift=<screen heights, 0 = fixed>
+//   speed density glow bloom bg-gain (times the theme's, 1 = as it is)  snow=on|off  hieroglyphs=<share 0..1>
 const META = /*@META@*/null;
 const BUILD = /*@BUILD@*/0, STREAM = '/*@STREAM@*/';   // written by tools/build_web.py
 const SRC = /*@SHADERS@*/null;
@@ -119,6 +120,19 @@ function motion() {                          // same as engine.motion() in the n
     uDrift: driftParam === null ? (TH.logo.drift || 0) : driftParam,
   };
 }
+// the picture options, as engine.look() in the native app makes them
+const LOOK = { speed: [0.25, 4], density: [0, 2.3], glow: [0, 2], bloom: [0, 2], hieroglyphs: [0, 1] };
+function look() {
+  const out = {};
+  for (const [k, [lo, hi]] of Object.entries(LOOK)) {
+    const v = P.has(k) && P.get(k) !== '' && !isNaN(Number(P.get(k))) ? Number(P.get(k))
+      : (k === 'hieroglyphs' ? (TH.rain.hieroglyphs || 0) : 1);
+    out[k] = Math.min(hi, Math.max(lo, v));
+  }
+  out.snow = P.get('snow') !== 'off';
+  return out;
+}
+const bgGain = P.has('bg-gain') && !isNaN(Number(P.get('bg-gain'))) && P.get('bg-gain') !== '' ? Number(P.get('bg-gain')) : 1;
 const fixedT = P.has('t') ? Number(P.get('t')) : null;
 const showHud = P.get('hud') !== '0';
 const renderScale = P.has('scale') ? Math.max(0.25, Math.min(3, Number(P.get('scale')) || 1)) : Math.min(window.devicePixelRatio || 1, 2);
@@ -282,8 +296,11 @@ function draw(ms) {
   gl.uniform1i(pr.u('uLUT'), UNIT.lut); gl.uniform1i(pr.u('uWords'), UNIT.words);
   gl.uniform1i(pr.u('uNumWords'), words.length);
   gl.uniform4fv(pr.u('uKeep'), keep);
-  gl.uniform1f(pr.u('uDensity'), TH.rain.density); gl.uniform1f(pr.u('uWordRate'), TH.rain.wordRate);
+  const L = look(), hiero = META.atlas.hieroglyphs || [0, 0];
+  gl.uniform1f(pr.u('uDensity'), Math.min(1, TH.rain.density * L.density)); gl.uniform1f(pr.u('uWordRate'), TH.rain.wordRate);
   gl.uniform1f(pr.u('uGlintRate'), TH.rain.glintRate); gl.uniform1i(pr.u('uContrast'), TH.rain.contrast);
+  gl.uniform1f(pr.u('uSpeed'), L.speed); gl.uniform1f(pr.u('uHiero'), hiero[1] ? L.hieroglyphs : 0);
+  gl.uniform1i(pr.u('uHieroFirst'), hiero[0]); gl.uniform1i(pr.u('uHieroCount'), Math.max(1, hiero[1]));
   pass(F.state, COLS, rows);
 
   bind(UNIT.state, T.state);
@@ -309,14 +326,14 @@ function draw(ms) {
   gl.uniform1i(pr.u('uBgMode'), 0);
   gl.uniform3fv(pr.u('bgTop'), bg.top); gl.uniform3fv(pr.u('bgBot'), bg.bottom);
   gl.uniform3fv(pr.u('bgCenter'), bg.center); gl.uniform1f(pr.u('bgVignette'), bg.vignette);
-  gl.uniform1f(pr.u('uBgGamma'), 1); gl.uniform1f(pr.u('uBgGain'), 1);
+  gl.uniform1f(pr.u('uBgGamma'), 1); gl.uniform1f(pr.u('uBgGain'), bgGain); gl.uniform1f(pr.u('uCentreGlow'), L.glow);
   gl.uniform2f(pr.u('uBgScale'), 1, 1); gl.uniform2f(pr.u('uBgOffset'), 0, 0);
   gl.uniform1i(pr.u('uHasLogo'), logoOn ? 1 : 0); gl.uniform1i(pr.u('uHasMask'), 0);
   gl.uniform3fv(pr.u('cGlow'), TH.colors.glow); gl.uniform3fv(pr.u('cLogoGlow'), TH.logo.glow);
-  gl.uniform1f(pr.u('uBloomK'), TH.rain.bloom); gl.uniform1f(pr.u('uVeil'), TH.rain.veil);
-  gl.uniform1f(pr.u('uLogoSize'), TH.logo.size); gl.uniform1f(pr.u('uLogoGlowK'), TH.logo.glowStrength);
+  gl.uniform1f(pr.u('uBloomK'), TH.rain.bloom * L.bloom); gl.uniform1f(pr.u('uVeil'), TH.rain.veil);
+  gl.uniform1f(pr.u('uLogoSize'), TH.logo.size); gl.uniform1f(pr.u('uLogoGlowK'), TH.logo.glowStrength * L.glow);
   for (const [k, v] of Object.entries(motion())) gl.uniform1f(pr.u(k), v);
-  const sn = TH.snow.slice(0, 4);
+  const sn = L.snow ? TH.snow.slice(0, 4) : [];
   const pack = f => new Float32Array([].concat(...[0, 1, 2, 3].map(i => sn[i] ? f(sn[i]) : [0, 0, 0, 0])));
   gl.uniform1i(pr.u('uSnowN'), sn.length);
   gl.uniform4fv(pr.u('uSnowA'), pack(s => [s.cell, s.speed, s.density, s.bright]));

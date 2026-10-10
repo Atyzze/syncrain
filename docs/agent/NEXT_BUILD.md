@@ -1,12 +1,14 @@
-# The next build is 12
+# The next build is 13
 
 The first line is parsed: `# The next build is <N>`, exactly one above `BUILD_NUMBER`.
 
-## Build 12: the operator's answers
+## Build 13: the operator's answers
 
 * Read what the operator sent last, and answer it in one plain sentence first. If memory still
-  grows with build 11, that comes first: `syncrain --diagnose` shows whether their session sets
-  `__NV_DISABLE_EXPLICIT_SYNC` itself.
+  grows with build 12, that comes first: their `syncrain --diagnose` shows the memory record and
+  the environment the running wallpaper got.
+* **The glow flare-up**: with the time they saw it, draw that moment (`--time`, their options, both
+  screens' sizes) and look at the frames around it.
 * **The three questions** in `docs/ROADMAP.md`. A default frame rate of 20 or 15 lives in four
   places: `--fps` in `syncrain/app.py`, `fps` in `nix/options.nix`, `base_args` in
   `syncrain/power.py` and the options table in `docs/OPERATIONS.md`. Pausing only under full-screen

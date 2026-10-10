@@ -11,12 +11,18 @@ uniform sampler2D uWords;    // 16 x n: hidden words, one per row (R = glyph ind
 uniform int uNumWords;
 uniform vec4 uKeep;          // cells kept free of words (the logo): col0, row0, col1, row1
 uniform float uDensity;      // spawn probability per column per second
+uniform float uSpeed;        // fall speed, times the theme's
+uniform float uHiero;        // share of the scrambling and resting glyphs drawn from the hieroglyphs
+uniform int uHieroFirst, uHieroCount;   // where the hieroglyphs sit in the atlas
 uniform float uWordRate;     // chance that a full-height drop carries a word
 uniform float uGlintRate;    // chance per cell per 2 s of a brief flare-up
 uniform int uContrast;       // 1: wide brightness range (dim distant streams, hot heads, glints)
 out vec4 oState;
 
-int lutGlyph(uint h) { return int(texelFetch(uLUT, ivec2(int(h & 255u), 0), 0).r * 255.0 + 0.5); }
+int lutGlyph(uint h) {
+    if (U(lowbias32(h ^ 0x68696572u)) < uHiero) return uHieroFirst + int(lowbias32(h ^ 0x6f676c79u) % uint(uHieroCount));
+    return int(texelFetch(uLUT, ivec2(int(h & 255u), 0), 0).r * 255.0 + 0.5);
+}
 int wordGlyph(int w, int i) { return int(texelFetch(uWords, ivec2(i, w), 0).r * 255.0 + 0.5); }
 int wordLen(int w) {
     int n = 0;
@@ -33,9 +39,9 @@ void main() {
     int G = -1;
     bool headCell = false, wordCell = false;
 
-    // longest life: a word drop (7 rows/s) crossing the screen plus its 34-row trail
-    int back = int(ceil((float(uRows) + 41.0) / 7.0)) + 1;
-    for (int i = 0; i < 64; i++) {
+    // longest life: a word drop (7 rows/s at speed 1) crossing the screen plus its 34-row trail
+    int back = int(ceil((float(uRows) + 41.0) / (7.0 * uSpeed))) + 1;
+    for (int i = 0; i < 256; i++) {
         if (i > back) break;
         uint k = uSec - uint(i);                               // spawn second
         if (U(H(cu, k, 0u, 1u)) >= uDensity) continue;
@@ -76,6 +82,7 @@ void main() {
             }
         }
 
+        v *= uSpeed;
         float head = r0 + v * el;
         bool alive = head <= r1;
         if (r < max(0, int(floor(r0))) || fr > floor(min(head, r1))) continue;

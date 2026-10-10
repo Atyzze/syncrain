@@ -141,23 +141,30 @@ def test_the_sweep_warns_before_it_turns_every_screen_black():
     assert power.cover_warning([p for p in power.phases(25) if not p.get("cover")], 25) is None
 
 
-@pytest.mark.parametrize("sig", [signal.SIGHUP, signal.SIGTERM], ids=["closed-terminal", "kill"])
+@pytest.mark.parametrize("sig", [signal.SIGINT, signal.SIGHUP, signal.SIGTERM], ids=["ctrl-c", "closed-terminal", "kill"])
 def test_a_closed_terminal_stops_the_sweep_as_ctrl_c_does(sig):
     """The black windows must not outlive the sweep: SIGHUP and SIGTERM end its phases the way Ctrl+C
     does (its children are stopped on the way out), and the handlers that were there come back."""
-    before = [signal.getsignal(s) for s in power.STOPPING]
-    with pytest.raises(KeyboardInterrupt):
-        with power.interrupted_by_hangup():
-            try:
-                os.kill(os.getpid(), sig)
-                time.sleep(5)
-            except KeyboardInterrupt:
-                # stopping the children: a second signal of any kind must not cut that short
-                for again in power.STOPPING:
-                    os.kill(os.getpid(), again)
-                time.sleep(0.2)
-                raise
-    assert [signal.getsignal(s) for s in power.STOPPING] == before
+    started = {s: signal.getsignal(s) for s in power.STOPPING}
+    try:
+        for s in power.STOPPING:              # as a terminal starts it, even when pytest runs under nohup
+            signal.signal(s, signal.default_int_handler if s == signal.SIGINT else signal.SIG_DFL)
+        before = [signal.getsignal(s) for s in power.STOPPING]
+        with pytest.raises(KeyboardInterrupt):
+            with power.interrupted_by_hangup():
+                try:
+                    os.kill(os.getpid(), sig)
+                    time.sleep(5)
+                except KeyboardInterrupt:
+                    # stopping the children: a second signal of any kind must not cut that short
+                    for again in power.STOPPING:
+                        os.kill(os.getpid(), again)
+                    time.sleep(0.2)
+                    raise
+        assert [signal.getsignal(s) for s in power.STOPPING] == before
+    finally:
+        for s, handler in started.items():
+            signal.signal(s, handler)
 
 
 def test_a_sweep_started_with_nohup_outlives_its_terminal():
@@ -184,8 +191,7 @@ def test_the_results_are_saved_even_when_the_table_cannot_be_printed(tmp_path, m
 
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.setattr(builtins, "print", no_terminal)
-    source = power.Command("echo 1")
     with pytest.raises(Gone):
-        power.report([{"phase": "nothing (your desktop alone)", "watts": 50.0}], source, interrupted=True)
+        power.report([{"phase": "nothing (your desktop alone)", "watts": 50.0}], "echo 1", interrupted=True)
     saved = list(tmp_path.glob("syncrain-power-*.json"))
     assert len(saved) == 1 and '"interrupted": true' in saved[0].read_text()

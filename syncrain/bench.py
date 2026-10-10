@@ -85,7 +85,7 @@ def run_benchmark(args) -> int:
         return 1
     from . import gl
     from .app import EXIT_NO_GL, describe_context, gl_context_problem
-    from .renderer import Renderer
+    from .renderer import from_args
 
     try:
         ctx = display.create_gl_context()
@@ -99,8 +99,7 @@ def run_benchmark(args) -> int:
         print(f"syncrain: {problem}")
         return EXIT_NO_GL
     w, h = (int(v) for v in args.size.lower().split("x")) if args.size else screen_size(Gdk, display)
-    r = Renderer(theme=args.theme, channel=args.channel, logo=args.logo, background=args.background, mask=args.mask,
-                 bg_gamma=args.bg_gamma, bg_gain=args.bg_gain, rainbow=args.rainbow, spin=args.spin, drift=args.drift)
+    r = from_args(args)
     r.init(use_es)
     fbo, tex = gl.gen_framebuffer(), gl.gen_texture()
     gl.glBindTexture(gl.GL_TEXTURE_2D, tex)

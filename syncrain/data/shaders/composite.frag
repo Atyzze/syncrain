@@ -8,7 +8,8 @@ uniform int uBgMode;                 // 0: procedural gradient, 1: image
 uniform int uHasLogo, uHasMask;
 uniform vec3 bgTop, bgBot, bgCenter;
 uniform float bgVignette;
-uniform float uBgGamma, uBgGain;     // image background tone curve (darkens everything except the mask)
+uniform float uBgGamma, uBgGain;     // background tone: the image's curve (not under the mask), or the gradient's level
+uniform float uCentreGlow;           // the gradient's glow around the centre, times the theme's
 uniform vec2 uBgScale, uBgOffset;    // cover-fit of the image
 uniform vec3 cGlow, cLogoGlow;
 uniform float uBloomK, uVeil, uLogoSize, uLogoGlowK;
@@ -133,8 +134,8 @@ void main() {
         col = mix(bgTop, bgBot, suv.y);
         vec2 d = (px - 0.5 * uRes) / uRes.y;
         vec3 centre = uRainHueCph > 0.0 ? max(hueRotate(bgCenter, cyclesPerHour(uRainHueCph)), 0.0) : bgCenter;
-        col += centre * exp(-dot(d, d) / 0.22);
-        col *= 1.0 - bgVignette * smoothstep(0.35, 1.2, length(d * vec2(0.85, 1.3)));
+        col += uCentreGlow * centre * exp(-dot(d, d) / 0.22);
+        col *= uBgGain * (1.0 - bgVignette * smoothstep(0.35, 1.2, length(d * vec2(0.85, 1.3))));
         col += (U(lowbias32(uint(px.x) * 73856093u ^ uint(px.y) * 19349663u)) - 0.5) / 255.0;   // anti-banding
     }
 

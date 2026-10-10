@@ -16,8 +16,11 @@ Open questions, planned builds, the cadence and the constraints. What shipped: `
 
 ## Decisions answered
 
+* **2026-10-10 12:29**: a darker background and less glow in the centre, parameters for speed and
+  for how many lanes spawn, the snow off, Egyptian hieroglyphs; a rare glow flare-up; memory "a
+  slowdown/plateau ... is this a non issue?", then "dropped back to 170MiB". Build 12.
 * **2026-10-09 13:07**: memory still creeps on build 8 ("Will it ever gc and go back down?"); the
-  documents: "Keep it minimal please". Build 10 made them short; build 11 stops the creep.
+  documents: "Keep it minimal please". Builds 10 and 11.
 * **2026-10-09 11:36**: build 8 approved for GitHub; a warning before the sweep's black screens.
   Builds 8 and 9.
 * **2026-10-09 07:05**: the smallest footprint, power first; does another language help? Build 8.
@@ -30,7 +33,8 @@ Open questions, planned builds, the cadence and the constraints. What shipped: `
 
 ## Planned builds
 
-1. **The operator's answers** above (`docs/agent/NEXT_BUILD.md`).
+1. **The operator's answers** above, and the flare-up once they note its time
+   (`docs/agent/NEXT_BUILD.md`).
 2. **The Plasma wallpaper plugin**, if chosen.
 3. **A NixOS image** with syncrain as its wallpaper.
 

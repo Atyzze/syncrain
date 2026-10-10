@@ -74,6 +74,48 @@ in
     description = "Slow orbit of the logo, or pan of a background image, in screen heights (null: 0.03; 0: fixed).";
   };
 
+  speed = mkOption {
+    type = types.nullOr (types.numbers.between 0.25 4.0);
+    default = null;
+    description = "How fast the symbols fall, times the theme's (null: 1).";
+  };
+
+  density = mkOption {
+    type = types.nullOr (types.numbers.between 0.0 2.3);
+    default = null;
+    description = "How often a column starts a new stream, times the theme's (null: 1).";
+  };
+
+  glow = mkOption {
+    type = types.nullOr (types.numbers.between 0.0 2.0);
+    default = null;
+    description = "The glow around the centre and the logo, times the theme's (null: 1; 0: none).";
+  };
+
+  bloom = mkOption {
+    type = types.nullOr (types.numbers.between 0.0 2.0);
+    default = null;
+    description = "The glow around the falling symbols, times the theme's (null: 1; 0: none).";
+  };
+
+  bgGain = mkOption {
+    type = types.nullOr (types.numbers.between 0.0 2.0);
+    default = null;
+    description = "Background brightness (null: 1 for the gradient, 0.42 for `background`; lower is darker).";
+  };
+
+  snow = mkOption {
+    type = types.bool;
+    default = true;
+    description = "The falling snowflakes, where the theme has them.";
+  };
+
+  hieroglyphs = mkOption {
+    type = types.nullOr (types.numbers.between 0.0 1.0);
+    default = null;
+    description = "Share of the changing symbols that are Egyptian hieroglyphs (null: 0.15; 0: none).";
+  };
+
   scale = mkOption {
     type = types.numbers.between 0.25 1.0;
     default = 1.0;

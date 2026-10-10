@@ -29,6 +29,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/signalfd.h>
+#include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -200,6 +201,11 @@ static struct {
 	bool drawn;                              /* a frame was committed: no more handing over */
 	const char *lost;                        /* why the wallpaper must stop with status 1 */
 	bool settled;                            /* memory handed back since the screens last changed */
+	int64_t started;                         /* monotonic microseconds at the start */
+	int64_t frames;                          /* frames shown, every screen */
+	int64_t next_trim;                       /* when freed memory is next handed back */
+	int64_t trim_us;
+	int trims;
 	bool running;
 	struct watch *watch;
 	bool watch_said, watch_retried;
@@ -468,12 +474,87 @@ static void schedule(struct screen *s)
 	s->due = now + (int64_t)(delay > 1000 ? delay : 1000);
 }
 
+/* ------------------------------------------------------------------ memory */
+
+#define TRIM_US (300LL * 1000000)                /* hand freed memory back every five minutes */
+#define RECORD_EVERY 12                          /* and write it down every twelfth time: hourly */
+
+static double resident_mib(void)
+{
+	long kib = 0;
+	FILE *status = fopen("/proc/self/status", "r");
+	char line[128];
+	while (status && fgets(line, sizeof line, status))
+		if (sscanf(line, "VmRSS: %ld", &kib) == 1)
+			break;
+	if (status)
+		fclose(status);
+	return kib / 1024.0;
+}
+
+/* The memory record, ~/.local/state/syncrain/memory.log (syncrain --diagnose shows its end): a line
+ * when the screens have drawn their first frames and one an hour after, with what handing back
+ * freed memory gave, so a leak (it grows and stays) can be told from memory not yet handed back. */
+static void record_memory(double before, double after)
+{
+	char path[1024];
+	const char *state = getenv("XDG_STATE_HOME"), *home = getenv("HOME");
+	int n;
+	if (state && state[0] == '/')
+		n = snprintf(path, sizeof path, "%s/syncrain", state);
+	else if (home && home[0] == '/')
+		n = snprintf(path, sizeof path, "%s/.local/state/syncrain", home);
+	else
+		return;
+	if (n < 0 || (size_t)n + 16 > sizeof path)
+		return;
+	for (char *p = path + 1; *p; p++) {           /* mkdir -p */
+		if (*p == '/') {
+			*p = 0;
+			mkdir(path, 0755);
+			*p = '/';
+		}
+	}
+	mkdir(path, 0755);
+	strcat(path, "/memory.log");
+	struct stat st;
+	if (stat(path, &st) == 0 && st.st_size > 256 * 1024) {     /* keep it small: the older half goes */
+		char old[1040];
+		snprintf(old, sizeof old, "%s.old", path);
+		rename(path, old);
+	}
+	FILE *f = fopen(path, "a");
+	if (!f)
+		return;
+	struct mallinfo2 mi = mallinfo2();
+	time_t now = time(NULL);
+	struct tm tm;
+	char when[32];
+	gmtime_r(&now, &tm);
+	strftime(when, sizeof when, "%Y-%m-%dT%H:%M:%SZ", &tm);
+	fprintf(f, "%s pid %d, up %.0f min, %lld frames: %.1f MiB resident (%.1f before handing back), "
+	        "malloc %.1f MiB in use\n", when, (int)getpid(), (monotonic_us() - W.started) / 6e7,
+	        (long long)W.frames, after, before, (double)mi.uordblks / 1048576.0 + (double)mi.hblkhd / 1048576.0);
+	fclose(f);
+}
+
+/* Freed memory goes back to the system every TRIM_US while frames are drawn (the driver frees as
+ * it goes, and the C heap keeps what it frees until asked). Nothing is drawn, nothing grows. */
+static void trim_memory(int64_t now)
+{
+	double before = resident_mib();
+	malloc_trim(0);
+	W.next_trim = now + W.trim_us;
+	if (++W.trims % RECORD_EVERY == 0)
+		record_memory(before, resident_mib());
+}
+
 /* Once every screen shown has drawn its first frames (after startup, and after the screens changed):
  * hand back to the system what starting left free in the C heap, as the GTK host does (app.py,
  * settle_memory). The driver's shader compiler works there the first time it meets the shaders, and
  * with a cold shader cache (the first start after an install or a driver update) that held tens of
  * MiB until the process ended: on the operator's NVIDIA card the first native run of a sweep kept
- * 182 MiB, the later ones 123. Nothing is allocated per frame, so once is enough. */
+ * 182 MiB, the later ones 123. After that, trim_memory does it every five minutes. */
 static void settle_memory(void)
 {
 	if (W.settled)
@@ -490,18 +571,14 @@ static void settle_memory(void)
 	if (!drawn)
 		return;
 	W.settled = true;
+	double before = resident_mib();
 	malloc_trim(0);
-	if (opt.debug_fps > 0) {
-		long kib = 0;
-		FILE *status = fopen("/proc/self/status", "r");
-		char line[128];
-		while (status && fgets(line, sizeof line, status))
-			if (sscanf(line, "VmRSS: %ld", &kib) == 1)
-				break;
-		if (status)
-			fclose(status);
-		printf("syncrain: memory handed back after the first frames (%.0f MiB resident)\n", kib / 1024.0);
-	}
+	double after = resident_mib();
+	record_memory(before, after);
+	W.next_trim = monotonic_us() + W.trim_us;
+	W.trims = 0;
+	if (opt.debug_fps > 0)
+		printf("syncrain: memory handed back after the first frames (%.0f MiB resident)\n", after);
 }
 
 /* The frame did not reach the compositor (a driver can fail a swap after a resume or a reset of the
@@ -563,7 +640,10 @@ static void draw(struct screen *s)
 		if (s->failing_since)
 			fprintf(stderr, "syncrain: frames are shown again\n");
 		s->failing_since = 0;
+		W.frames++;
 		settle_memory();
+		if (W.settled && now >= W.next_trim)
+			trim_memory(now);
 	} else {
 		swap_failed(s, f, error);
 	}
@@ -1104,6 +1184,9 @@ int main(int argc, char **argv)
 {
 	setvbuf(stdout, NULL, _IOLBF, 0);
 	parse_options(argc, argv);
+	W.started = monotonic_us();
+	const char *trim = getenv("SYNCRAIN_MEMORY_SECONDS");     /* tests: a shorter round */
+	W.trim_us = trim && atof(trim) > 0 ? (int64_t)(atof(trim) * 1e6) : TRIM_US;
 	/* Few threads allocate here (the driver's); two arenas keep what they free from spreading out. */
 	mallopt(M_ARENA_MAX, 2);
 	char why[1024];

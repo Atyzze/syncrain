@@ -257,12 +257,14 @@ def test_the_launcher_hands_it_everything_the_gtk_host_would_use():
     """The scene carries the GTK host's own sources: every shader, every texture at its size, and
     every uniform static_uniforms lists, each value exactly."""
     from syncrain.renderer import STATIC_TEXTURES, shader_bodies, static_uniforms, texture_sources
-    args = native_args("--rainbow", "all", "--spin", "240")
+    args = native_args("--rainbow", "all", "--spin", "240", "--speed", "0.5", "--glow", "0", "--snow", "off",
+                       "--hieroglyphs", "0.4", "--bg-gain", "0.7")
     data = native.scene_bytes(args, ["python3", "-m", "syncrain", "--host", "gtk"])
     head, _, body = data.partition(b"\nend\n")
     lines = head.decode().splitlines()
     assert lines[0] == native.SCENE_CONTRACT
-    r = Renderer(theme=args.theme, channel=args.channel, rainbow="all", spin=240.0)
+    r = Renderer(theme=args.theme, channel=args.channel, rainbow="all", spin=240.0, speed=0.5, glow=0.0, snow="off",
+                 hieroglyphs=0.4, bg_gain=0.7)
     sources, _, _ = texture_sources(r)
     for name, src in shader_bodies().items():
         line = next(x for x in lines if x.startswith(f"shader {name} "))

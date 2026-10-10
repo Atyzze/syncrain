@@ -11,9 +11,10 @@ Where syncrain runs. The build sandbox: `docs/agent/ENVIRONMENT.md`.
 * syncrain there (sweep of build 8, 2026-10-09): 123 MiB and 0.9% of a core at 30 fps; +11.9 W at
   30 fps, +7.3 W at 20, +3.5 W at 15; 0 W behind a covering window; 97 to 100% even and steady.
 * Builds 8 to 10 grew about 0.9 MiB a minute while drawing (btop: 154 MiB after 44 minutes, 200
-  after about 90): NVIDIA's explicit-sync leak. Build 11 turns explicit sync off for syncrain; not
-  yet seen there. Build 7 climbed the same way (287 to 420 MiB) and stopped overnight, when the
-  screens were off.
+  after about 90). Build 11 (explicit sync off): 110 MiB at start, 225 after 18 h and slowing, then
+  170 at once, so most of it was freed memory not yet handed back. Build 12 hands it back every
+  five minutes; not yet seen there.
+* They start syncrain from a terminal (fish), not the autostart service.
 * On Plasma syncrain takes the bottom layer and covers the desktop icons; "show desktop" hides it.
 * Archives get unpacked under `/data/projects/...`; installed with `./install.sh`.
 
