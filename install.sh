@@ -3,7 +3,6 @@
 #
 #   ./install.sh                     install this build for your user (asks for sudo once, for pacman packages)
 #   ./install.sh --autostart         ...and start it with every graphical login
-#   ./install.sh --plasma            ...or, on KDE Plasma, as the desktop's and the lock screen's wallpaper
 #   ./install.sh --theme matrix --channel friends --autostart
 #   ./install.sh --uninstall         remove it again (pacman packages are left installed)
 #
@@ -12,18 +11,14 @@
 #   ~/.local/share/syncrain/                 the app (plus web/index.html, the browser version)
 #   ~/.local/bin/syncrain                    the launcher
 #   ~/.config/systemd/user/syncrain.service  only with --autostart
-#   ~/.local/share/plasma/wallpapers/org.syncrain.wallpaper/ and, with sudo, <Qt's QML folder>/org/syncrain/
-#                                            only with --plasma
 set -euo pipefail
 
 PACKAGES=(python python-gobject python-cairo python-pillow gtk4 gtk4-layer-shell)
 # what the native wallpaper is built with (syncrain/native/build.sh); wayland and dbus are on every Plasma desktop
 BUILD_PACKAGES=(gcc pkgconf wayland dbus)
-# and the Plasma wallpaper (syncrain/plasma/); Plasma itself brings the Qt ones
-PLASMA_PACKAGES=(cmake make qt6-base qt6-declarative)
 PREFIX="${PREFIX:-$HOME/.local}"
 SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-AUTOSTART=0 PLASMA=0 UNINSTALL=0 NODEPS=0 YES=0
+AUTOSTART=0 UNINSTALL=0 NODEPS=0 YES=0
 THEME="" CHANNEL="" RAINBOW="" EXTRA=()
 
 bold() { printf '\033[1m%s\033[0m\n' "$*"; }
@@ -36,8 +31,6 @@ usage() {
 
 Options:
   --autostart           start with every graphical login (systemd user service)
-  --plasma              KDE Plasma: the wallpaper of every desktop and of the lock screen, drawn
-                        by Plasma itself (behind the icons); its settings are in Desktop and Wallpaper
   --theme NAME          nixos (default) or matrix
   --channel NAME        stream name (default: public)
   --rainbow MODE        logo (default), all or off
@@ -53,7 +46,6 @@ EOF
 while [ $# -gt 0 ]; do
   case "$1" in
     --autostart) AUTOSTART=1 ;;
-    --plasma) PLASMA=1 ;;
     --theme) THEME="${2:?--theme needs a value}"; shift ;;
     --channel) CHANNEL="${2:?--channel needs a value}"; shift ;;
     --rainbow) RAINBOW="${2:?--rainbow needs a value}"; shift ;;
@@ -73,50 +65,42 @@ BINDIR="$PREFIX/bin"
 UNITDIR="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
 UNIT="$UNITDIR/syncrain.service"
 have_user_systemd() { command -v systemctl >/dev/null && systemctl --user show-environment >/dev/null 2>&1; }
-SUDO=(); [ "$(id -u)" != 0 ] && SUDO=(sudo)
-WALLPAPER=org.syncrain.wallpaper
-PLASMA_PACKAGE="${XDG_DATA_HOME:-$HOME/.local/share}/plasma/wallpapers/$WALLPAPER"
-SCENES="${XDG_CACHE_HOME:-$HOME/.cache}/syncrain"
-qml_dir() { local d; d="$(qtpaths6 --query QT_INSTALL_QML 2>/dev/null || true)"; printf '%s' "${d:-/usr/lib/qt6/qml}"; }
-# Plasma's scripting: every desktop's wallpaper (plasmashell has to be running)
-plasma_script() {
-  command -v dbus-send >/dev/null &&
-    dbus-send --session --print-reply --dest=org.kde.plasmashell /PlasmaShell \
-      org.kde.PlasmaShell.evaluateScript "string:$1" >/dev/null 2>&1
+
+# Builds 13 and 14 had a Plasma wallpaper (dropped in build 15): take it away again, and put Plasma's
+# desktops and lock screen back on their image wallpaper.
+remove_plasma_wallpaper() {
+  local plugin=org.syncrain.wallpaper qml package
+  package="${XDG_DATA_HOME:-$HOME/.local/share}/plasma/wallpapers/$plugin"
+  qml="$(qtpaths6 --query QT_INSTALL_QML 2>/dev/null || true)"
+  qml="${qml:-/usr/lib/qt6/qml}/org/syncrain"
+  [ -d "$package" ] || [ -d "$qml" ] || return 0
+  bold "Removing build 13 and 14's Plasma wallpaper"
+  if command -v dbus-send >/dev/null && dbus-send --session --print-reply --dest=org.kde.plasmashell /PlasmaShell \
+      org.kde.PlasmaShell.evaluateScript \
+      "string:desktops().forEach(d => { if (d.wallpaperPlugin === '$plugin') d.wallpaperPlugin = 'org.kde.image'; });" \
+      >/dev/null 2>&1; then
+    info "Plasma's desktops are back on their image wallpaper"
+  else
+    info "Plasma's shell did not answer: if a desktop stays black, right-click it, Desktop and Wallpaper, Image"
+  fi
+  if [ "$(kreadconfig6 --file kscreenlockerrc --group Greeter --key WallpaperPlugin 2>/dev/null || true)" = "$plugin" ]; then
+    kwriteconfig6 --file kscreenlockerrc --group Greeter --key WallpaperPlugin --delete && info "the lock screen too"
+  fi
+  rm -rf "$package" "${XDG_CACHE_HOME:-$HOME/.cache}/syncrain"/scene-*.bin
+  if [ -d "$qml" ]; then
+    local sudo=(); [ "$(id -u)" != 0 ] && sudo=(sudo)
+    "${sudo[@]}" rm -rf "$qml" && info "removed $qml"
+  fi
 }
 
 if [ "$UNINSTALL" = 1 ]; then
+  remove_plasma_wallpaper
   bold "Removing syncrain"
   if [ -f "$UNIT" ]; then
     if have_user_systemd; then systemctl --user disable --now syncrain.service >/dev/null 2>&1 || true; fi
     rm -f "$UNIT"
     if have_user_systemd; then systemctl --user daemon-reload || true; fi
     info "removed the autostart service"
-  fi
-  keep_plasma=0
-  if [ -d "$PLASMA_PACKAGE" ]; then
-    if plasma_script "desktops().forEach(d => { if (d.wallpaperPlugin === '$WALLPAPER') d.wallpaperPlugin = 'org.kde.image'; });"; then
-      info "Plasma's desktops are back on their image wallpaper"
-    elif grep -qs "wallpaperplugin=$WALLPAPER" "${XDG_CONFIG_HOME:-$HOME/.config}/plasma-org.kde.plasma.desktop-appletsrc"; then
-      # without the shell nothing can switch them, and a removed wallpaper leaves the desktop black
-      keep_plasma=1
-      info "Plasma's shell did not answer and its desktops still show syncrain, so the Plasma wallpaper stays;"
-      info "run ./install.sh --uninstall again from inside your Plasma session to remove it"
-    fi
-    if [ "$(kreadconfig6 --file kscreenlockerrc --group Greeter --key WallpaperPlugin 2>/dev/null || true)" = "$WALLPAPER" ]; then
-      kwriteconfig6 --file kscreenlockerrc --group Greeter --key WallpaperPlugin --delete && info "the lock screen is back on its default wallpaper"
-    fi
-    if [ "$keep_plasma" = 0 ]; then
-      rm -rf "$PLASMA_PACKAGE" "$SCENES"
-      info "removed the Plasma wallpaper package"
-    fi
-  fi
-  if [ "$keep_plasma" = 0 ] && [ -d "$(qml_dir)/org/syncrain" ]; then
-    "${SUDO[@]}" rm -rf "$(qml_dir)/org/syncrain" && info "removed $(qml_dir)/org/syncrain"
-  fi
-  if [ "$keep_plasma" = 1 ]; then
-    info "kept $APPDIR and $BINDIR/syncrain too: the Plasma wallpaper makes its scenes with them"
-    exit 0
   fi
   rm -rf "$APPDIR" "$BINDIR/syncrain"
   info "removed $APPDIR and $BINDIR/syncrain"
@@ -133,12 +117,11 @@ BUILD="$(tr -d '[:space:]' < "$SRC/BUILD_NUMBER")"
 if [ "$NODEPS" = 0 ]; then
   command -v pacman >/dev/null || die "pacman not found: this script is for Arch-based systems (use --no-deps if you installed the dependencies yourself: ${PACKAGES[*]} ${BUILD_PACKAGES[*]})"
   missing=()
-  wanted=("${PACKAGES[@]}" "${BUILD_PACKAGES[@]}")
-  [ "$PLASMA" = 1 ] && wanted+=("${PLASMA_PACKAGES[@]}")
-  for p in "${wanted[@]}"; do pacman -Qq "$p" >/dev/null 2>&1 || missing+=("$p"); done
+  for p in "${PACKAGES[@]}" "${BUILD_PACKAGES[@]}"; do pacman -Qq "$p" >/dev/null 2>&1 || missing+=("$p"); done
   if [ ${#missing[@]} -gt 0 ]; then
     bold "Installing packages: ${missing[*]}"
     confirm=(); [ "$YES" = 1 ] && confirm=(--noconfirm)
+    SUDO=(); [ "$(id -u)" != 0 ] && SUDO=(sudo)
     if ! "${SUDO[@]}" pacman -S --needed "${confirm[@]}" "${missing[@]}"; then
       die "pacman could not install the packages. If it reported missing files (404), update first with 'sudo pacman -Syu' and run this again."
     fi
@@ -214,6 +197,8 @@ chmod +x "$BINDIR/syncrain"
 "$BINDIR/syncrain" --build >/dev/null || die "the launcher does not run"
 info "launcher: $BINDIR/syncrain ($("$BINDIR/syncrain" --build))"
 
+remove_plasma_wallpaper
+
 # ---- 4. autostart
 ARGS=()
 [ -n "$THEME" ] && ARGS+=(--theme "$THEME")
@@ -233,11 +218,6 @@ unit_words() {
   done
   printf '%s' "${out# }"
 }
-
-if [ "$PLASMA" = 1 ] && [ "$AUTOSTART" = 1 ]; then
-  info "note: --plasma draws the wallpaper inside Plasma, so --autostart is left out"
-  AUTOSTART=0
-fi
 
 if [ "$AUTOSTART" = 1 ]; then
   bold "Setting up autostart"
@@ -271,80 +251,18 @@ elif [ -f "$UNIT" ] && have_user_systemd && systemctl --user is-active --quiet s
   systemctl --user restart syncrain.service && info "restarted the running wallpaper on build $BUILD"
 fi
 
-# ---- 5. the Plasma wallpaper
-if [ "$PLASMA" = 1 ]; then
-  bold "Installing the Plasma wallpaper"
-  work="$(mktemp -d)"
-  trap 'rm -rf "$work"' EXIT
-  if ! log="$(cmake -S "$APPDIR/syncrain/plasma" -B "$work" -DCMAKE_BUILD_TYPE=Release \
-                -DSYNCRAIN_COMMAND="$BINDIR/syncrain" 2>&1 && cmake --build "$work" -j "$(nproc)" 2>&1)"; then
-    printf '%s\n' "$log" | tail -n 12 | sed 's/^/    /'
-    die "the Plasma wallpaper did not build (it needs: ${PLASMA_PACKAGES[*]} pkgconf dbus)"
-  fi
-  module="$(qml_dir)/org/syncrain"
-  upgrade=0; [ -d "$module" ] && upgrade=1
-  # Qt's own QML folder, so plasmashell and the lock screen find it without any setting
-  "${SUDO[@]}" install -d "$module"
-  "${SUDO[@]}" install -m 644 "$work"/qml/org/syncrain/qmldir "$work"/qml/org/syncrain/*.qmltypes "$module/"
-  "${SUDO[@]}" install -m 755 "$work"/qml/org/syncrain/*.so "$module/"
-  info "QML module: $module"
-  rm -rf "$PLASMA_PACKAGE" "$SCENES"
-  mkdir -p "$(dirname "$PLASMA_PACKAGE")"
-  cp -r "$APPDIR/syncrain/plasma/package" "$PLASMA_PACKAGE"
-  info "wallpaper: $PLASMA_PACKAGE"
-  # the service would draw a second wallpaper on top of Plasma's
-  if [ -f "$UNIT" ] && have_user_systemd; then
-    systemctl --user disable --now syncrain.service >/dev/null 2>&1 && info "the autostart service is off now: Plasma draws syncrain"
-  fi
-  # the installer's options become the wallpaper's settings
-  settings=()
-  [ -n "$THEME" ] && settings+=(Theme "$THEME")
-  [ -n "$CHANNEL" ] && settings+=(Channel "$CHANNEL")
-  [ -n "$RAINBOW" ] && settings+=(Rainbow "$RAINBOW")
-  [ ${#EXTRA[@]} -gt 0 ] && settings+=(ExtraArgs "${EXTRA[*]}")
-  script="$(python3 - "$WALLPAPER" "${settings[@]}" <<'PY'
-import json, sys
-plugin, pairs = sys.argv[1], sys.argv[2:]
-settings = dict(zip(pairs[::2], pairs[1::2]))
-print("const settings = %s; desktops().forEach(d => { d.wallpaperPlugin = %s; "
-      "d.currentConfigGroup = ['Wallpaper', %s, 'General']; "
-      "for (const k in settings) d.writeConfig(k, settings[k]); d.reloadConfig(); });"
-      % (json.dumps(settings), json.dumps(plugin), json.dumps(plugin)))
-PY
-)"
-  if plasma_script "$script"; then
-    info "now the wallpaper of every desktop (Desktop and Wallpaper has its settings)"
-  else
-    info "Plasma's shell did not answer: choose \"syncrain\" in Desktop and Wallpaper"
-  fi
-  if command -v kwriteconfig6 >/dev/null; then
-    kwriteconfig6 --file kscreenlockerrc --group Greeter --key WallpaperPlugin "$WALLPAPER"
-    for ((i = 0; i < ${#settings[@]}; i += 2)); do
-      kwriteconfig6 --file kscreenlockerrc --group Greeter --group Wallpaper --group "$WALLPAPER" --group General \
-        --key "${settings[i]}" "${settings[i + 1]}"
-    done
-    info "and of the lock screen (Screen Locking, Appearance)"
-  fi
-  if [ "$upgrade" = 1 ] && have_user_systemd && systemctl --user is-active --quiet plasma-plasmashell.service; then
-    systemctl --user restart plasma-plasmashell.service && info "restarted Plasma's shell, so it draws with build $BUILD"
-  fi
-fi
-
-# ---- 6. what next
+# ---- 5. what next
 desktop="${XDG_CURRENT_DESKTOP:-}"
 echo
-if [ "$PLASMA" = 1 ]; then
-  bold "Done: Plasma draws syncrain now. More:"
-else
-  bold "Done. Try it:"
-fi
+bold "Done. Try it:"
 info "syncrain --window        preview in a normal window"
-[ "$PLASMA" = 1 ] || info "syncrain                 run as your wallpaper (Ctrl+C stops it)"
+info "syncrain                 run as your wallpaper (Ctrl+C stops it)"
 info "syncrain --theme matrix  the green theme; see --help for all options"
 info "syncrain --diagnose      if it does not draw: what this machine offers, and why"
 case ":$PATH:" in *":$BINDIR:"*) ;; *) info "note: $BINDIR is not on your PATH; run $BINDIR/syncrain or add it to PATH" ;; esac
 case "$desktop" in
-  *KDE*) [ "$PLASMA" = 1 ] || info "KDE Plasma: ./install.sh --plasma makes syncrain the wallpaper of every desktop and the lock screen, behind the icons." ;;
+  *KDE*) info "KDE Plasma: syncrain sits just above Plasma's desktop, so desktop icons and widgets are hidden behind it (clicks still reach the desktop)."
+         info "To keep the icons, show $APPDIR/web/index.html?hud=0 with a Plasma wallpaper plugin for web pages instead." ;;
   *Hyprland*) [ "$AUTOSTART" = 1 ] && info "Hyprland: if it doesn't start at login, add 'exec-once = $BINDIR/syncrain$(quote "${ARGS[@]}")' to hyprland.conf (or log in through UWSM)." ;;
   *sway*|*Sway*) [ "$AUTOSTART" = 1 ] && info "Sway: if it doesn't start at login, add 'exec $BINDIR/syncrain$(quote "${ARGS[@]}")' to your sway config." ;;
   *GNOME*) info "GNOME has no wallpaper layer for apps; use 'syncrain --window' or open $APPDIR/web/index.html in a browser." ;;

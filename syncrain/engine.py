@@ -12,7 +12,7 @@ import os
 DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 
 
-THEMES_CONTRACT = "syncrain-themes-1"
+THEMES_CONTRACT = "syncrain-themes-2"
 
 
 def load_meta(data_dir=DATA_DIR):
@@ -79,32 +79,17 @@ LOOK = {"speed": (0.25, 4.0), "density": (0.0, 2.3), "glow": (0.0, 2.0), "bloom"
 
 def look(theme, speed=None, density=None, snow=None, glow=None, bloom=None, hieroglyphs=None):
     """The picture options as multipliers of the theme's own values (1: as the theme has it), the
-    share of hieroglyphs among the changing glyphs, and whether the snow falls."""
-    rain = theme["rain"]
+    share of hieroglyphs among the changing glyphs (None: as the symbol sets say), and whether the
+    snow falls."""
     given = dict(speed=speed, density=density, glow=glow, bloom=bloom, hieroglyphs=hieroglyphs)
     out = {}
     for key, value in given.items():
         lo, hi = LOOK[key]
         if value is None:
-            value = rain.get("hieroglyphs", 0.0) if key == "hieroglyphs" else 1.0
+            if key == "hieroglyphs":          # the sets' own share (syncrain/glyphs.py)
+                out[key] = None
+                continue
+            value = 1.0
         out[key] = float(min(hi, max(lo, value)))
     out["snow"] = snow if isinstance(snow, bool) else snow != "off"
     return out
-
-
-def lut_bytes(theme) -> bytes:
-    out = bytearray(256 * 4)
-    for i, g in enumerate(theme["lut"]):
-        out[i * 4] = g
-        out[i * 4 + 3] = 255
-    return bytes(out)
-
-
-def words_bytes(theme):
-    words = theme["words"]
-    n = max(1, len(words))
-    out = bytearray([255]) * (16 * n * 4)
-    for row, w in enumerate(words):
-        for i, g in enumerate(w[:16]):
-            out[(row * 16 + i) * 4] = g
-    return bytes(out), n

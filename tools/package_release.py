@@ -53,7 +53,7 @@ REQUIRED_RELEASE_PATHS = {
     "syncrain/__main__.py", "syncrain/app.py", "syncrain/build.py", "syncrain/diagnose.py", "syncrain/engine.py",
     "syncrain/renderer.py", "syncrain/gl.py", "syncrain/native.py", "syncrain/native/build.sh",
     "syncrain/native/wallpaper.c", "syncrain/native/render.c", "syncrain/native/syncrain.h",
-    "syncrain/data/themes.json", "syncrain/data/atlas.png",
+    "syncrain/data/themes.json", "syncrain/data/glyphs.png",
     "web/index.html", "web/artifact.html", "web/template.html",
     "nix/package.nix", "nix/nixos-module.nix", "nix/hm-module.nix",
     "tests/fixtures/stream_freeze.json", "tools/package_release.py", "tools/test_suite.py",

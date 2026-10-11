@@ -49,8 +49,9 @@ BUILD_NUMBER = _read_build_number()
 #: like at a given second belongs here; one that only changes how the app runs does not.
 STREAM_FILES = (
     "engine.py",
+    "glyphs.py",
     "data/themes.json",
-    "data/atlas.png",
+    "data/glyphs.png",
     "data/logo-white.png",
     "data/logo-colours.png",
     "data/shaders/common.glsl",

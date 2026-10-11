@@ -145,3 +145,20 @@ def test_each_picture_option_changes_the_picture(app, tmp_path, option):
         done = app(["--window", "--size", "640x360", "--time", str(MOMENT), "--screenshot", str(path), *extra])
         assert done.returncode == 0, done.stderr
     assert mean_abs_diff(plain, changed) > 0.05
+
+
+def test_a_symbols_file_changes_the_symbols_and_a_broken_one_is_said(app, tmp_path):
+    """Sets from a file: shipped symbols and one drawn from this machine's fonts (★, DejaVu Sans)."""
+    mine = tmp_path / "glyphs.json"
+    mine.write_text('{"sets": [{"name": "mine", "chars": "Ж★Ω𓆙", "weight": 1}]}', encoding="utf-8")
+    theme, own, broken = tmp_path / "theme.png", tmp_path / "own.png", tmp_path / "broken.png"
+    base = ["--window", "--size", "640x360", "--time", str(MOMENT), "--screenshot"]
+    assert app([*base, str(theme)]).returncode == 0
+    done = app([*base, str(own), "--glyphs", str(mine)])
+    assert done.returncode == 0 and "syncrain:" not in done.stderr.replace("syncrain: saved", ""), done.stderr
+    assert mean_abs_diff(theme, own) > 0.05
+    bad = tmp_path / "bad.json"
+    bad.write_text('{"sets": 3}', encoding="utf-8")
+    done = app([*base, str(broken), "--glyphs", str(bad)])
+    assert done.returncode == 0 and "needs a list \"sets\"; the theme's own symbols instead" in done.stderr, done.stderr
+    assert mean_abs_diff(theme, broken) == 0

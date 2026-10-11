@@ -35,7 +35,7 @@ def pages():
     shaders = {name: read(os.path.join(SH, fname)) for name, fname in SHADER_FILES.items()}
     meta = json.loads(read(os.path.join(DATA, 'themes.json')))
     images = {}
-    for name in ('atlas', 'logo-white', 'logo-colours'):
+    for name in ('glyphs', 'logo-white', 'logo-colours'):
         with open(os.path.join(DATA, name + '.png'), 'rb') as fh:
             images[name] = 'data:image/png;base64,' + base64.b64encode(fh.read()).decode('ascii')
 

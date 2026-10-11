@@ -71,7 +71,13 @@ def parse_args(argv=None):
                     help="the glow around the falling symbols, times the theme's (default 1; 0 = none)")
     ap.add_argument("--snow", choices=("on", "off"), help="the falling snowflakes (default on, where the theme has them)")
     ap.add_argument("--hieroglyphs", type=float, metavar="SHARE",
-                    help="share of the changing symbols that are Egyptian hieroglyphs (default 0.15; 0 = none, 1 = only)")
+                    help="share of the changing symbols that are Egyptian hieroglyphs (default: as the symbol sets "
+                         "say, 0.15 in the themes; 0 = none, 1 = only)")
+    ap.add_argument("--glyphs", metavar="FILE",
+                    help="a symbols file: sets of characters and how often each falls (default: "
+                         "~/.config/syncrain/glyphs.json if there is one, else the theme's; 'theme' for the theme's)")
+    ap.add_argument("--write-glyphs", action="store_true",
+                    help="write a starter symbols file (to --glyphs, or ~/.config/syncrain/glyphs.json) and exit")
     ap.add_argument("--scale", type=float, default=1.0, help="render resolution scale, e.g. 0.75 on weak GPUs")
     ap.add_argument("--layer", choices=("background", "bottom"),
                     help="Wayland layer (default: bottom on KDE Plasma, whose own desktop sits on the background layer)")
@@ -85,7 +91,6 @@ def parse_args(argv=None):
     ap.add_argument("--size", help="window size for --window / --record (default 1280x720), or the size "
                                    "--benchmark draws at (default: the first screen), e.g. 1920x1080")
     ap.add_argument("--list-themes", action="store_true")
-    ap.add_argument("--write-scene", metavar="PATH", help=argparse.SUPPRESS)   # the Plasma wallpaper's scene
     ap.add_argument("--benchmark", action="store_true",
                     help="time each pass on this machine's graphics card, print the table, exit")
     ap.add_argument("--power-sweep", action="store_true",
@@ -298,8 +303,10 @@ def main(argv=None):
         for name, th in load_meta()["themes"].items():
             print(f"{name:10s} {th['label']}")
         return 0
-    if args.write_scene:                      # for the Plasma wallpaper: no window, no GTK
-        return native.write_scene(args, args.write_scene)
+    if args.write_glyphs:
+        from . import glyphs
+        print(f"syncrain: {glyphs.write_starter(args.glyphs or glyphs.default_path())}")
+        return 0
     # Before GTK is imported: PyGObject initialises GTK on import, and GDK reads GDK_DISABLE then.
     use_gl_renderer()
     avoid_the_explicit_sync_leak()

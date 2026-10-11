@@ -13,19 +13,14 @@ Wayland, a compositor with layer-shell (not GNOME: use `--window` or the web pag
 git clone https://github.com/Atyzze/syncrain && cd syncrain   # or unpack SYNCRAIN<N>.tar.zst
 ./install.sh                  # pacman packages (sudo once), then everything in ~/.local
 ./install.sh --autostart      # also a systemd user service
-./install.sh --plasma         # KDE Plasma: the wallpaper of the desktop and the lock screen
 ./install.sh --uninstall      # remove it (the pacman packages stay)
 ```
 
 * Packages: `python python-gobject python-cairo python-pillow gtk4 gtk4-layer-shell`, plus
   `gcc pkgconf wayland dbus` to build the native wallpaper. If that build fails, the installer says
   why and Python and GTK draw instead.
-* `--theme`, `--channel`, `--rainbow` and `--arg ...` (repeatable) go into the autostart service, or
-  with `--plasma` into the wallpaper's settings.
-* `--plasma` builds the Plasma wallpaper (`syncrain/plasma/`; pacman: `cmake make qt6-base
-  qt6-declarative`), puts its QML module in Qt's QML folder (sudo), makes it every desktop's and the
-  lock screen's wallpaper and turns the service off. Its settings: right-click the desktop, Desktop
-  and Wallpaper; the lock screen's: System Settings, Screen Locking, Appearance.
+* `--theme`, `--channel`, `--rainbow` and `--arg ...` (repeatable) go into the autostart service.
+* Builds 13 and 14's Plasma wallpaper (dropped in build 15) is removed by any later install.
 * Upgrading: run the newer `./install.sh`; it names the build it replaces and restarts the
   wallpaper. `syncrain --build` says what is installed.
 
@@ -34,8 +29,7 @@ with `syncrain.nixosModules.default` (or `homeManagerModules.default`). Options:
 `package`, `theme`, `channel`, `fps`, `logo`, `background`, `mask`, `rainbow`, `spin`, `drift`,
 `speed`, `density`, `glow`, `bloom`, `bgGain`, `snow`, `hieroglyphs`, `scale`, `pauseUnder`, `layer`,
 `extraArgs` (`nix/options.nix`). Without installing:
-`nix run github:Atyzze/syncrain -- --window`. The Plasma wallpaper: the package `syncrain-plasma`
-in `environment.systemPackages`.
+`nix run github:Atyzze/syncrain -- --window`.
 
 **Other systems**: GTK 4, gtk4-layer-shell, PyGObject, pycairo and Pillow, then `pip install .`.
 For the native wallpaper: `sh syncrain/native/build.sh <path>` and `SYNCRAIN_WALLPAPER=<path>` in
@@ -67,7 +61,9 @@ web-wallpaper plugin can host it, behind the desktop icons.
 | `--speed F` | `1` | Fall speed, 0.25 to 4 |
 | `--density F` | `1` | How often a column starts a stream, 0 to 2.3 |
 | `--snow` | `on` | `off`: no falling snowflakes |
-| `--hieroglyphs F` | `0.15` | Share of the changing symbols that are Egyptian hieroglyphs; 0 = none |
+| `--hieroglyphs F` | sets' | Share of the changing symbols that are Egyptian hieroglyphs (the themes: 0.15) |
+| `--glyphs FILE` | see below | A symbols file; `theme` for the theme's own symbols |
+| `--write-glyphs` | - | Write a starter symbols file (a bit of everything) and exit |
 | `--scale` | `1.0` | Render resolution scale (0.75 on a weak GPU) |
 | `--layer` | auto | `background` or `bottom`; auto is `bottom` on KDE |
 | `--window` | - | A normal window instead of the wallpaper |
@@ -88,13 +84,32 @@ Environment: `SYNCRAIN_DEBUG_FPS=<s>` reports each screen's frame rate and timin
 syncrain sets `__NV_DISABLE_EXPLICIT_SYNC=1` and `__GL_YIELD=USLEEP` for itself unless you set them
 (NVIDIA's driver leaks memory per frame with explicit sync on).
 
+## Your own symbols
+
+`syncrain --write-glyphs` writes `~/.config/syncrain/glyphs.json`, used whenever it is there:
+
+```json
+{ "balance": "sets",
+  "sets": [ { "name": "katakana", "chars": "アイウエオ", "weight": 2 },
+            { "name": "arabic",   "chars": "ابتثج",     "weight": 1 },
+            { "name": "mine",     "chars": "λ❄𓆙",       "share": 0.1 } ] }
+```
+
+* `weight`: how often a set falls next to the others (0 leaves it out); `share`: that fraction of
+  all symbols. `balance` `glyphs`: a weight counts for each character, so every symbol is alike.
+* Per set, optional: `font` (a family or a file), `size` (of a cell, 0.9), `mirror` (true).
+* Up to 16 sets and 640 different symbols. The 489 shipped ones need no font; others come from
+  this machine's fonts, and `syncrain --diagnose` lists any no font has.
+* Restart syncrain after a change (`systemctl --user restart syncrain` for the service).
+* The same file on the same channel gives the same rain everywhere, symbol for symbol; only a
+  character that is not shipped looks as each machine's fonts draw it.
+
 ## When it does not draw
 
 `syncrain --diagnose`, inside the desktop session: a verdict first, then the session, libraries,
 cards, OpenGL, screens, the native wallpaper and, on KDE, KWin's answer about covered screens. If
 OpenGL cannot start, syncrain exits with status 69 and the service does not retry.
-`journalctl --user -u syncrain` shows the startup line; for the Plasma wallpaper,
-`journalctl --user -b | grep syncrain` (one line a screen: "the Plasma wallpaper draws on ...").
+`journalctl --user -u syncrain` shows the startup line.
 
 ## Power and memory
 
@@ -116,7 +131,7 @@ OpenGL cannot start, syncrain exits with status 69 and the service does not retr
 | Desktop | How | Tested |
 | --- | --- | --- |
 | Hyprland, Sway, river, niri, Wayfire, labwc, COSMIC | background layer | headless Sway, every release |
-| KDE Plasma 6 | a Plasma wallpaper (`--plasma`), or the bottom layer (covering the icons); covered screens not drawn | headless KWin and Qt, every release |
+| KDE Plasma 6 | bottom layer (above Plasma's desktop, covering its icons); covered screens not drawn | headless KWin, every release |
 | X11 | a desktop window over all monitors | Xvfb, every release |
 | GNOME | no layer-shell: `--window` or the web page | no |
 

@@ -14,9 +14,10 @@ Where syncrain runs. The build sandbox: `docs/agent/ENVIRONMENT.md`.
   after about 90). Build 11 (explicit sync off): 110 MiB at start, 225 after 18 h and slowing, then
   170 at once, so most of it was freed memory not yet handed back. Build 12 hands it back every
   five minutes; not yet seen there.
-* Until build 13 they started syncrain from a terminal (fish); build 14 makes it Plasma's wallpaper.
-* On Plasma the layer-shell wallpaper takes the bottom layer and covers the desktop icons; the
-  Plasma wallpaper (build 14) is behind them.
+* They start syncrain from a terminal (fish). Builds 13 and 14's Plasma wallpaper was "severely
+  broken" there (2026-10-11); build 15 removes it.
+* On Plasma syncrain takes the bottom layer and covers the desktop icons; "show desktop" hides it.
+* Login screen: SDDM; build 16 is to replace it with greetd and syncrain's own.
 * Archives get unpacked under `/data/projects/...`; installed with `./install.sh`.
 
 ## NixOS

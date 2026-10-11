@@ -31,7 +31,6 @@
 struct watch {
 	DBusConnection *bus;
 	char *kwin_owner;
-	char prefix[40];
 	char plugin[64];
 	char path[PATH_MAX];
 	bool registered, matched, filtered;
@@ -50,18 +49,10 @@ static const char *const MATCH =
 
 struct watch *watch_new(void (*on_change)(void))
 {
-	return watch_new_named(on_change, "syncrain-watch");
-}
-
-/* The Plasma wallpaper names its script otherwise ("syncrain-plasma-watch"): a syncrain that
- * unloads the scripts of dead syncrains (unload_leftovers) must not take plasmashell's for one. */
-struct watch *watch_new_named(void (*on_change)(void), const char *prefix)
-{
 	struct watch *w = calloc(1, sizeof *w);
 	if (w) {
 		w->on_change = on_change;
-		snprintf(w->prefix, sizeof w->prefix, "%s", prefix);
-		snprintf(w->plugin, sizeof w->plugin, "%s-%d", prefix, (int)getpid());
+		snprintf(w->plugin, sizeof w->plugin, "syncrain-watch-%d", (int)getpid());
 	}
 	return w;
 }
@@ -203,15 +194,6 @@ bool is_syncrain_command(char **argv, int argc)
 	return false;
 }
 
-/* The Plasma wallpaper's scripts belong to whatever Qt program loaded them (the shell, the lock
- * screen, a test's qml): a leftover once that process is gone. */
-static bool shell_alive(int pid)
-{
-	char path[64];
-	snprintf(path, sizeof path, "/proc/%d", pid);
-	return access(path, F_OK) == 0;
-}
-
 static bool alive(int pid)
 {
 	char path[64], buf[8192];
@@ -232,23 +214,19 @@ static bool alive(int pid)
 	return is_syncrain_command(argv, argc);
 }
 
-/* The scripts of syncrains (or shells, for the Plasma wallpaper's prefix) that died without
- * unloading theirs (a crash, SIGKILL). */
+/* The scripts of syncrains that died without unloading theirs (a crash, SIGKILL). */
 static void unload_leftovers(struct watch *w, const char *runtime)
 {
 	DIR *d = opendir(runtime);
 	if (!d)
 		return;
-	bool shell = strcmp(w->prefix, "syncrain-watch") != 0;
-	size_t n = strlen(w->prefix);
 	for (struct dirent *e; (e = readdir(d)); ) {
 		int pid = 0, len = 0;
-		if (strncmp(e->d_name, w->prefix, n) != 0 || e->d_name[n] != '-' ||
-		    sscanf(e->d_name + n + 1, "%d.js%n", &pid, &len) != 1 || e->d_name[n + 1 + len] != '\0' ||
-		    pid == (int)getpid() || (shell ? shell_alive(pid) : alive(pid)))
+		if (sscanf(e->d_name, "syncrain-watch-%d.js%n", &pid, &len) != 1 || e->d_name[len] != '\0' ||
+		    pid == (int)getpid() || alive(pid))
 			continue;
 		char plugin[64], path[PATH_MAX];
-		snprintf(plugin, sizeof plugin, "%s-%d", w->prefix, pid);
+		snprintf(plugin, sizeof plugin, "syncrain-watch-%d", pid);
 		snprintf(path, sizeof path, "%s/%s", runtime, e->d_name);
 		unload(w, plugin);
 		unlink(path);
@@ -462,25 +440,6 @@ void watch_dispatch(struct watch *w)
 	while (dbus_connection_dispatch(w->bus) == DBUS_DISPATCH_DATA_REMAINS)
 		;
 	dbus_connection_flush(w->bus);
-}
-
-/* Whether the KWin the script went to is still there: a KWin that restarted (Plasma 6 restarts a
- * crashed one, and its clients stay) has another bus name and no script. */
-bool watch_current(struct watch *w)
-{
-	if (!w || !w->bus || !w->kwin_owner)
-		return false;
-	DBusError err;
-	dbus_error_init(&err);
-	const char *name = KWIN, *owner = NULL;
-	DBusMessage *r = call(w, DBUS_SERVICE_DBUS, DBUS_PATH_DBUS, DBUS_INTERFACE_DBUS, "GetNameOwner", &err,
-	                      DBUS_TYPE_STRING, &name, DBUS_TYPE_INVALID);
-	bool same = r && dbus_message_get_args(r, &err, DBUS_TYPE_STRING, &owner, DBUS_TYPE_INVALID) &&
-	            strcmp(owner, w->kwin_owner) == 0;
-	if (r)
-		dbus_message_unref(r);
-	dbus_error_free(&err);
-	return same;
 }
 
 bool watch_answered(const struct watch *w)

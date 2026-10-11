@@ -1,4 +1,5 @@
-// Pass 1 (one fragment per rain cell, uCols x uRows): brightness, head whiteness and glyph of every cell.
+// Pass 1 (one fragment per rain cell, uCols x uRows): brightness, head whiteness and glyph of every cell
+// (R, G, and the glyph's atlas slot in B + 256 A).
 //
 // Drops: every column gets one spawn opportunity per second. Whether a drop spawns, and all of its
 // parameters, come from H(column, second). A cell's state is the brightest of all drops that could
@@ -6,22 +7,30 @@
 //#include common
 
 uniform int uCols, uRows;
-uniform sampler2D uLUT;      // 256 x 1: weighted glyph table (R = glyph index / 255)
+uniform sampler2D uTable;    // n x 1: atlas slots, R + 256 G, set after set (syncrain/glyphs.py)
+uniform int uSetN;           // the symbol sets
+uniform vec4 uSets[16];      // each: where its share ends (cumulative, 0..1), first table entry, entries
 uniform sampler2D uWords;    // 16 x n: hidden words, one per row (R = glyph index / 255, 255 = end)
 uniform int uNumWords;
 uniform vec4 uKeep;          // cells kept free of words (the logo): col0, row0, col1, row1
 uniform float uDensity;      // spawn probability per column per second
 uniform float uSpeed;        // fall speed, times the theme's
-uniform float uHiero;        // share of the scrambling and resting glyphs drawn from the hieroglyphs
-uniform int uHieroFirst, uHieroCount;   // where the hieroglyphs sit in the atlas
 uniform float uWordRate;     // chance that a full-height drop carries a word
 uniform float uGlintRate;    // chance per cell per 2 s of a brief flare-up
 uniform int uContrast;       // 1: wide brightness range (dim distant streams, hot heads, glints)
 out vec4 oState;
 
-int lutGlyph(uint h) {
-    if (U(lowbias32(h ^ 0x68696572u)) < uHiero) return uHieroFirst + int(lowbias32(h ^ 0x6f676c79u) % uint(uHieroCount));
-    return int(texelFetch(uLUT, ivec2(int(h & 255u), 0), 0).r * 255.0 + 0.5);
+// A set by its share, then a symbol of it, all alike.
+int pickGlyph(uint h) {
+    float u = U(h);
+    int s = uSetN - 1;
+    for (int i = 0; i < 16; i++) {
+        if (i >= uSetN) break;
+        if (u < uSets[i].x) { s = i; break; }
+    }
+    int e = int(uSets[s].y + 0.5) + int(lowbias32(h ^ 0x6f676c79u) % uint(uSets[s].z + 0.5));
+    vec4 t = texelFetch(uTable, ivec2(e, 0), 0);
+    return int(t.r * 255.0 + 0.5) + 256 * int(t.g * 255.0 + 0.5);
 }
 int wordGlyph(int w, int i) { return int(texelFetch(uWords, ivec2(i, w), 0).r * 255.0 + 0.5); }
 int wordLen(int w) {
@@ -37,7 +46,7 @@ void main() {
 
     float B = 0.0, W = 0.0;
     int G = -1;
-    bool headCell = false, wordCell = false;
+    bool headCell = false;
 
     // longest life: a word drop (7 rows/s at speed 1) crossing the screen plus its 34-row trail
     int back = int(ceil((float(uRows) + 41.0) / (7.0 * uSpeed))) + 1;
@@ -107,15 +116,14 @@ void main() {
         }
 
         if (b > B) {
-            B = b; W = max(W, w); headCell = isHead; wordCell = false; G = -1;
+            B = b; W = max(W, w); headCell = isHead; G = -1;
             if (word >= 0 && r >= wr && r < wr + wl) {
                 G = wordGlyph(word, r - wr);
-                wordCell = true;
                 B = min(1.0, b * 1.15);
                 if (!isHead) W = max(W, 0.28 * b);
             } else if (isHead) {
                 uint tick15 = uSec * 15u + uint(uFrac * 15.0);   // the leading glyph scrambles 15x a second
-                G = lutGlyph(H(cu, ru, tick15, 20u));
+                G = pickGlyph(H(cu, ru, tick15, 20u));
             }
         }
     }
@@ -153,8 +161,9 @@ void main() {
         uint tick4 = uSec * 4u + uint(uFrac * 4.0);
         uint P = 6u + H(cu, ru, 0u, 50u) % 19u;
         uint ph = H(cu, ru, 0u, 51u) % P;
-        G = lutGlyph(H(cu, ru, (tick4 + ph) / P, 52u));
+        G = pickGlyph(H(cu, ru, (tick4 + ph) / P, 52u));
     }
 
-    oState = vec4(B, W, float(max(G, 0)) / 255.0, wordCell ? 1.0 : 0.0);
+    int g = max(G, 0);
+    oState = vec4(B, W, float(g % 256) / 255.0, float(g / 256) / 255.0);
 }

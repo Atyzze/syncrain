@@ -25,7 +25,7 @@ from . import build, hidden
 from .renderer import STATIC_TEXTURES, from_args, rgba_pil, shader_bodies, static_uniforms, texture_sources
 
 NAME = "syncrain-wallpaper"
-SCENE_CONTRACT = "syncrain-scene-1"
+SCENE_CONTRACT = "syncrain-scene-2"
 HOSTS = ("auto", "native", "gtk")
 
 
@@ -92,19 +92,6 @@ def scene_bytes(args, fallback: list[str] | None) -> bytes:
         header.append(f"fallback {put(b''.join(a.encode() + b'\0' for a in fallback))}")
     header.append("end")
     return ("\n".join(header) + "\n").encode() + b"".join(blobs)
-
-
-def write_scene(args, path: str) -> int:
-    """`syncrain --write-scene PATH`: the scene for these options as a file, for the Plasma wallpaper
-    (syncrain/plasma/), which draws it with the native wallpaper's passes. Written whole, then
-    renamed, so a reader never sees half of one."""
-    data = scene_bytes(args, None)
-    tmp = f"{path}.{os.getpid()}.tmp"
-    os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
-    with open(tmp, "wb") as fh:
-        fh.write(data)
-    os.replace(tmp, path)
-    return 0
 
 
 def gtk_host_command(user_args) -> list[str]:

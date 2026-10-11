@@ -14,7 +14,6 @@ What every lane needs, how to bring a sandbox up, and its traps. `tools/prepare_
 | kwin | KWin 6 (`SYNCRAIN_KWIN` = its `kwin_wayland`), dbus-daemon, dbus-send, node |
 | browser | node with Playwright and its Chromium |
 | nix | nix-build; nixpkgs and home-manager checkouts (`SYNCRAIN_NIXPKGS`, `SYNCRAIN_HOME_MANAGER`); a driver in `/run/opengl-driver` |
-| plasma | what nix needs, plus sway and KWin; Qt 6 and Kirigami come from Nix's cache |
 | release | all of the above, plus setuptools and wheel |
 
 The release runs every lane with `--require-all`: a missing environment fails it.
@@ -40,10 +39,9 @@ The release runs every lane with `--require-all`: a missing environment fails it
    (about ten minutes on two cores). Keep `<dir>` and the log outside the tree.
 
 Before a build that changes `install.sh`, run it once in a real Arch root (the bootstrap tarball,
-pacman with the proxy's CA and `CheckSpace` off, a user with sudo, headless Sway inside). For
-`--plasma`: `plasma-workspace kwin`, then in `dbus-run-session`: `kwin_wayland --virtual`,
-`/usr/lib/kactivitymanagerd`, `plasmashell`, the installer, and `/usr/lib/kscreenlocker_greet
---testing` for the lock screen; their logs say "the Plasma wallpaper draws on".
+pacman with the proxy's CA and `CheckSpace` off, a user with sudo, headless Sway inside). A
+Plasma session there: `plasma-workspace kwin`, then in `dbus-run-session`: `kwin_wayland --virtual`,
+`/usr/lib/kactivitymanagerd`, `plasmashell`.
 
 ## Traps
 

@@ -31,10 +31,9 @@ LANES = {
     "browser": ["tests/browser"],
     "kwin": ["tests/kwin"],
     "nix": ["tests/nix"],
-    "plasma": ["tests/plasma"],
     "quick": ["tests/unit", "tests/contract"],
     "all": ["tests/unit", "tests/contract", "tests/native", "tests/render", "tests/wayland", "tests/kwin",
-            "tests/browser", "tests/nix", "tests/plasma"],
+            "tests/browser", "tests/nix"],
 }
 
 

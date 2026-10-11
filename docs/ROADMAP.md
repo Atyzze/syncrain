@@ -12,6 +12,12 @@ Open questions, planned builds, the cadence and the constraints. What shipped: `
 
 ## Decisions answered
 
+* **2026-10-11 19:03**: the Plasma wallpaper "was severely broken"; "stay closer to the barebone
+  linux kernel ... our own boot sequence ... the rain ... as the login screen ... then load
+  KDE/Plasma"; greetd rather than a login manager of our own. Build 15 drops the Plasma wallpaper;
+  build 16 is the login screen.
+* **2026-10-11 18:29**: "a json config ... the exact symbol/language-set to include and what %/bias
+  if any, or all equally neutral". Build 15.
 * **2026-10-10 13:38**: "yes make build 13, the plasma plugin" (asked at 13:28 for a way to start it
   without a terminal, and for the lock and login screens). Builds 13 and 14; the login screen is next.
 * **2026-10-10 12:29**: a darker background and less glow in the centre, parameters for speed and
@@ -31,8 +37,8 @@ Open questions, planned builds, the cadence and the constraints. What shipped: `
 
 ## Planned builds
 
-1. **Their trial of the Plasma wallpaper**, and the two questions above (`docs/agent/NEXT_BUILD.md`).
-2. **The login screen**: an SDDM theme that keeps Breeze's login form, with the rain behind it.
+1. **The login screen**: greetd with syncrain's own greeter (`docs/agent/NEXT_BUILD.md`).
+2. **The boot splash**: a still frame of the rain (Plymouth), until the login screen's live one.
 3. **A NixOS image** with syncrain as its wallpaper.
 
 ## Build cadence

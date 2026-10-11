@@ -64,8 +64,9 @@ Rules learned by shipping their opposite, one line each. When and how: `docs/HIS
 * **Atlas lookups need explicit gradients**, or cell edges pick the wrong mip level.
 * **Integer hashing is the only randomness bit-exact on every GPU.**
 * **A loop shows on a wallpaper within seconds** (the GIFs before build 1).
-* **One set of passes, many hosts**: the Plasma item reuses `passes.c` and the scene, so its frames
-  are the others' without a second copy of anything.
+* **A toolkit's item inside someone else's shell breaks where no lane can see**: builds 13 and 14's
+  Plasma wallpaper passed every lane and a real shell in an Arch root, and broke on the operator's
+  desktop. Our own program, on our own surface, is what holds up there.
 
 ## The sandbox
 

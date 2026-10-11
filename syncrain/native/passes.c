@@ -1,7 +1,6 @@
-/* The six passes, the same calls in the same order as renderer.py, on whatever OpenGL context is
- * current: the native wallpaper's own (render.c) or the one Qt Quick gives the Plasma wallpaper
- * (syncrain/plasma/). A `struct passes` is what one context made: the programs, the textures every
- * frame reads, and each viewport size's intermediate textures.
+/* The six passes, the same calls in the same order as renderer.py, on the OpenGL context that is
+ * current (render.c's). A `struct passes` is what one context made: the programs, the textures
+ * every frame reads, and each viewport size's intermediate textures.
  *
  * The OpenGL functions come from the caller's getProcAddress, so building needs no OpenGL headers.
  */
@@ -105,9 +104,9 @@ typedef unsigned char GLboolean, GLubyte;
 GL_FUNCTIONS(DECLARE)
 
 /* renderer.py, UNIT: the texture unit each sampler reads. */
-enum { UNIT_STATE = 0, UNIT_FIELD = 1, UNIT_ATLAS = 2, UNIT_LUT = 3, UNIT_WORDS = 4, UNIT_BLOOM = 5,
+enum { UNIT_STATE = 0, UNIT_FIELD = 1, UNIT_ATLAS = 2, UNIT_TABLE = 3, UNIT_WORDS = 4, UNIT_BLOOM = 5,
        UNIT_LOGO = 6, UNIT_BG = 7, UNIT_MASK = 8, UNIT_SRC = 9 };
-static const int STATIC_UNIT[TEXTURE_COUNT] = { UNIT_ATLAS, UNIT_LUT, UNIT_WORDS, UNIT_LOGO, UNIT_BG, UNIT_MASK };
+static const int STATIC_UNIT[TEXTURE_COUNT] = { UNIT_ATLAS, UNIT_TABLE, UNIT_WORDS, UNIT_LOGO, UNIT_BG, UNIT_MASK };
 
 /* The per-frame uniforms of each program, in the order renderer.py sets them. */
 enum { STATE_SEC, STATE_FRAC, STATE_COLS, STATE_ROWS, STATE_KEEP, STATE_N };

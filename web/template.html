@@ -125,9 +125,9 @@ const LOOK = { speed: [0.25, 4], density: [0, 2.3], glow: [0, 2], bloom: [0, 2],
 function readLook() {
   const out = {};
   for (const [k, [lo, hi]] of Object.entries(LOOK)) {
-    const v = P.has(k) && P.get(k) !== '' && !isNaN(Number(P.get(k))) ? Number(P.get(k))
-      : (k === 'hieroglyphs' ? (TH.rain.hieroglyphs || 0) : 1);
-    out[k] = Math.min(hi, Math.max(lo, v));
+    const given = P.has(k) && P.get(k) !== '' && !isNaN(Number(P.get(k)));
+    if (k === 'hieroglyphs' && !given) { out[k] = null; continue; }   // the sets' own share
+    out[k] = Math.min(hi, Math.max(lo, given ? Number(P.get(k)) : 1));
   }
   out.snow = P.get('snow') !== 'off';
   return out;
@@ -211,21 +211,58 @@ function fbo(tex) {
 }
 
 const T = {}, F = {};
-const UNIT = { state: 0, field: 1, atlas: 2, lut: 3, words: 4, bloom: 5, logo: 6, bg: 7, mask: 8, src: 9 };
-let themeName, TH, words, logoChoice, channel, SEED;
+const UNIT = { state: 0, field: 1, atlas: 2, table: 3, words: 4, bloom: 5, logo: 6, bg: 7, mask: 8, src: 9 };
+let themeName, TH, words, logoChoice, channel, SEED, SETS;
+
+// The theme's symbol sets over the shipped glyphs, as syncrain/glyphs.py resolves them: the table
+// of glyph slots, set after set, and each set's share (set_shares), cumulative for state.frag.
+const LIB = new Map(META.library.glyphs.map((k, i) => [k, i]));
+const charsOf = s => [...new Set(Array.from(s.chars))].filter(c => !/\s/.test(c));
+function setShares(cfg, hieroglyphs) {
+  const given = cfg.sets.map(s => (s.share === undefined ? null : s.share));
+  if (hieroglyphs !== null) cfg.sets.forEach((s, i) => { if (s.name === 'hieroglyphs') given[i] = hieroglyphs; });
+  let fixed = given.reduce((a, g) => a + (g === null ? 0 : g), 0);
+  if (fixed > 1) { for (let i = 0; i < given.length; i++) if (given[i] !== null) given[i] = given[i] / fixed; fixed = 1; }
+  const weights = cfg.sets.map((s, i) => {
+    let w = given[i] !== null ? 0 : (s.weight === undefined ? 1 : s.weight);
+    if (cfg.balance === 'glyphs') w *= charsOf(s).length;
+    return w;
+  });
+  const total = weights.reduce((a, w) => a + w, 0), rest = 1 - fixed;
+  const out = given.map((g, i) => (g !== null ? g : (total > 0 ? rest * weights[i] / total : 0)));
+  const norm = out.reduce((a, x) => a + x, 0);
+  return norm <= 0 ? out.map(() => 0) : out.map(x => x / norm);
+}
+function glyphSets() {
+  const cfg = TH.glyphs, table = [], ranges = [];
+  for (const s of cfg.sets) {
+    const first = table.length;
+    for (const c of charsOf(s)) table.push(LIB.get(c + (s.mirror ? '~' : '')));
+    ranges.push([first, table.length - first]);
+  }
+  const shares = setShares(cfg, look().hieroglyphs), uniform = [];
+  const chosen = ranges.map((r, i) => [r, shares[i]]).filter(([[, count], share]) => share > 0 && count > 0);
+  const whole = chosen.reduce((a, [, share]) => a + share, 0);
+  let acc = 0;
+  chosen.forEach(([[first, count], share]) => { acc += share / whole; uniform.push([acc, first, count]); });
+  if (!uniform.length) uniform.push([1, 0, table.length]);
+  uniform[uniform.length - 1][0] = 1;
+  return { table, uniform };
+}
 
 function setTheme(name) {
   themeName = META.themes[name] ? name : 'nixos';
   TH = META.themes[themeName];
-  words = TH.words;
+  words = TH.wordText.map(w => Array.from(w).map(c => LIB.get(c)));
   logoChoice = logoParam || TH.logo.default;
-  const lut = new Uint8Array(256 * 4);
-  TH.lut.forEach((g, i) => { lut[i * 4] = g; lut[i * 4 + 3] = 255; });
+  SETS = glyphSets();
+  const table = new Uint8Array(SETS.table.length * 4);
+  SETS.table.forEach((g, i) => { table[i * 4] = g & 255; table[i * 4 + 1] = g >> 8; table[i * 4 + 3] = 255; });
   const wd = new Uint8Array(16 * Math.max(1, words.length) * 4).fill(255);
   words.forEach((w, row) => w.forEach((g, i) => { wd[(row * 16 + i) * 4] = g; }));
-  if (T.lut) gl.deleteTexture(T.lut);
+  if (T.table) gl.deleteTexture(T.table);
   if (T.words) gl.deleteTexture(T.words);
-  T.lut = makeTex(256, 1, lut, false);
+  T.table = makeTex(SETS.table.length, 1, table, false);
   T.words = makeTex(16, Math.max(1, words.length), wd, false);
   document.documentElement.dataset.rain = themeName;
 }
@@ -265,6 +302,7 @@ function common(pr, sec, frac) {
 function rainUniforms(pr) {
   gl.uniform1i(pr.u('uCols'), COLS); gl.uniform1i(pr.u('uRows'), rows);
   gl.uniform1i(pr.u('uState'), UNIT.state); gl.uniform1i(pr.u('uAtlas'), UNIT.atlas);
+  gl.uniform1i(pr.u('uAtlasRows'), Math.ceil(META.library.glyphs.length / 16));
   const c = TH.colors;
   gl.uniform3fv(pr.u('cDeep'), c.deep); gl.uniform3fv(pr.u('cMid'), c.mid);
   gl.uniform3fv(pr.u('cPale'), c.pale); gl.uniform3fv(pr.u('cHead'), c.head);
@@ -283,7 +321,7 @@ function draw(ms) {
   const sec = whole - META.epoch0, frac = (ms - whole * 1000) / 1000;
   gl.bindVertexArray(vao);
   const logoOn = logoChoice !== 'none';
-  bind(UNIT.atlas, T.atlas); bind(UNIT.lut, T.lut); bind(UNIT.words, T.words);
+  bind(UNIT.atlas, T.atlas); bind(UNIT.table, T.table); bind(UNIT.words, T.words);
   bind(UNIT.logo, T.logos[logoChoice]); bind(UNIT.bg, T.dummy); bind(UNIT.mask, T.dummy);
 
   const cell = CELL;
@@ -295,14 +333,15 @@ function draw(ms) {
 
   let pr = prog.state; gl.useProgram(pr.p); common(pr, sec, frac);
   gl.uniform1i(pr.u('uCols'), COLS); gl.uniform1i(pr.u('uRows'), rows);
-  gl.uniform1i(pr.u('uLUT'), UNIT.lut); gl.uniform1i(pr.u('uWords'), UNIT.words);
+  gl.uniform1i(pr.u('uTable'), UNIT.table); gl.uniform1i(pr.u('uWords'), UNIT.words);
   gl.uniform1i(pr.u('uNumWords'), words.length);
   gl.uniform4fv(pr.u('uKeep'), keep);
-  const L = look(), hiero = META.atlas.hieroglyphs || [0, 0];
+  const L = look(), sets = new Float32Array(64);
+  SETS.uniform.forEach(([end, first, count], i) => sets.set([end, first, count, 0], i * 4));
+  gl.uniform1i(pr.u('uSetN'), SETS.uniform.length); gl.uniform4fv(pr.u('uSets'), sets);
   gl.uniform1f(pr.u('uDensity'), Math.min(1, TH.rain.density * L.density)); gl.uniform1f(pr.u('uWordRate'), TH.rain.wordRate);
   gl.uniform1f(pr.u('uGlintRate'), TH.rain.glintRate); gl.uniform1i(pr.u('uContrast'), TH.rain.contrast);
-  gl.uniform1f(pr.u('uSpeed'), L.speed); gl.uniform1f(pr.u('uHiero'), hiero[1] ? L.hieroglyphs : 0);
-  gl.uniform1i(pr.u('uHieroFirst'), hiero[0]); gl.uniform1i(pr.u('uHieroCount'), Math.max(1, hiero[1]));
+  gl.uniform1f(pr.u('uSpeed'), L.speed);
   pass(F.state, COLS, rows);
 
   bind(UNIT.state, T.state);
@@ -399,7 +438,7 @@ if (paused && showHud) {
 }
 
 (async function start() {
-  T.atlas = await imageTex(IMAGES.atlas);
+  T.atlas = await imageTex(IMAGES.glyphs);
   T.logos = { none: makeTex(1, 1, new Uint8Array(4), true) };
   for (const v of ['white', 'colours']) T.logos[v] = await imageTex(IMAGES['logo-' + v]);
   T.dummy = makeTex(1, 1, new Uint8Array([0, 0, 0, 255]), true);

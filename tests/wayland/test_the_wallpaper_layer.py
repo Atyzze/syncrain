@@ -102,12 +102,18 @@ def test_without_opengl_the_desktop_is_given_back(root, sway, tmp_path):
     assert mean_abs_diff(after, empty) < 1, "something is still covering the desktop"
 
 
+SYMBOLS = '{"balance": "glyphs", "sets": [{"name": "a", "chars": "Ж★ΩअДあ", "weight": 2}, {"name": "b", "chars": "𓆙λ", "share": 0.3}]}'
+
+
 @pytest.mark.parametrize("look", [[], ["--speed", "2", "--density", "0.5", "--glow", "0", "--bloom", "1.5",
-                                        "--bg-gain", "0.5", "--snow", "off", "--hieroglyphs", "1"]],
-                         ids=["defaults", "every-option"])
+                                        "--bg-gain", "0.5", "--snow", "off", "--hieroglyphs", "1"], ["--glyphs"]],
+                         ids=["defaults", "every-option", "a-symbols-file"])
 def test_the_native_wallpaper_draws_the_gtk_host_s_frame(root, sway, tmp_path, look):
     """The same moment, drawn by each host on the same screen, is the same picture to the pixel."""
     session, _ = sway
+    if look == ["--glyphs"]:
+        (tmp_path / "glyphs.json").write_text(SYMBOLS, encoding="utf-8")
+        look = ["--glyphs", str(tmp_path / "glyphs.json")]
     shots = {}
     for host in ("native", "gtk"):
         proc, line = start(root, wallpaper_env(root, session), "--time", str(MOMENT), "--host",

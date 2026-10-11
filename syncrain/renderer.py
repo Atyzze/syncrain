@@ -21,19 +21,21 @@ and its per-size and per-frame arithmetic is a port of `geometry` and `Renderer.
 value for value by tests/native/.
 """
 import os
+import sys
 from types import SimpleNamespace
 
 from . import engine, gl
+from . import glyphs as glyph_sets
 from .gl import (GL_BLEND, GL_CLAMP_TO_EDGE, GL_COLOR_ATTACHMENT0, GL_DEPTH_TEST, GL_FRAGMENT_SHADER,
                  GL_FRAMEBUFFER, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_NEAREST, GL_RGBA, GL_RGBA8,
                  GL_SCISSOR_TEST, GL_TEXTURE0, GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_TEXTURE_MIN_FILTER,
                  GL_TEXTURE_WRAP_S, GL_TEXTURE_WRAP_T, GL_TRIANGLES, GL_UNPACK_ALIGNMENT, GL_UNSIGNED_BYTE,
                  GL_VERTEX_SHADER, GL_COMPILE_STATUS, GL_LINK_STATUS)
 
-UNIT = dict(state=0, field=1, atlas=2, lut=3, words=4, bloom=5, logo=6, bg=7, mask=8, src=9)
+UNIT = dict(state=0, field=1, atlas=2, table=3, words=4, bloom=5, logo=6, bg=7, mask=8, src=9)
 PROGRAMS = ("state", "field", "glyphs", "blur", "composite")
 #: The textures every frame binds, in the order it binds them.
-STATIC_TEXTURES = ("atlas", "lut", "words", "logo", "bg", "mask")
+STATIC_TEXTURES = ("atlas", "table", "words", "logo", "bg", "mask")
 
 HEADER_ES = "#version 300 es\nprecision highp float;\nprecision highp int;\nprecision highp sampler2D;\n"
 HEADER_GL = "#version 330 core\n"
@@ -178,10 +180,10 @@ def texture_sources(r, bundled=rgba_pil):
     `bundled` decodes the images that come with syncrain; an image the user names (--background,
     --mask) always goes through Pillow."""
     out = {}
-    w, h, data = bundled(os.path.join(r.data_dir, "atlas.png"))
+    w, h, data = r.glyphs.atlas()              # only the glyphs the symbol sets use (syncrain/glyphs.py)
     out["atlas"] = (w, h, "mip", data)
-    out["lut"] = (256, 1, "nearest", engine.lut_bytes(r.th))
-    wb, n_words = engine.words_bytes(r.th)
+    out["table"] = (len(r.glyphs.table), 1, "nearest", r.glyphs.table_bytes())
+    wb, n_words = r.glyphs.words_bytes()
     out["words"] = (16, n_words, "nearest", wb)
     if r.logo_choice != "none":
         w, h, data = bundled(os.path.join(r.data_dir, f"logo-{r.logo_choice}.png"))
@@ -218,14 +220,15 @@ def static_uniforms(r):
         out.append((program, name, kind, values))
 
     put("state", "uSeed", "ui", r.seed)
-    put("state", "uLUT", "i", UNIT["lut"]); put("state", "uWords", "i", UNIT["words"])
-    put("state", "uNumWords", "i", len(th["words"]))
+    put("state", "uTable", "i", UNIT["table"]); put("state", "uWords", "i", UNIT["words"])
+    put("state", "uNumWords", "i", len(r.glyphs.words))
+    sets = r.glyphs.uniform()
+    put("state", "uSetN", "i", len(sets))
+    put("state", "uSets", "f4v", *sum(([end, first, count, 0.0] for end, first, count in sets), []),
+        *([0.0] * (4 * (16 - len(sets)))))
     put("state", "uDensity", "f", min(1.0, rain["density"] * r.look["density"]))
     put("state", "uWordRate", "f", rain["wordRate"])
     put("state", "uSpeed", "f", r.look["speed"])
-    first, count = r.meta["atlas"].get("hieroglyphs", (0, 0))
-    put("state", "uHiero", "f", r.look["hieroglyphs"] if count else 0.0)
-    put("state", "uHieroFirst", "i", first); put("state", "uHieroCount", "i", max(1, count))
     put("state", "uGlintRate", "f", rain["glintRate"])
     put("state", "uContrast", "i", rain["contrast"])
 
@@ -234,6 +237,7 @@ def static_uniforms(r):
     for name in ("glyphs", "composite"):
         put(name, "uSeed", "ui", r.seed)
         put(name, "uState", "i", UNIT["state"]); put(name, "uAtlas", "i", UNIT["atlas"])
+        put(name, "uAtlasRows", "i", r.glyphs.rows)
         for uniform, key in (("cDeep", "deep"), ("cMid", "mid"), ("cPale", "pale"), ("cHead", "head")):
             put(name, uniform, "f3", *c[key])
         put(name, "uContrast", "i", rain["contrast"])
@@ -369,7 +373,7 @@ class Shared:
 
 #: The Renderer's keywords that come straight from the command line's options of the same names.
 OPTIONS = ("theme", "channel", "logo", "background", "mask", "bg_gamma", "bg_gain", "rainbow", "spin", "drift",
-           "speed", "density", "snow", "glow", "bloom", "hieroglyphs")
+           "speed", "density", "snow", "glow", "bloom", "hieroglyphs", "glyphs")
 
 
 def from_args(args, **override):
@@ -382,7 +386,7 @@ def from_args(args, **override):
 class Renderer:
     def __init__(self, theme="nixos", channel="public", logo=None, background=None, mask=None,
                  bg_gamma=None, bg_gain=None, rainbow=None, spin=None, drift=None, speed=None, density=None,
-                 snow=None, glow=None, bloom=None, hieroglyphs=None, data_dir=engine.DATA_DIR):
+                 snow=None, glow=None, bloom=None, hieroglyphs=None, glyphs=None, data_dir=engine.DATA_DIR):
         self.meta = engine.load_meta(data_dir)
         if theme not in self.meta["themes"]:
             raise SystemExit(f"unknown theme {theme!r}; available: {', '.join(self.meta['themes'])}")
@@ -397,6 +401,10 @@ class Renderer:
         self.motion = engine.motion(self.th, rainbow=rainbow, spin=spin, drift=drift)
         self.look = engine.look(self.th, speed=speed, density=density, snow=snow, glow=glow, bloom=bloom,
                                 hieroglyphs=hieroglyphs)
+        # the symbols: a symbols file (`glyphs`, else ~/.config/syncrain/glyphs.json if there is one),
+        # else the theme's own sets
+        self.glyphs = glyph_sets.for_theme(self.meta, self.th, data_dir, path=glyphs, hieroglyphs=self.look["hieroglyphs"],
+                                           warn=lambda why: print(f"syncrain: {why}", file=sys.stderr, flush=True))
         self.data_dir = data_dir
         self.epoch0, self.cols = self.meta["epoch0"], self.meta["cols"]
         self.targets = {}
@@ -409,7 +417,9 @@ class Renderer:
         """Everything the shared programs and textures depend on: two renderers with the same key
         draw with the same objects."""
         return (use_es, self.data_dir, self.theme_name, self.seed, self.logo_choice, self.background, self.mask,
-                self.bg_gamma, self.bg_gain, tuple(sorted(self.motion.items())), tuple(sorted(self.look.items())))
+                self.bg_gamma, self.bg_gain, tuple(sorted(self.motion.items())),
+                tuple(sorted((k, str(v)) for k, v in self.look.items())), self.glyphs.source,
+                tuple(self.glyphs.keys), tuple(self.glyphs.table), tuple(self.glyphs.uniform()))
 
     def keep_mode(self):
         """Which cells the hidden words keep clear of, as the native scene says it:

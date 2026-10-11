@@ -88,13 +88,8 @@ def running_lines(record_lines=8) -> list[str]:
         argv = [a.decode(errors="replace") for a in raw.split(b"\0") if a]
         if comm == "syncrain-wallpa":
             what = "the native wallpaper"
-        elif comm in ("plasmashell", "kscreenlocker_g"):
-            if "libsyncrainplugin" not in (_read(d + "/maps") or ""):
-                continue
-            what = f"the Plasma wallpaper, in {comm} (its memory is the whole {comm}'s)"
         elif is_syncrain_command(argv):           # the launcher's python -m syncrain, or Nix's wrapped script
-            if any(a in argv for a in ("--diagnose", "--power-sweep", "--benchmark", "--screenshot", "--record",
-                                       "--write-scene")):
+            if any(a in argv for a in ("--diagnose", "--power-sweep", "--benchmark", "--screenshot", "--record")):
                 continue
             what = "the GTK host"
         else:
@@ -117,6 +112,26 @@ def running_lines(record_lines=8) -> list[str]:
     if record:
         lines.append(f"memory record ({path.replace(os.path.expanduser('~'), '~', 1)}), the last lines:")
         lines.extend("  " + line for line in record[-record_lines:])
+    return lines
+
+
+def symbol_lines(args) -> list[str]:
+    """Which symbols a wallpaper started now would draw, and what no font here can draw."""
+    from . import engine, glyphs
+    meta = engine.load_meta()
+    theme = meta["themes"].get(args.theme, meta["themes"]["nixos"])
+    said = []
+    r = glyphs.for_theme(meta, theme, engine.DATA_DIR, path=args.glyphs, hieroglyphs=args.hieroglyphs,
+                         warn=said.append)
+    shipped = glyphs.Library(meta, engine.DATA_DIR).index
+    lines = said + [f"from {r.source}: {len(r.sets)} sets, {len(r.keys)} symbols "
+                    f"({sum(k not in shipped for k in r.keys)} drawn from this machine's fonts)"]
+    for (name, _, count), share in zip(r.sets, r.shares):
+        lines.append(f"  {name}: {count} symbols, {share * 100:.1f}%")
+    if r.missing:
+        lines.append("no font here has: " + " ".join(r.missing) + " (they fall as blanks)")
+    if r.source == "the theme":
+        lines.append(f"your own: {glyphs.default_path()} (syncrain --write-glyphs writes a starter)")
     return lines
 
 
@@ -254,6 +269,7 @@ def run(args) -> int:
 
     section("session", session_lines())
     section("running wallpaper", running_lines())
+    section("symbols", symbol_lines(args))
     section("graphics cards", graphics_cards())
     from .app import avoid_the_explicit_sync_leak, use_gl_renderer
     use_gl_renderer()                        # what the wallpaper itself does, so the answer is about it

@@ -2,14 +2,14 @@
  * text header, line by line up to "end", and then the shader sources and pixels the header points
  * into. Offsets count from the first byte after the "end" line.
  *
- *   syncrain-scene-1
+ *   syncrain-scene-2
  *   describe syncrain build 8 (stream 48e6bf9c)
  *   epoch0 1704067200
  *   cols 64
  *   keep logo <size> <drift> | keep mask <x0> <y0> <x1> <y1> <drift> | keep none
  *   bg <width> <height>                          (only with a background image)
  *   shader <vert|state|field|glyphs|blur|composite> <offset> <length>
- *   texture <atlas|lut|words|logo|bg|mask> <width> <height> <nearest|linear|mip> <offset> <length>
+ *   texture <atlas|table|words|logo|bg|mask> <width> <height> <nearest|linear|mip> <offset> <length>
  *   uniform <program> <name> <i|ui|f|f2|f3|f4|f4v> <values...>
  *   kwin-script <offset> <length>
  *   fallback <offset> <length>                   (NUL-separated arguments)
@@ -26,10 +26,10 @@
 
 #include "syncrain.h"
 
-#define CONTRACT "syncrain-scene-1"
+#define CONTRACT "syncrain-scene-2"
 
 static const char *const PROGRAMS[PROGRAM_COUNT] = { "state", "field", "glyphs", "blur", "composite" };
-static const char *const TEXTURES[TEXTURE_COUNT] = { "atlas", "lut", "words", "logo", "bg", "mask" };
+static const char *const TEXTURES[TEXTURE_COUNT] = { "atlas", "table", "words", "logo", "bg", "mask" };
 static const char *const FILTERS[] = { "nearest", "linear", "mip" };
 
 const char *scene_program_name(enum program program)
@@ -91,7 +91,7 @@ static char **split_arguments(struct blob b)
 }
 
 #define FAIL(...) do { snprintf(why, why_size, __VA_ARGS__); goto fail; } while (0)
-#define MAX_WORDS 24
+#define MAX_WORDS (UNIFORM_VALUES + 8)
 
 bool scene_load(struct scene *scene, int fd, char *why, size_t why_size)
 {
@@ -249,15 +249,6 @@ bool scene_load(struct scene *scene, int fd, char *why, size_t why_size)
 fail:
 	scene_unmap(scene);
 	return false;
-}
-
-void scene_free(struct scene *scene)
-{
-	scene_unmap(scene);
-	free(scene->kwin_script);
-	free(scene->fallback);
-	scene->kwin_script = NULL;
-	scene->fallback = NULL;
 }
 
 void scene_unmap(struct scene *scene)

@@ -20,7 +20,7 @@ struct wl_surface;
 
 enum program { PROGRAM_STATE, PROGRAM_FIELD, PROGRAM_GLYPHS, PROGRAM_BLUR, PROGRAM_COMPOSITE, PROGRAM_COUNT };
 /* The textures every frame reads, in the order a frame binds them (renderer.py, STATIC_TEXTURES). */
-enum texture { TEXTURE_ATLAS, TEXTURE_LUT, TEXTURE_WORDS, TEXTURE_LOGO, TEXTURE_BG, TEXTURE_MASK, TEXTURE_COUNT };
+enum texture { TEXTURE_ATLAS, TEXTURE_TABLE, TEXTURE_WORDS, TEXTURE_LOGO, TEXTURE_BG, TEXTURE_MASK, TEXTURE_COUNT };
 enum filter { FILTER_NEAREST, FILTER_LINEAR, FILTER_MIP };
 enum keep { KEEP_NONE, KEEP_LOGO, KEEP_MASK };
 
@@ -36,7 +36,7 @@ struct texture_source {
 	struct blob pixels;
 };
 
-#define UNIFORM_VALUES 16
+#define UNIFORM_VALUES 64
 
 struct uniform_source {
 	enum program program;
@@ -67,7 +67,6 @@ struct scene {
 const char *scene_program_name(enum program program);
 bool scene_load(struct scene *scene, int fd, char *why, size_t why_size);
 void scene_unmap(struct scene *scene);  /* the sources and pixels, once they are on the card */
-void scene_free(struct scene *scene);   /* and the rest */
 
 /* ------------------------------------------------------------------ arithmetic (timing.c)
  * Every value here must equal what the Python host computes (renderer.py, engine.py, pacing.py),
@@ -154,7 +153,6 @@ void render_shutdown(void);
 struct watch;
 
 struct watch *watch_new(void (*on_change)(void));
-struct watch *watch_new_named(void (*on_change)(void), const char *prefix);
 const char *watch_start(struct watch *w, const char *script_template, bool maximized); /* NULL: running */
 void watch_stop(struct watch *w);
 void watch_free(struct watch *w);
@@ -162,7 +160,6 @@ void watch_retry(struct watch *w);
 int watch_fd(const struct watch *w);
 void watch_dispatch(struct watch *w);
 bool watch_answered(const struct watch *w);
-bool watch_current(struct watch *w);
 bool watch_hidden(const struct watch *w, const char *screen);
 bool is_syncrain_command(char **argv, int argc);
 

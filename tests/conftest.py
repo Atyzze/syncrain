@@ -19,6 +19,10 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 REQUIRE_ALL = os.environ.get("SYNCRAIN_REQUIRE_ALL") == "1"
 sys.path.insert(0, str(ROOT))
+# A symbols file of this machine's (~/.config/syncrain/glyphs.json) would change every frame drawn:
+# the lanes draw with the themes' own unless a test names one.
+os.environ["XDG_CONFIG_HOME"] = __import__("tempfile").mkdtemp(prefix="syncrain-config-")
+os.environ["XDG_CACHE_HOME"] = __import__("tempfile").mkdtemp(prefix="syncrain-cache-")
 
 
 def need(ok: bool, what: str) -> None:

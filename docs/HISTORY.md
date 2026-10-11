@@ -46,6 +46,8 @@ showed within seconds, which is why syncrain draws every frame from the clock.
   drawn with the native wallpaper's passes inside Plasma. Not delivered: its review came first.
 * **14** (2026-10-10): build 13's review fixed (a crash when the wallpaper is switched away
   mid-frame, KWin scripts left behind, a lock screen blank while its scene is made).
+* **15** (2026-10-11): your own symbols: a file of sets (any language, favourites) with weights or
+  shares; 489 shipped glyphs, others from the machine's fonts. The Plasma wallpaper removed.
 
 ## The operator's words
 
@@ -76,4 +78,9 @@ showed within seconds, which is why syncrain draws every frame from the clock.
   run/trigger it in a console to start?"; "could we apply it to the background of the login/lock
   screen as well? (Without disabling the current login window)"; "yes make build 13, the plasma
   plugin".
+* **After 14**: "I have yet to see 𓆙"; "I'm also missing arabic symbols I mean, and russian, and french
+  and japanese ... this calls for a json config, where one can explicitly inspect/set the exact
+  symbol/language-set to include and what %/bias if any, or all equally neutral"; "I tried the
+  plasma wallpaper but that was severely broken ... stay closer to the barebone linux kernel";
+  "yes, lets incorporate greetd".
 * **Standing**: no long dashes in anything written to them.

@@ -120,3 +120,23 @@ def test_uninstall_takes_everything_it_put_there(root, home):
     assert gone.returncode == 0, gone.stdout + gone.stderr
     for path in (".local/share/syncrain", ".local/bin/syncrain", "config/systemd/user/syncrain.service"):
         assert not (tmp / path).exists(), path
+
+
+def test_build_13_and_14_s_plasma_wallpaper_is_taken_away_again(root, home):
+    """It was dropped in build 15: an install or an uninstall removes it and gives Plasma its image
+    wallpaper back (Plasma's scripting and kscreenlockerrc are stubs here)."""
+    tmp, env = home
+    stubs, calls, qml = tmp / "stub-bin", tmp / "calls.log", tmp / "qt-qml"
+    for name, body in {"qtpaths6": f'echo "{qml}"', "sudo": '"$@"', "dbus-send": f'echo "dbus-send $*" >> "{calls}"',
+                       "kreadconfig6": "echo org.syncrain.wallpaper",
+                       "kwriteconfig6": f'echo "kwriteconfig6 $*" >> "{calls}"'}.items():
+        (stubs / name).write_text(f"#!/bin/sh\n{body}\n")
+        (stubs / name).chmod(0o755)
+    package = tmp / ".local/share/plasma/wallpapers/org.syncrain.wallpaper"
+    for d in (package, qml / "org/syncrain"):
+        d.mkdir(parents=True)
+    done = install(root, env)
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert not package.exists() and not (qml / "org/syncrain").exists()
+    said = calls.read_text()
+    assert "d.wallpaperPlugin = 'org.kde.image'" in said and "WallpaperPlugin --delete" in said, said

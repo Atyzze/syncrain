@@ -272,7 +272,8 @@ def interrupted_by_hangup():
 
 #: The wallpaper options a sweep passes on to every phase (the rest are the phase's own).
 PASS_ON = ("theme", "channel", "logo", "background", "mask", "bg_gamma", "bg_gain", "rainbow", "spin", "drift",
-           "speed", "density", "glow", "bloom", "snow", "hieroglyphs", "layer", "scale", "fps", "pause_under", "host")
+           "speed", "density", "glow", "bloom", "snow", "hieroglyphs", "glyphs", "layer", "scale", "fps", "pause_under",
+           "host")
 
 
 def base_args(args) -> list[str]:

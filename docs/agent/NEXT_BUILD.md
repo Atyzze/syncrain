@@ -1,16 +1,18 @@
-# The next build is 15
+# The next build is 16
 
 The first line is parsed: `# The next build is <N>`, exactly one above `BUILD_NUMBER`.
 
-## Build 15: their trial, then the login screen
+## Build 16: the login screen (greetd)
 
-* Read what the operator sent last, and answer it in one plain sentence first. Builds 13 and 14 go
-  to GitHub (committed, not pushed) only once they say the Plasma wallpaper works; what they report
-  about it comes first.
-* **The login screen**: an SDDM theme that keeps Breeze's login form (`/usr/share/sddm/themes/breeze`)
-  with the `SyncRain` item behind it (the module is in Qt's QML folder already; SDDM runs as its
-  own user, so its scene goes somewhere it can read). Test it with `sddm-greeter-qt6 --test-mode`
-  in the Arch root.
+* Read what the operator sent last, and answer it in one plain sentence first.
+* **greetd** replaces SDDM (asked 2026-10-11 19:03): greetd checks the password through PAM and
+  starts the Plasma session; its greeter is ours: syncrain's native rain on every screen (a
+  compositor such as `cage` or a minimal `sway` under greetd) with a small user and password box
+  speaking greetd's IPC (JSON over its socket). Never write PAM handling ourselves.
+* `install.sh --login-screen`: `pacman -S greetd`, the greeter, `/etc/greetd/config.toml`,
+  `systemctl disable sddm; enable greetd`; SDDM stays installed. Undo from a text console
+  (Ctrl+Alt+F3): one documented command. Test it all in the Arch root: greetd, the greeter in a
+  headless compositor, a login that starts `startplasma-wayland`.
 * **The glow flare-up**, with the time they saw it: draw that moment and look.
 * **The two questions** in `docs/ROADMAP.md` (default frame rate, what pauses).
 

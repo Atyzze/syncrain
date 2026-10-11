@@ -12,7 +12,6 @@
       packages = forAllSystems (pkgs: rec {
         syncrain = pkgs.callPackage ./nix/package.nix { };
         syncrain-web = pkgs.callPackage ./nix/web.nix { };
-        syncrain-plasma = pkgs.callPackage ./nix/plasma.nix { inherit syncrain; };
         default = syncrain;
       });
 
@@ -26,7 +25,6 @@
       overlays.default = final: _prev: {
         syncrain = final.callPackage ./nix/package.nix { };
         syncrain-web = final.callPackage ./nix/web.nix { };
-        syncrain-plasma = final.callPackage ./nix/plasma.nix { };
       };
 
       nixosModules.default = import ./nix/nixos-module.nix self;

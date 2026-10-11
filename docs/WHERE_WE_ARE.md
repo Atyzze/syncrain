@@ -1,4 +1,4 @@
-# Where we are, at build 14
+# Where we are, at build 15
 
 The project on one page. Detail: `docs/agent/HANDOFF.md`.
 
@@ -21,15 +21,16 @@ name, so everyone on a channel sees the same rain. Linux (Wayland, X11) and the 
   `--density`, `--snow off`, `--hieroglyphs` (0.15 by default).
 * **The glow flare-up**: not in the frames syncrain computes (two hours checked). Note the time
   when you see it, and that moment can be drawn again.
-* **A Plasma wallpaper** (builds 13 and 14): `./install.sh --plasma` makes syncrain the wallpaper of every
-  desktop and of the lock screen, drawn by Plasma behind the icons, with its settings in Desktop and
-  Wallpaper. No terminal, no service.
-* **On GitHub**: github.com/Atyzze/syncrain, builds up to 12; 13 and 14 after your trial.
+* **The Plasma wallpaper** (builds 13 and 14) broke on your desktop; build 15 removes it.
+* **Your own symbols** (build 15): `syncrain --write-glyphs`, then edit
+  `~/.config/syncrain/glyphs.json`: sets of characters (any language, your favourites), each with
+  a weight or a share.
+* **On GitHub**: github.com/Atyzze/syncrain, every build up to 15.
 
 ## What comes next
 
-* **Build 15**: what you find with the Plasma wallpaper; then the login screen (the rain behind
-  the usual login form).
+* **Build 16**: the login screen: greetd instead of SDDM, the rain on every screen with a small
+  password box, then your Plasma session.
 * **Then**: a NixOS image.
 
 ## The decision in front of you
