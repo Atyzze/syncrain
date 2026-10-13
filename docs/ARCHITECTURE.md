@@ -55,9 +55,10 @@ against burn-in; nothing flashes.
 
 **The login screen** (`syncrain/login/`, `syncrain/greeter.py`, `syncrain/greetd.py`): greetd runs
 `login.sh` as its user `greeter`; that runs KWin, and in it the native wallpaper and a GTK box on the
-overlay layer. The box speaks greetd's IPC (JSON over its socket); greetd checks the password (PAM)
+overlay layer, one per screen sharing what is typed. The box speaks greetd's IPC (JSON over its socket); greetd checks the password (PAM)
 and starts the session once KWin is gone. No login, no marker file: `login.sh` hands over to
 greetd's text login. Installed to `/usr/local/lib/syncrain`, logs in `/var/lib/syncrain-login`.
+After the login, Plasma's splash and wallpaper show a still frame of the rain (`syncrain/handover.py`).
 
 The lanes compare them: native and GTK host to the pixel (at whole-number scales; at 125% or 150%
 GTK draws more pixels and scales them down), the page within texture filtering.

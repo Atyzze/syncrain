@@ -50,6 +50,8 @@ showed within seconds, which is why syncrain draws every frame from the clock.
   shares; 489 shipped glyphs, others from the machine's fonts. The Plasma wallpaper removed.
 * **16** (2026-10-13): the rain as the login screen (greetd, KWin, a login box); numbers read alike
   in any locale (what broke the Plasma wallpaper).
+* **17** (2026-10-13): the box on every screen; after a login, Plasma's splash and wallpaper show a
+  still frame of the rain.
 
 ## The operator's words
 
@@ -86,4 +88,6 @@ showed within seconds, which is why syncrain draws every frame from the clock.
   plasma wallpaper but that was severely broken ... stay closer to the barebone linux kernel";
   "yes, lets incorporate greetd".
 * **After 15**: a photo of the Plasma wallpaper, all white and all hieroglyphs; "yes, make it".
+* **After 16**: "Success!"; "I want it displayed always on all screens"; "the kde login logo with a
+  black screen and then for 1s I still saw my old static wallpaper".
 * **Standing**: no long dashes in anything written to them.

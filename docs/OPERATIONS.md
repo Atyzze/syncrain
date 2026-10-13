@@ -22,8 +22,8 @@ git clone https://github.com/Atyzze/syncrain && cd syncrain   # or unpack SYNCRA
   why and Python and GTK draw instead.
 * `--theme`, `--channel`, `--rainbow` and `--arg ...` (repeatable) go into the autostart service.
 * Builds 13 and 14's Plasma wallpaper (dropped in build 15) is removed by any later install.
-* `--login-screen`: greetd instead of SDDM; the rain on every screen, a box for user, password and
-  session, then Plasma. If it fails (or after "Text login" in the box), greetd's text login asks. Back: `./install.sh
+* `--login-screen`: greetd instead of SDDM (or Plasma Login); the rain and the same box on every
+  screen, then Plasma, with its splash and wallpaper a still frame of the rain. If it fails (or after "Text login" in the box), greetd's text login asks. Back: `./install.sh
   --login-screen-off`, or from a text console (Ctrl+Alt+F3) `sudo systemctl enable --force sddm &&
   sudo reboot`. `--diagnose` shows its last starts.
 * Upgrading: run the newer `./install.sh`; it names the build it replaces and restarts the

@@ -17,8 +17,9 @@ Where syncrain runs. The build sandbox: `docs/agent/ENVIRONMENT.md`.
 * They start syncrain from a terminal (fish). Builds 13 and 14's Plasma wallpaper was "severely
   broken" there (2026-10-11); build 15 removes it.
 * On Plasma syncrain takes the bottom layer and covers the desktop icons; "show desktop" hides it.
-* Login screen: SDDM. Build 16 offers greetd with syncrain's (`install.sh --login-screen`); not yet
-  tried there. Their locale is Dutch (nl_NL): a comma is the decimal sign.
+* Login screen: Plasma Login (`plasmalogin.service`, not SDDM). Build 16's `install.sh
+  --login-screen` replaced it with greetd on 2026-10-13 (greeter UID 939); `--login-screen-off`
+  goes back to it. Their locale is Dutch (nl_NL): a comma is the decimal sign.
 * Archives get unpacked under `/data/projects/...`; installed with `./install.sh`.
 
 ## NixOS

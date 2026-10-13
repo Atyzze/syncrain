@@ -1,12 +1,12 @@
-# The next build is 17
+# The next build is 18
 
 The first line is parsed: `# The next build is <N>`, exactly one above `BUILD_NUMBER`.
 
-## Build 17: the login screen on their machine, then the boot splash
+## Build 18: the hand-over as it looks there, then the boot splash
 
 * Read what the operator sent last, and answer it in one plain sentence first.
-* **The login screen** (build 16) as it ran there: `syncrain --diagnose` shows its last starts.
-  Fix what they find first; KWin under greetd on NVIDIA was never run here.
+* **Build 17 on their desktop**: the box on both screens, the still after the login. Fix what they
+  find first.
 * **The boot splash**: a still frame of the rain (Plymouth) until the login screen draws.
 * **The glow flare-up**, with the time they saw it: draw that moment and look.
 * **The two questions** in `docs/ROADMAP.md` (default frame rate, what pauses).

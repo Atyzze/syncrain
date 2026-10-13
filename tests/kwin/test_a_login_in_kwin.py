@@ -62,7 +62,8 @@ def test_a_login_through_the_box_starts_plasma(tmp_path, native_wallpaper):
     log, greetd = run_login(tmp_path, [{"password": "wrong", "wait": 4}, {"password": "right"}])
     assert not (tmp_path / "text-login.ran").exists(), log[-4000:]
     assert re.search(r"syncrain-login: [0-9:.]+ rain started", log)
-    assert re.search(r"syncrain-login: [0-9:.]+ box shown", log)
+    shown = re.findall(r"syncrain-login: [0-9:.]+ box shown on (\S+)", log)
+    assert len(set(shown)) == 2, f"a box on each of the two screens:\n{log[-4000:]}"
     assert "native wallpaper, 2 screens" in log, f"the rain never drew:\n{log[-4000:]}"
     assert re.search(r"syncrain-login: [0-9:.]+ not logged in: Welcome / Wrong password", log)
     assert greetd.started() == [{"type": "start_session", "cmd": PLASMA.split(),

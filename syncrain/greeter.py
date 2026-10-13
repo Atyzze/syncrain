@@ -225,6 +225,8 @@ def run_box(config: dict, client: Greetd) -> int:
     add_provider = getattr(Gtk, "style_context_add_provider_for_display", None) \
         or Gtk.StyleContext.add_provider_for_display
     add_provider(display, css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+    if LayerShell is None:
+        say("the compositor has no layer-shell; the box opens as a window")
 
     found = sessions()
     if not found:
@@ -232,51 +234,41 @@ def run_box(config: dict, client: Greetd) -> int:
     loop = GLib.MainLoop()
     result = {"code": 1}
 
-    win = Gtk.Window(title="syncrain login")
-    win.add_css_class("syncrain-login")
-    win.set_decorated(False)
-    if LayerShell is not None:
-        LayerShell.init_for_window(win)
-        LayerShell.set_namespace(win, "syncrain-login")
-        LayerShell.set_layer(win, LayerShell.Layer.OVERLAY)
-        LayerShell.set_keyboard_mode(win, LayerShell.KeyboardMode.EXCLUSIVE)
-        # below the rain's logo, which sits in the middle of the screen; KWin puts the box on the
-        # screen with the pointer, and its height is known once it is there (shown, below)
-        LayerShell.set_anchor(win, LayerShell.Edge.BOTTOM, True)
-        LayerShell.set_margin(win, LayerShell.Edge.BOTTOM, 40)
-    else:
-        say("the compositor has no layer-shell; the box opens as a window")
-
-    box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=9)
-    box.add_css_class("login-box")
-    title = Gtk.Label(label=os.uname().nodename)
-    title.add_css_class("title")
-    user = Gtk.Entry(placeholder_text="User", text=str(config.get("user", "")))
-    password = Gtk.PasswordEntry(placeholder_text="Password", show_peek_icon=True)
+    # One box on every screen, all the same box: what is typed in one shows in all of them, so the
+    # screen with the keyboard's attention never matters, nor one that is off or out of sight.
+    user_text = Gtk.EntryBuffer.new(str(config.get("user", "")), -1)
+    password_text = Gtk.PasswordEntryBuffer()
     names = Gtk.StringList()
     for s in found:
         names.append(s["name"])
-    chooser = Gtk.DropDown(model=names)
-    if found:
-        chooser.set_selected(pick(found, config.get("session")))
-    login = Gtk.Button(label="Log in")
-    login.add_css_class("login")
-    message = Gtk.Label(label="", wrap=True, max_width_chars=36, justify=Gtk.Justification.CENTER, visible=False)
-    message.add_css_class("message")
+    shared = {"session": pick(found, config.get("session")) if found else 0, "message": "", "busy": False,
+              "peek": False, "shown": set()}
+    boxes: list[dict] = []
 
     def tell(text):
-        message.set_label(text)
-        message.set_visible(bool(text))
-    power = Gtk.Box(spacing=8, halign=Gtk.Align.CENTER)
-    for label, verb in (("Restart", "reboot"), ("Shut down", "poweroff"), ("Text login", "text")):
-        b = Gtk.Button(label=label)
-        b.add_css_class("flat")
-        b.add_css_class("power")
-        b.connect("clicked", lambda _b, verb=verb: text_login() if verb == "text" else power_off(verb))
-        power.append(b)
-    for w in (title, user, password, chooser, login, message, power):
-        box.append(w)
-    win.set_child(box)
+        shared["message"] = text
+        for b in boxes:
+            b["message"].set_label(text)
+            b["message"].set_visible(bool(text))
+
+    def busy(on: bool):
+        shared["busy"] = on
+        for b in boxes:
+            for w in (b["user"], b["password"], b["chooser"], b["login"]):
+                w.set_sensitive(not on)
+
+    def choose(i):
+        shared["session"] = i
+        for b in boxes:
+            if b["chooser"].get_selected() != i:
+                b["chooser"].set_selected(i)
+
+    def peek(on):
+        shared["peek"] = on
+        for b in boxes:
+            b["password"].set_visibility(on)
+            b["password"].set_icon_from_icon_name(Gtk.EntryIconPosition.SECONDARY,
+                                                  "view-conceal-symbolic" if on else "view-reveal-symbolic")
 
     def power_off(verb):
         say(f"systemctl {verb}")
@@ -297,20 +289,19 @@ def run_box(config: dict, client: Greetd) -> int:
         say("text login asked for")
         loop.quit()
 
-    def busy(on: bool):
-        for w in (user, password, chooser, login):
-            w.set_sensitive(not on)
-
     def attempt(*_):
-        name = user.get_text().strip()
+        if shared["busy"]:
+            return
+        name = user_text.get_text().strip()
         if not name:
-            user.grab_focus()
+            for b in boxes:
+                b["user"].grab_focus()
             return
         if not found:
             tell("No session to start")
             return
-        session = found[chooser.get_selected()]
-        secret = password.get_text()
+        session = found[shared["session"]]
+        secret = password_text.get_text()
         busy(True)
         tell("Logging in...")
 
@@ -335,15 +326,105 @@ def run_box(config: dict, client: Greetd) -> int:
         say(f"not logged in: {said.replace(chr(10), ' / ')}")
         tell(said)
         busy(False)
-        password.set_text("")
-        password.grab_focus()
+        password_text.set_text("", -1)
+        for b in boxes:
+            b["password"].grab_focus()
         later(next_test)
         return False
 
-    user.connect("activate", lambda *_: password.grab_focus())
-    password.connect("activate", attempt)
-    login.connect("clicked", attempt)
-    win.connect("close-request", lambda *_: (loop.quit(), False)[1])
+    def mirror(field):
+        if shared.get("mirroring"):
+            return
+        shared["mirroring"] = True
+        try:
+            for b in boxes:
+                b[field].grab_focus()
+        finally:
+            shared["mirroring"] = False
+
+    def make(monitor):
+        win = Gtk.Window(title="syncrain login")
+        win.add_css_class("syncrain-login")
+        win.set_decorated(False)
+        if LayerShell is not None:
+            LayerShell.init_for_window(win)
+            LayerShell.set_namespace(win, "syncrain-login")
+            LayerShell.set_layer(win, LayerShell.Layer.OVERLAY)
+            LayerShell.set_keyboard_mode(win, LayerShell.KeyboardMode.EXCLUSIVE)
+            if monitor is not None:
+                LayerShell.set_monitor(win, monitor)
+            # below the rain's logo, which sits in the middle of the screen
+            LayerShell.set_anchor(win, LayerShell.Edge.BOTTOM, True)
+            height = monitor.get_geometry().height if monitor is not None else 720
+            LayerShell.set_margin(win, LayerShell.Edge.BOTTOM, int(height * 0.04))
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=9)
+        box.add_css_class("login-box")
+        title = Gtk.Label(label=os.uname().nodename)
+        title.add_css_class("title")
+        user = Gtk.Entry(buffer=user_text, placeholder_text="User")
+        password = Gtk.Entry(buffer=password_text, placeholder_text="Password", visibility=shared["peek"],
+                             input_purpose=Gtk.InputPurpose.PASSWORD)
+        password.set_icon_from_icon_name(Gtk.EntryIconPosition.SECONDARY,
+                                         "view-conceal-symbolic" if shared["peek"] else "view-reveal-symbolic")
+        password.connect("icon-press", lambda *_: peek(not shared["peek"]))
+        chooser = Gtk.DropDown(model=names)
+        if found:
+            chooser.set_selected(shared["session"])
+        chooser.connect("notify::selected", lambda c, _p: choose(c.get_selected()))
+        login = Gtk.Button(label="Log in")
+        login.add_css_class("login")
+        message = Gtk.Label(label=shared["message"], wrap=True, max_width_chars=36,
+                            justify=Gtk.Justification.CENTER, visible=bool(shared["message"]))
+        message.add_css_class("message")
+        power = Gtk.Box(spacing=8, halign=Gtk.Align.CENTER)
+        for label, verb in (("Restart", "reboot"), ("Shut down", "poweroff"), ("Text login", "text")):
+            b = Gtk.Button(label=label)
+            b.add_css_class("flat")
+            b.add_css_class("power")
+            b.connect("clicked", lambda _b, verb=verb: text_login() if verb == "text" else power_off(verb))
+            power.append(b)
+        for w in (title, user, password, chooser, login, message, power):
+            box.append(w)
+        win.set_child(box)
+        user.connect("activate", lambda *_: password.grab_focus())
+        password.connect("activate", attempt)
+        login.connect("clicked", attempt)
+        # On layer-shell a box is closed by the compositor when its screen goes; place() rebuilds.
+        win.connect("close-request", lambda *_: True if LayerShell is not None else (loop.quit(), False)[1])
+        # The keyboard goes to one box (KWin picks); a field clicked in any box is the field in all.
+        for field, widget in (("user", user), ("password", password)):
+            focus = Gtk.EventControllerFocus()
+            focus.connect("enter", lambda _c, field=field: mirror(field))
+            widget.add_controller(focus)
+        name = (monitor.get_connector() if monitor is not None else None) or "a window"
+        entry = {"win": win, "user": user, "password": password, "chooser": chooser, "login": login,
+                 "message": message, "name": name}
+
+        def shown(*_):
+            if name in shared["shown"]:
+                return
+            (password if user_text.get_text() else user).grab_focus()
+            first = not shared["shown"]
+            shared["shown"].add(name)
+            say(f"box shown on {name}")
+            if first:
+                later(next_test)
+        win.connect("map", shown)
+        boxes.append(entry)
+        if shared["busy"]:
+            busy(True)
+        win.present()
+
+    def place(*_):
+        """A box for every screen there is now (a screen plugged in or out rebuilds them)."""
+        for b in boxes:
+            b["win"].destroy()
+        boxes.clear()
+        shared["shown"] = set()
+        monitors = display.get_monitors()
+        items = [monitors.get_item(i) for i in range(monitors.get_n_items())]
+        for monitor in (items if LayerShell is not None and items else [None]):
+            make(monitor)
 
     # The tests type into the box through this: a list of {"user", "password", "session", "wait"
     # (seconds before typing)} tried in turn; {"text": true} presses Text login.
@@ -361,29 +442,20 @@ def run_box(config: dict, client: Greetd) -> int:
             text_login()
             return False
         if "user" in t:
-            user.set_text(t["user"])
-        password.set_text(t.get("password", ""))
+            user_text.set_text(t["user"], -1)
+        password_text.set_text(t.get("password", ""), -1)
         if "session" in t:
             for i, s in enumerate(found):
                 if s["id"] == t["session"]:
-                    chooser.set_selected(i)
+                    choose(i)
         attempt()
         return False
 
-    def shown(*_):
-        if result.get("shown"):
-            return
-        result["shown"] = True
-        monitor = display.get_monitor_at_surface(win.get_surface()) if win.get_surface() else None
-        if LayerShell is not None and monitor is not None:
-            LayerShell.set_margin(win, LayerShell.Edge.BOTTOM, int(monitor.get_geometry().height * 0.04))
-        say("box shown")
-        (password if user.get_text() else user).grab_focus()
-        later(next_test)
-    win.connect("map", shown)
-    win.present()
+    display.get_monitors().connect("items-changed", lambda *_: GLib.idle_add(lambda: (place(), False)[1]))
+    place()
     loop.run()
-    win.destroy()
+    for b in boxes:
+        b["win"].destroy()
     return result["code"]
 
 

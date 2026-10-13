@@ -108,6 +108,11 @@ GREETD_CONFIG="${SYNCRAIN_GREETD_CONFIG:-/etc/greetd/config.toml}"
 GREETD_PAM="${SYNCRAIN_GREETD_PAM:-/etc/pam.d/greetd}"
 DM_LINK="${SYNCRAIN_DM_LINK:-/etc/systemd/system/display-manager.service}"
 as_root() { if [ "$(id -u)" = 0 ]; then "$@"; else sudo "$@"; fi; }
+# The hand-over after a login (syncrain/handover.py): Plasma's splash and wallpaper become a still
+# frame of the rain. It needs this user's Plasma session (its shell sets the wallpaper).
+in_plasma() { case "${XDG_CURRENT_DESKTOP:-}" in *KDE*) [ -n "${WAYLAND_DISPLAY:-}${DISPLAY:-}" ] ;; *) false ;; esac; }
+handover() { PYTHONPATH="$1" PYTHONSAFEPATH=1 python3 -m syncrain.handover "${@:2}"; }
+
 display_manager() { local t; t="$(readlink "$DM_LINK" 2>/dev/null)" && basename "$t"; }
 
 login_screen_on() {
@@ -181,6 +186,12 @@ login_screen_on() {
       | as_root tee -a "$GREETD_PAM" >/dev/null
   fi
   as_root systemctl enable --force greetd.service >/dev/null || die "systemctl could not enable greetd"
+  if in_plasma; then
+    info "after a login, Plasma's splash and wallpaper show a still frame of the rain (a window opens for a moment):"
+    handover "$APPDIR" on "${ARGS[@]}" || info "the still frame was not made; Plasma's splash and wallpaper stay as they were"
+  else
+    info "run this again from your Plasma session for the still frame after a login"
+  fi
   info "from your next boot the login screen is the rain (before: ${previous:-none})"
   info "if it ever fails, greetd's text login asks instead, and Plasma starts as usual"
   info "back: ./install.sh --login-screen-off, or from a text console (Ctrl+Alt+F3):"
@@ -195,6 +206,9 @@ login_screen_off() {
   as_root systemctl enable --force "$previous" >/dev/null || die "systemctl could not enable $previous"
   if [ -f "$GREETD_CONFIG.before-syncrain" ]; then as_root mv -f "$GREETD_CONFIG.before-syncrain" "$GREETD_CONFIG"; fi
   if [ -f "$GREETD_PAM.before-syncrain" ]; then as_root mv -f "$GREETD_PAM.before-syncrain" "$GREETD_PAM"; fi
+  # this build's hand-over, or the installed one when this folder is older than build 17
+  if [ -f "$SRC/syncrain/handover.py" ]; then handover "$SRC" off || true
+  elif [ -f "$APPDIR/syncrain/handover.py" ]; then handover "$APPDIR" off || true; fi
   as_root rm -rf "$LOGIN_LIB" "$LOGIN_STATE"
   info "from your next boot; greetd stays installed"
 }
@@ -209,6 +223,16 @@ login_screen_refresh() {
   as_root mv "$LOGIN_LIB/syncrain.new" "$LOGIN_LIB/syncrain"
   as_root cp "$APPDIR/BUILD_NUMBER" "$LOGIN_LIB/"
   info "the login screen: build $BUILD too"
+  local rain=()
+  # the login screen's options without its copy of the symbols file (here syncrain reads yours)
+  mapfile -t rain < <(python3 -c '
+import json, sys
+args = json.load(open(sys.argv[1])).get("rain", [])
+skip = {i + 1 for i, a in enumerate(args) if a == "--glyphs"} | {i for i, a in enumerate(args) if a == "--glyphs"}
+[print(a) for i, a in enumerate(args) if i not in skip]' "$LOGIN_LIB/login.json" 2>/dev/null)
+  if in_plasma && [ -f "${XDG_STATE_HOME:-$HOME/.local/state}/syncrain/handover.json" ]; then
+    handover "$APPDIR" on "${rain[@]}" >/dev/null || true
+  fi
 }
 
 if [ "$LOGIN_OFF" = 1 ]; then

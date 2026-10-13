@@ -12,6 +12,9 @@ Open questions, planned builds, the cadence and the constraints. What shipped: `
 
 ## Decisions answered
 
+* **2026-10-13 15:29**: build 16 works; the box on all screens, always; no Plasma logo or old
+  wallpaper between the login and the rain. Build 17.
+
 * **2026-10-13 13:08**: a photo of the broken Plasma wallpaper (all white, all hieroglyphs); "yes,
   make it" (the login screen). Build 16.
 
