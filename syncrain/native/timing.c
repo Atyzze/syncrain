@@ -6,11 +6,23 @@
  * host. Python's own float floor division and round() are ported too, since C's differ at the edges.
  */
 #define _GNU_SOURCE
+#include <locale.h>
 #include <math.h>
 #include <stdlib.h>
 #include <time.h>
 
 #include "syncrain.h"
+
+/* A number as the scene writes it ("0x1.333p-3", "30.0"), whatever locale the process runs in: a
+ * program that set a Dutch or German locale reads "0.15" only up to its point otherwise (builds 13
+ * and 14's Plasma wallpaper drew everything white for that). */
+double c_strtod(const char *s, char **end)
+{
+	static locale_t c;
+	if (!c)
+		c = newlocale(LC_ALL_MASK, "C", (locale_t)0);
+	return c ? strtod_l(s, end, c) : strtod(s, end);
+}
 
 /* Objects/floatobject.c, _float_div_mod: fmod, then the quotient snapped to the nearest integer. */
 double py_floordiv(double vx, double wx)

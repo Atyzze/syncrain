@@ -69,7 +69,7 @@ static void usage(void)
 static double number(const char *s)
 {
 	char *end;
-	double v = strtod(s, &end);
+	double v = c_strtod(s, &end);
 	if (end == s || *end)
 		usage();
 	return v;
@@ -111,7 +111,7 @@ static void parse_options(int argc, char **argv)
 	const char *debug = getenv("SYNCRAIN_DEBUG_FPS");   /* app.py, debug_fps_interval */
 	if (debug && *debug) {
 		char *end;
-		double v = strtod(debug, &end);
+		double v = c_strtod(debug, &end);
 		opt.debug_fps = end == debug || *end ? 5.0 : (v > 0.5 ? v : 0.5);
 	}
 }
@@ -1186,7 +1186,7 @@ int main(int argc, char **argv)
 	parse_options(argc, argv);
 	W.started = monotonic_us();
 	const char *trim = getenv("SYNCRAIN_MEMORY_SECONDS");     /* tests: a shorter round */
-	W.trim_us = trim && atof(trim) > 0 ? (int64_t)(atof(trim) * 1e6) : TRIM_US;
+	W.trim_us = trim && c_strtod(trim, NULL) > 0 ? (int64_t)(c_strtod(trim, NULL) * 1e6) : TRIM_US;
 	/* Few threads allocate here (the driver's); two arenas keep what they free from spreading out. */
 	mallopt(M_ARENA_MAX, 2);
 	char why[1024];

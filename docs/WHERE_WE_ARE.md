@@ -1,4 +1,4 @@
-# Where we are, at build 15
+# Where we are, at build 16
 
 The project on one page. Detail: `docs/agent/HANDOFF.md`.
 
@@ -25,12 +25,14 @@ name, so everyone on a channel sees the same rain. Linux (Wayland, X11) and the 
 * **Your own symbols** (build 15): `syncrain --write-glyphs`, then edit
   `~/.config/syncrain/glyphs.json`: sets of characters (any language, your favourites), each with
   a weight or a share.
-* **On GitHub**: github.com/Atyzze/syncrain, every build up to 15.
+* **The login screen** (build 16): `./install.sh --login-screen`; greetd instead of SDDM, the rain
+  on every screen with a small login box, then Plasma. A failure falls back to a text login.
+* **Why the Plasma wallpaper went white**: Dutch number format inside Plasma; fixed in build 16.
+* **On GitHub**: github.com/Atyzze/syncrain, every build up to 16.
 
 ## What comes next
 
-* **Build 16**: the login screen: greetd instead of SDDM, the rain on every screen with a small
-  password box, then your Plasma session.
+* **Build 17**: what you find on the login screen; then a boot splash (a still frame of the rain).
 * **Then**: a NixOS image.
 
 ## The decision in front of you

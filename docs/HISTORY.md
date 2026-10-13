@@ -48,6 +48,8 @@ showed within seconds, which is why syncrain draws every frame from the clock.
   mid-frame, KWin scripts left behind, a lock screen blank while its scene is made).
 * **15** (2026-10-11): your own symbols: a file of sets (any language, favourites) with weights or
   shares; 489 shipped glyphs, others from the machine's fonts. The Plasma wallpaper removed.
+* **16** (2026-10-13): the rain as the login screen (greetd, KWin, a login box); numbers read alike
+  in any locale (what broke the Plasma wallpaper).
 
 ## The operator's words
 
@@ -83,4 +85,5 @@ showed within seconds, which is why syncrain draws every frame from the clock.
   symbol/language-set to include and what %/bias if any, or all equally neutral"; "I tried the
   plasma wallpaper but that was severely broken ... stay closer to the barebone linux kernel";
   "yes, lets incorporate greetd".
+* **After 15**: a photo of the Plasma wallpaper, all white and all hieroglyphs; "yes, make it".
 * **Standing**: no long dashes in anything written to them.

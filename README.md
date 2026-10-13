@@ -21,6 +21,7 @@ git clone https://github.com/Atyzze/syncrain && cd syncrain
 syncrain --window            # in a window
 syncrain                     # as your wallpaper (Ctrl+C stops it)
 ./install.sh --autostart     # start it with every login
+./install.sh --login-screen  # and as the login screen (greetd)
 ```
 
 * **NixOS**: `nix run github:Atyzze/syncrain -- --window`; the flake has NixOS and home-manager modules.

@@ -1,18 +1,13 @@
-# The next build is 16
+# The next build is 17
 
 The first line is parsed: `# The next build is <N>`, exactly one above `BUILD_NUMBER`.
 
-## Build 16: the login screen (greetd)
+## Build 17: the login screen on their machine, then the boot splash
 
 * Read what the operator sent last, and answer it in one plain sentence first.
-* **greetd** replaces SDDM (asked 2026-10-11 19:03): greetd checks the password through PAM and
-  starts the Plasma session; its greeter is ours: syncrain's native rain on every screen (a
-  compositor such as `cage` or a minimal `sway` under greetd) with a small user and password box
-  speaking greetd's IPC (JSON over its socket). Never write PAM handling ourselves.
-* `install.sh --login-screen`: `pacman -S greetd`, the greeter, `/etc/greetd/config.toml`,
-  `systemctl disable sddm; enable greetd`; SDDM stays installed. Undo from a text console
-  (Ctrl+Alt+F3): one documented command. Test it all in the Arch root: greetd, the greeter in a
-  headless compositor, a login that starts `startplasma-wayland`.
+* **The login screen** (build 16) as it ran there: `syncrain --diagnose` shows its last starts.
+  Fix what they find first; KWin under greetd on NVIDIA was never run here.
+* **The boot splash**: a still frame of the rain (Plymouth) until the login screen draws.
 * **The glow flare-up**, with the time they saw it: draw that moment and look.
 * **The two questions** in `docs/ROADMAP.md` (default frame rate, what pauses).
 

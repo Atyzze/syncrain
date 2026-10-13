@@ -72,6 +72,7 @@ void scene_unmap(struct scene *scene);  /* the sources and pixels, once they are
  * Every value here must equal what the Python host computes (renderer.py, engine.py, pacing.py),
  * double for double, so the same moment draws the same frame; tests/native compares them. */
 
+double c_strtod(const char *s, char **end);   /* strtod in the C locale, whatever the process's */
 double py_floordiv(double x, double y);   /* Python's float // */
 double py_round(double x);                /* Python's round(): halves to even */
 

@@ -13,6 +13,7 @@ Wayland, a compositor with layer-shell (not GNOME: use `--window` or the web pag
 git clone https://github.com/Atyzze/syncrain && cd syncrain   # or unpack SYNCRAIN<N>.tar.zst
 ./install.sh                  # pacman packages (sudo once), then everything in ~/.local
 ./install.sh --autostart      # also a systemd user service
+./install.sh --login-screen   # also the login screen, from the next boot (greetd)
 ./install.sh --uninstall      # remove it (the pacman packages stay)
 ```
 
@@ -21,6 +22,10 @@ git clone https://github.com/Atyzze/syncrain && cd syncrain   # or unpack SYNCRA
   why and Python and GTK draw instead.
 * `--theme`, `--channel`, `--rainbow` and `--arg ...` (repeatable) go into the autostart service.
 * Builds 13 and 14's Plasma wallpaper (dropped in build 15) is removed by any later install.
+* `--login-screen`: greetd instead of SDDM; the rain on every screen, a box for user, password and
+  session, then Plasma. If it fails (or after "Text login" in the box), greetd's text login asks. Back: `./install.sh
+  --login-screen-off`, or from a text console (Ctrl+Alt+F3) `sudo systemctl enable --force sddm &&
+  sudo reboot`. `--diagnose` shows its last starts.
 * Upgrading: run the newer `./install.sh`; it names the build it replaces and restarts the
   wallpaper. `syncrain --build` says what is installed.
 
@@ -134,6 +139,7 @@ OpenGL cannot start, syncrain exits with status 69 and the service does not retr
 | KDE Plasma 6 | bottom layer (above Plasma's desktop, covering its icons); covered screens not drawn | headless KWin, every release |
 | X11 | a desktop window over all monitors | Xvfb, every release |
 | GNOME | no layer-shell: `--window` or the web page | no |
+| Login screen (greetd, Arch) | KWin, the rain and a box on the overlay layer | headless KWin, every release |
 
 ## Recipes
 

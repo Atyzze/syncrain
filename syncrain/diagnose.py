@@ -115,6 +115,32 @@ def running_lines(record_lines=8) -> list[str]:
     return lines
 
 
+def login_lines(log_lines=8) -> list[str]:
+    """The login screen (install.sh --login-screen): which display manager starts at boot, whether
+    greetd runs syncrain's, its build, and what its last start said."""
+    env = os.environ.get
+    link = env("SYNCRAIN_DM_LINK") or "/etc/systemd/system/display-manager.service"
+    manager = os.path.basename(os.readlink(link)) if os.path.islink(link) else "none set"
+    lines = [f"display manager at boot: {manager}"]
+    lib = env("SYNCRAIN_LOGIN_LIB") or "/usr/local/lib/syncrain"
+    config = _read(env("SYNCRAIN_GREETD_CONFIG") or "/etc/greetd/config.toml") or ""
+    if manager == "greetd.service":
+        ours = f"{lib}/syncrain/login/login.sh" in config
+        lines.append("greetd runs syncrain's login screen" if ours else "greetd runs another greeter")
+    built = (_read(os.path.join(lib, "BUILD_NUMBER")) or "").strip()
+    if built:
+        lines.append(f"syncrain's login screen: build {built} in {lib}")
+    state = env("SYNCRAIN_LOGIN_STATE") or "/var/lib/syncrain-login"
+    for name in ("login.log", "login.log.1"):
+        said = [line for line in (_read(os.path.join(state, name)) or "").splitlines()
+                if line.startswith(("syncrain-login:", "syncrain build", "syncrain:"))
+                and " fps at " not in line]
+        if said:
+            lines.append(f"{'the last start' if name == 'login.log' else 'the start before'} ({state}/{name}):")
+            lines.extend("  " + line for line in said[-log_lines:])
+    return lines
+
+
 def symbol_lines(args) -> list[str]:
     """Which symbols a wallpaper started now would draw, and what no font here can draw."""
     from . import engine, glyphs
@@ -270,6 +296,7 @@ def run(args) -> int:
     section("session", session_lines())
     section("running wallpaper", running_lines())
     section("symbols", symbol_lines(args))
+    section("login screen", login_lines())
     section("graphics cards", graphics_cards())
     from .app import avoid_the_explicit_sync_leak, use_gl_renderer
     use_gl_renderer()                        # what the wallpaper itself does, so the answer is about it

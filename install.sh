@@ -4,6 +4,8 @@
 #   ./install.sh                     install this build for your user (asks for sudo once, for pacman packages)
 #   ./install.sh --autostart         ...and start it with every graphical login
 #   ./install.sh --theme matrix --channel friends --autostart
+#   ./install.sh --login-screen      ...and make the rain your login screen (greetd; SDDM stays installed)
+#   ./install.sh --login-screen-off  back to the login screen from before
 #   ./install.sh --uninstall         remove it again (pacman packages are left installed)
 #
 # Run from a newer build's folder, it upgrades in place and restarts a running wallpaper.
@@ -18,7 +20,7 @@ PACKAGES=(python python-gobject python-cairo python-pillow gtk4 gtk4-layer-shell
 BUILD_PACKAGES=(gcc pkgconf wayland dbus)
 PREFIX="${PREFIX:-$HOME/.local}"
 SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-AUTOSTART=0 UNINSTALL=0 NODEPS=0 YES=0
+AUTOSTART=0 UNINSTALL=0 NODEPS=0 YES=0 LOGIN=0 LOGIN_OFF=0
 THEME="" CHANNEL="" RAINBOW="" EXTRA=()
 
 bold() { printf '\033[1m%s\033[0m\n' "$*"; }
@@ -26,11 +28,13 @@ info() { printf '  %s\n' "$*"; }
 die()  { printf '\033[31merror:\033[0m %s\n' "$*" >&2; exit 1; }
 
 usage() {
-  sed -n '2,14p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+  sed -n '2,16p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
   cat <<'EOF'
 
 Options:
   --autostart           start with every graphical login (systemd user service)
+  --login-screen        the rain and a login box as the login screen, from the next boot (greetd)
+  --login-screen-off    back to the login screen from before (SDDM)
   --theme NAME          nixos (default) or matrix
   --channel NAME        stream name (default: public)
   --rainbow MODE        logo (default), all or off
@@ -46,6 +50,8 @@ EOF
 while [ $# -gt 0 ]; do
   case "$1" in
     --autostart) AUTOSTART=1 ;;
+    --login-screen) LOGIN=1 ;;
+    --login-screen-off) LOGIN_OFF=1 ;;
     --theme) THEME="${2:?--theme needs a value}"; shift ;;
     --channel) CHANNEL="${2:?--channel needs a value}"; shift ;;
     --rainbow) RAINBOW="${2:?--rainbow needs a value}"; shift ;;
@@ -93,7 +99,125 @@ remove_plasma_wallpaper() {
   fi
 }
 
+# ---- the login screen (build 16): greetd runs syncrain/login/login.sh as its user `greeter`, so the
+# app is copied where that user can read it. SDDM (or whichever was the display manager) stays
+# installed; switching back is `systemctl enable --force` of it again.
+LOGIN_LIB="${SYNCRAIN_LOGIN_LIB:-/usr/local/lib/syncrain}"
+LOGIN_STATE="${SYNCRAIN_LOGIN_STATE:-/var/lib/syncrain-login}"
+GREETD_CONFIG="${SYNCRAIN_GREETD_CONFIG:-/etc/greetd/config.toml}"
+GREETD_PAM="${SYNCRAIN_GREETD_PAM:-/etc/pam.d/greetd}"
+DM_LINK="${SYNCRAIN_DM_LINK:-/etc/systemd/system/display-manager.service}"
+as_root() { if [ "$(id -u)" = 0 ]; then "$@"; else sudo "$@"; fi; }
+display_manager() { local t; t="$(readlink "$DM_LINK" 2>/dev/null)" && basename "$t"; }
+
+login_screen_on() {
+  bold "Making the rain your login screen (greetd)"
+  if [ "$NODEPS" = 0 ]; then
+    local confirm=(); [ "$YES" = 1 ] && confirm=(--noconfirm)
+    pacman -Qq greetd greetd-agreety >/dev/null 2>&1 \
+      || as_root pacman -S --needed "${confirm[@]}" greetd greetd-agreety || die "pacman could not install greetd"
+  fi
+  command -v kwin_wayland >/dev/null || die "the login screen runs in KWin (Plasma's compositor), which is not installed"
+  command -v agreety >/dev/null || die "greetd's text login (agreety, pacman: greetd-agreety) is missing; the login screen falls back to it"
+  local tmp glyphs rain=("${ARGS[@]}") previous new="$LOGIN_LIB.new"
+  # The display manager to go back to; kept where only root can change it, as root runs it.
+  previous="$(cat "$LOGIN_LIB/previous-display-manager" 2>/dev/null || display_manager || true)"
+  case "$previous" in greetd.service|*[!A-Za-z0-9@._-]*|"") previous="" ;; esac
+  tmp="$(mktemp -d)"
+  # login.json: who logs in by default, and the rain's options as the wallpaper has them
+  glyphs="${XDG_CONFIG_HOME:-$HOME/.config}/syncrain/glyphs.json"
+  if [ -f "$glyphs" ]; then cp "$glyphs" "$tmp/glyphs.json"; rain+=(--glyphs "$LOGIN_LIB/glyphs.json"); fi
+  write_login_json() {
+    python3 -c 'import json, sys; json.dump({"user": sys.argv[2], "session": "plasma.desktop", "rain": sys.argv[3:]},
+                open(sys.argv[1], "w"), indent=1)' "$@"
+  }
+  write_login_json "$tmp/login.json" "$(id -un)" "${rain[@]}"
+  if [ -f "$tmp/glyphs.json" ]; then
+    # Symbols not in syncrain's own set are drawn now, with this user's fonts, so the login screen
+    # does not spend seconds drawing them at every boot.
+    write_login_json "$tmp/draw.json" "$(id -un)" "${ARGS[@]}" --glyphs "$tmp/glyphs.json"
+    XDG_CACHE_HOME="$tmp/cache" SYNCRAIN_LOGIN_CONFIG="$tmp/draw.json" PYTHONPATH="$APPDIR" PYTHONSAFEPATH=1 \
+      python3 -m syncrain.greeter --draw-symbols || info "the symbols were not drawn now; the login screen draws them"
+  fi
+  # Made beside the old copy and swapped in whole, so greetd never finds half of one.
+  as_root rm -rf "$new"
+  as_root mkdir -p "$new/cache" "$new/kde"
+  as_root cp -r "$APPDIR/syncrain" "$APPDIR/BUILD_NUMBER" "$tmp/login.json" "$new/"
+  if [ -f "$tmp/glyphs.json" ]; then as_root cp "$tmp/glyphs.json" "$new/"; fi
+  if [ -n "$previous" ]; then printf '%s\n' "$previous" | as_root tee "$new/previous-display-manager" >/dev/null; fi
+  if [ -d "$tmp/cache/syncrain" ]; then
+    find "$tmp/cache/syncrain" -name 'glyphs-*.png' -exec cp {} "$tmp/" \;
+    for f in "$tmp"/glyphs-*.png; do if [ -f "$f" ]; then as_root cp "$f" "$new/cache/"; fi; done
+  fi
+  # KWin there reads your screen layout, keyboard layout and Num Lock (kcminputrc) from these copies
+  for f in kwinoutputconfig.json kxkbrc kcminputrc; do
+    f="${XDG_CONFIG_HOME:-$HOME/.config}/$f"
+    if [ -f "$f" ]; then as_root cp "$f" "$new/kde/"; fi
+  done
+  as_root chmod -R a+rX "$new"
+  as_root rm -rf "$LOGIN_LIB"
+  as_root mv "$new" "$LOGIN_LIB"
+  as_root install -d -m 755 -o "${SYNCRAIN_LOGIN_OWNER:-greeter}" -g "${SYNCRAIN_LOGIN_OWNER:-greeter}" "$LOGIN_STATE"
+  rm -rf "$tmp"
+  info "the app: $LOGIN_LIB (user $(id -un), Plasma, your wallpaper's options)"
+
+  if [ -f "$GREETD_CONFIG" ] && ! grep -q syncrain "$GREETD_CONFIG" && [ ! -f "$GREETD_CONFIG.before-syncrain" ]; then
+    as_root cp "$GREETD_CONFIG" "$GREETD_CONFIG.before-syncrain"
+  fi
+  as_root mkdir -p "$(dirname "$GREETD_CONFIG")"
+  # If the login screen's files ever go missing, greetd's text login asks instead of a black screen.
+  local login="$LOGIN_LIB/syncrain/login/login.sh"
+  printf '%s\n' "# written by syncrain's install.sh --login-screen; greetd's own: $GREETD_CONFIG.before-syncrain" \
+    "[terminal]" "vt = 1" "" "[default_session]" \
+    "command = \"sh -c 'test -x $login && exec $login; exec agreety --cmd startplasma-wayland'\"" \
+    "user = \"greeter\"" | as_root tee "$GREETD_CONFIG" >/dev/null
+  # SDDM's PAM opens KDE's wallet (and GNOME's keyring) with the password typed at login; greetd's
+  # does not, so without these the wallet would ask again. "-" skips a module that is not installed.
+  if [ -f "$GREETD_PAM" ] && ! grep -q pam_kwallet5 "$GREETD_PAM"; then
+    [ -f "$GREETD_PAM.before-syncrain" ] || as_root cp "$GREETD_PAM" "$GREETD_PAM.before-syncrain"
+    printf '%s\n' "" "# added by syncrain's install.sh --login-screen: the wallet opens with the login, as under SDDM" \
+      "-auth       optional    pam_gnome_keyring.so" "-auth       optional    pam_kwallet5.so" \
+      "-session    optional    pam_gnome_keyring.so    auto_start" "-session    optional    pam_kwallet5.so         auto_start" \
+      | as_root tee -a "$GREETD_PAM" >/dev/null
+  fi
+  as_root systemctl enable --force greetd.service >/dev/null || die "systemctl could not enable greetd"
+  info "from your next boot the login screen is the rain (before: ${previous:-none})"
+  info "if it ever fails, greetd's text login asks instead, and Plasma starts as usual"
+  info "back: ./install.sh --login-screen-off, or from a text console (Ctrl+Alt+F3):"
+  info "  sudo systemctl enable --force ${previous:-sddm.service} && sudo reboot"
+}
+
+login_screen_off() {
+  local previous
+  previous="$(cat "$LOGIN_LIB/previous-display-manager" 2>/dev/null || true)"
+  case "$previous" in greetd.service|*[!A-Za-z0-9@._-]*|"") previous=sddm.service ;; esac
+  bold "Putting the login screen back on $previous"
+  as_root systemctl enable --force "$previous" >/dev/null || die "systemctl could not enable $previous"
+  if [ -f "$GREETD_CONFIG.before-syncrain" ]; then as_root mv -f "$GREETD_CONFIG.before-syncrain" "$GREETD_CONFIG"; fi
+  if [ -f "$GREETD_PAM.before-syncrain" ]; then as_root mv -f "$GREETD_PAM.before-syncrain" "$GREETD_PAM"; fi
+  as_root rm -rf "$LOGIN_LIB" "$LOGIN_STATE"
+  info "from your next boot; greetd stays installed"
+}
+
+# A newer build updates the login screen's copy too, keeping its settings.
+login_screen_refresh() {
+  [ -f "$LOGIN_LIB/login.json" ] || return 0
+  as_root rm -rf "$LOGIN_LIB/syncrain.new"
+  as_root cp -r "$APPDIR/syncrain" "$LOGIN_LIB/syncrain.new"
+  as_root chmod -R a+rX "$LOGIN_LIB/syncrain.new"
+  as_root rm -rf "$LOGIN_LIB/syncrain"
+  as_root mv "$LOGIN_LIB/syncrain.new" "$LOGIN_LIB/syncrain"
+  as_root cp "$APPDIR/BUILD_NUMBER" "$LOGIN_LIB/"
+  info "the login screen: build $BUILD too"
+}
+
+if [ "$LOGIN_OFF" = 1 ]; then
+  login_screen_off
+  exit 0
+fi
+
 if [ "$UNINSTALL" = 1 ]; then
+  if [ -f "$LOGIN_LIB/login.json" ]; then login_screen_off; fi
   remove_plasma_wallpaper
   bold "Removing syncrain"
   if [ -f "$UNIT" ]; then
@@ -250,6 +374,8 @@ EOF
 elif [ -f "$UNIT" ] && have_user_systemd && systemctl --user is-active --quiet syncrain.service; then
   systemctl --user restart syncrain.service && info "restarted the running wallpaper on build $BUILD"
 fi
+
+if [ "$LOGIN" = 1 ]; then login_screen_on; else login_screen_refresh; fi
 
 # ---- 5. what next
 desktop="${XDG_CURRENT_DESKTOP:-}"

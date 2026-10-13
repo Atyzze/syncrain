@@ -47,6 +47,11 @@ Rules learned by shipping their opposite, one line each. When and how: `docs/HIS
 * **`QTimer.start()` restarts a running timer**: start it only when it is idle.
 * **Exit with status 1 when the compositor goes**, as GTK does, or the service never restarts you.
 * **gtk4-layer-shell must load before libwayland-client.**
+* **A Qt program sets the locale**: `strtod` then reads "0x1.8p-1" by Dutch rules. Parse numbers
+  in the C locale (`c_strtod`).
+* **GTK waits seconds for the desktop portal** where there is none (a login screen):
+  `GDK_DEBUG=no-portals`.
+* **greetd's PAM does not open KDE's wallet**; SDDM's does. Add its lines, as SDDM has them.
 
 ## Launching, services, releases
 

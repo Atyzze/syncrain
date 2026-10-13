@@ -1,7 +1,8 @@
-/* `syncrain-wallpaper --selftest geometry|time|pacer`: the arithmetic of timing.c on lines read from
+/* `syncrain-wallpaper --selftest geometry|time|pacer|number`: the arithmetic of timing.c on lines read from
  * standard input, printed exactly (hexadecimal floats), for tests/native/ to compare with the Python
  * host's own results, value for value. */
 #define _GNU_SOURCE
+#include <locale.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -107,9 +108,24 @@ static int pacer_lines(void)
 	return 0;
 }
 
+/* numbers as the scene holds them, read in the locale the environment names (as a Qt program sets
+ * its own): "<c_strtod> <strtod>" each, hexadecimal */
+static int number_lines(void)
+{
+	setlocale(LC_ALL, "");
+	char line[256];
+	while (fgets(line, sizeof line, stdin)) {
+		line[strcspn(line, "\n")] = '\0';
+		printf("%a %a\n", c_strtod(line, NULL), strtod(line, NULL));
+	}
+	return 0;
+}
+
 int selftest(const char *what)
 {
 	setvbuf(stdout, NULL, _IOLBF, 0);
+	if (strcmp(what, "number") == 0)
+		return number_lines();
 	if (strcmp(what, "geometry") == 0)
 		return geometry_lines();
 	if (strcmp(what, "time") == 0)

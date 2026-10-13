@@ -12,6 +12,9 @@ Open questions, planned builds, the cadence and the constraints. What shipped: `
 
 ## Decisions answered
 
+* **2026-10-13 13:08**: a photo of the broken Plasma wallpaper (all white, all hieroglyphs); "yes,
+  make it" (the login screen). Build 16.
+
 * **2026-10-11 19:03**: the Plasma wallpaper "was severely broken"; "stay closer to the barebone
   linux kernel ... our own boot sequence ... the rain ... as the login screen ... then load
   KDE/Plasma"; greetd rather than a login manager of our own. Build 15 drops the Plasma wallpaper;
@@ -37,9 +40,8 @@ Open questions, planned builds, the cadence and the constraints. What shipped: `
 
 ## Planned builds
 
-1. **The login screen**: greetd with syncrain's own greeter (`docs/agent/NEXT_BUILD.md`).
-2. **The boot splash**: a still frame of the rain (Plymouth), until the login screen's live one.
-3. **A NixOS image** with syncrain as its wallpaper.
+1. **The boot splash**: a still frame of the rain (Plymouth), until the login screen's live one.
+2. **A NixOS image** with syncrain as its wallpaper and login screen.
 
 ## Build cadence
 

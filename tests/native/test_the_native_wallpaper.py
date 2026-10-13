@@ -12,12 +12,15 @@ Needs a C compiler, pkg-config, wayland-scanner and the libwayland and libdbus h
 from __future__ import annotations
 
 import os
+import shutil
 import random
 import struct
 import subprocess
 import sys
 
 import pytest
+
+from tests.conftest import need
 
 from syncrain import engine, native, pacing
 from syncrain.renderer import Renderer, geometry
@@ -304,3 +307,18 @@ def test_gtk4_layer_shell_stays_out_of_the_native_process(monkeypatch):
     assert env["SYNCRAIN_LD_PRELOAD"] == "/usr/lib/libgtk4-layer-shell.so.0 /opt/other.so"
     monkeypatch.setenv("LD_PRELOAD", "/nix/store/x-gtk4-layer-shell-1.3.0/lib/libgtk4-layer-shell.so")
     assert "LD_PRELOAD" not in native.environment()
+
+
+def test_numbers_are_read_alike_in_any_locale(native_wallpaper, tmp_path):
+    """In a Dutch locale strtod stops at the point: the scene's 0.15 read as 1 drew builds 13 and 14's
+    Plasma wallpaper all white and all hieroglyphs. The scene is read in the C locale whatever."""
+    need(shutil.which("localedef") is not None, "no localedef to make a Dutch locale")
+    done = subprocess.run(["localedef", "-i", "nl_NL", "-f", "UTF-8", str(tmp_path / "nl_NL.UTF-8")],
+                          capture_output=True, text=True)
+    need(done.returncode in (0, 1) and (tmp_path / "nl_NL.UTF-8").exists(), "the Dutch locale could not be made")
+    env = dict(os.environ, LOCPATH=str(tmp_path), LC_ALL="nl_NL.UTF-8")
+    done = subprocess.run([str(native_wallpaper), "--selftest", "number"], input=f"{(0.15).hex()}\n30.0\n",
+                          capture_output=True, text=True, env=env, timeout=30)
+    read = [[float.fromhex(v.replace(",", ".")) for v in line.split()] for line in done.stdout.splitlines()]
+    assert read[0][1] == 1.0, "this machine's strtod reads 0.15 in Dutch as it should show: up to the point"
+    assert [r[0] for r in read] == [0.15, 30.0]

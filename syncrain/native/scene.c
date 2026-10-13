@@ -157,13 +157,13 @@ bool scene_load(struct scene *scene, int fd, char *why, size_t why_size)
 		} else if (strcmp(word[0], "keep") == 0 && n >= 2) {
 			if (strcmp(word[1], "logo") == 0 && n == 4) {
 				scene->keep = KEEP_LOGO;
-				scene->logo_size = strtod(word[2], NULL);
-				scene->drift = strtod(word[3], NULL);
+				scene->logo_size = c_strtod(word[2], NULL);
+				scene->drift = c_strtod(word[3], NULL);
 			} else if (strcmp(word[1], "mask") == 0 && n == 7) {
 				scene->keep = KEEP_MASK;
 				for (int i = 0; i < 4; i++)
-					scene->mask_bbox[i] = strtod(word[2 + i], NULL);
-				scene->drift = strtod(word[6], NULL);
+					scene->mask_bbox[i] = c_strtod(word[2 + i], NULL);
+				scene->drift = c_strtod(word[6], NULL);
 			} else if (strcmp(word[1], "none") == 0) {
 				scene->keep = KEEP_NONE;
 			} else {
@@ -218,7 +218,7 @@ bool scene_load(struct scene *scene, int fd, char *why, size_t why_size)
 			strcpy(u->kind, word[3]);
 			u->count = n - 4;
 			for (int i = 0; i < u->count; i++) {
-				u->value[i] = strtod(word[4 + i], NULL);
+				u->value[i] = c_strtod(word[4 + i], NULL);
 				u->integer[i] = strtoll(word[4 + i], NULL, 10);
 			}
 		} else if (strcmp(word[0], "kwin-script") == 0 && n == 3) {
