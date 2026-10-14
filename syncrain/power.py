@@ -27,7 +27,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-from . import build
+from . import build, engine
 
 # ---------------------------------------------------------------- power sources
 
@@ -278,9 +278,10 @@ PASS_ON = ("theme", "channel", "logo", "background", "mask", "bg_gamma", "bg_gai
 
 def base_args(args) -> list[str]:
     out = []
+    preset = engine.default_preset(engine.load_meta())
     for key in PASS_ON:
         value = getattr(args, key, None)
-        default = {"theme": "nixos", "channel": "public", "scale": 1.0, "fps": 30.0, "pause_under": "maximized",
+        default = {"theme": preset, "channel": "public", "scale": 1.0, "fps": 30.0, "pause_under": "maximized",
                    "host": "auto"}.get(key)
         if key == "glyphs" and not isinstance(value, str):
             continue                              # the settings file's sets: it is passed on below

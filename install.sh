@@ -39,7 +39,7 @@ Options:
   --login-screen-off    back to the login screen from before (undoes only what --login-screen did)
   --config FILE         a settings file the web page exported: the wallpaper (and the login screen)
                         draw what the page showed; kept as ~/.config/syncrain/config.json
-  --preset NAME         where the look starts: nixos (default) or matrix (--theme: the same)
+  --preset NAME         where the look starts: syncrain (the default), nixos or matrix (--theme: the same)
   --channel NAME        stream name (default: public)
   --rainbow MODE        logo (default), all or off
   --arg ARG             extra argument for syncrain, repeatable (e.g. --arg --fps --arg 24)

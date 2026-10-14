@@ -15,7 +15,8 @@ import io
 import os
 
 #: The shipped logos by the names the settings use, and by the files' own names.
-SHIPPED = {"nixos": "white", "nixos-colours": "colours", "white": "white", "colours": "colours"}
+SHIPPED = {"nixos": "white", "nixos-colours": "colours", "white": "white", "colours": "colours",
+           "syncrain": "syncrain"}
 SIDE = 1024
 DATA_PREFIX = "data:image/png;base64,"
 
@@ -25,7 +26,7 @@ class LogoError(ValueError):
 
 
 def normalize(choice: str) -> str:
-    """'white', 'colours', 'none', a data URI or a picture file's path."""
+    """'white', 'colours', 'syncrain', 'none', a data URI or a picture file's path."""
     return SHIPPED.get(choice, choice)
 
 
@@ -79,7 +80,7 @@ def check(choice: str) -> str:
     if os.path.isfile(choice) and os.access(choice, os.R_OK):
         open_picture(choice)
         return choice
-    raise LogoError(f"no logo {choice[:60]!r}: nixos, nixos-colours, none, or a picture file")
+    raise LogoError(f"no logo {choice[:60]!r}: syncrain, nixos, nixos-colours, none, or a picture file")
 
 
 def prepare(im):
@@ -108,7 +109,7 @@ def texture(choice: str, data_dir: str, bundled):
     """(width, height, RGBA bytes) of a logo other than none. `bundled` reads the shipped ones."""
     from .renderer import rgba_pil
     choice = normalize(choice)
-    if choice in ("white", "colours"):
+    if choice in ("white", "colours", "syncrain"):
         return bundled(os.path.join(data_dir, f"logo-{choice}.png"))
     if is_data(choice):
         return rgba_pil(decode(choice))

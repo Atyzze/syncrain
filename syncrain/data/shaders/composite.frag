@@ -12,6 +12,7 @@ uniform float uBgGamma, uBgGain;     // background tone: the image's curve (not 
 uniform float uCentreGlow;           // the gradient's glow around the centre, times the theme's
 uniform vec2 uBgScale, uBgOffset;    // cover-fit of the image
 uniform vec3 cGlow, cLogoGlow;
+uniform vec4 uLogoTint;              // one colour over the logo's own (a = 1), and its glow; a = 0: its own
 uniform float uBloomK, uVeil, uLogoSize, uLogoGlowK;
 uniform int uSnowN;
 uniform vec4 uSnowA[4];              // cell (power of two), speed (whole units/s), density, brightness
@@ -132,7 +133,7 @@ void main() {
     }
 
     float logoA = 0.0, logoMask = 0.0, logoHalo = 0.0;
-    vec3 logoRGB = vec3(0.0), haloCol = cLogoGlow;
+    vec3 logoRGB = vec3(0.0), haloCol = uLogoTint.a > 0.5 ? uLogoTint.rgb : cLogoGlow;
     if (uHasLogo == 1) {
         // the logo texture is padded: the snowflake fills its central 2/3
         float size = uLogoSize * uRes.y * 1.5;
@@ -145,14 +146,15 @@ void main() {
             float lod = max(0.0, log2(float(textureSize(uLogo, 0).x) / size));
             vec4 L = textureLod(uLogo, luv, lod);
             logoA = L.a;
-            logoRGB = L.rgb;
+            logoRGB = uLogoTint.a > 0.5 ? uLogoTint.rgb : L.rgb;
             logoMask = smoothstep(0.02, 0.3, textureLod(uLogo, luv, lod + 1.5).a);
             logoHalo = textureLod(uLogo, luv, 7.0).a;
             if (uLogoHueCph > 0.0) {
                 // rainbow wheel fixed to the arms, flowing round over time; keeps the logo's own shading
                 float base = cyclesPerHour(uLogoHueCph);
                 float hue = fract(base + atan(r.y, r.x) / 6.2831853);
-                float lum = dot(L.rgb, vec3(0.299, 0.587, 0.114));
+                float lum = dot(logoRGB, vec3(0.299, 0.587, 0.114));
+                if (lum < 0.04) lum = 0.9;               // a black logo (syncrain's) shows the rainbow too
                 logoRGB = hsv2rgb(vec3(hue, 0.7, 1.0)) * min(1.0, lum * 1.12);
                 haloCol = hsv2rgb(vec3(base, 0.55, 1.0));
             }

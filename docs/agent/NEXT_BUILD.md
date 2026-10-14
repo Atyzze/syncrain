@@ -1,12 +1,12 @@
-# The next build is 23
+# The next build is 24
 
 The first line is parsed: `# The next build is <N>`, exactly one above `BUILD_NUMBER`.
 
-## Build 23: what the operator asks next
+## Build 24: what the operator asks next
 
 * Read what the operator sent last, and answer it in one plain sentence first.
-* Build 22 made the look general (colours, flavours, a colour cycle, any logo, presets instead of
-  themes) and put the page at the top as `index.html`; fix first what they find on their desktop.
+* Build 23 made their own look the default (the `syncrain` preset, their logo as an SVG) and added
+  one colour over any logo; fix first what they find, and ask whether the logo is right.
 * With nothing asked: the boot splash (`docs/ROADMAP.md`, "Planned builds"), or an open item.
 
 **Known blockers**: watts, NVIDIA's driver and Plasma's shell exist only on the operator's machine;

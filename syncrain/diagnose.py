@@ -155,7 +155,7 @@ def symbol_lines(args) -> list[str]:
     """Which symbols a wallpaper started now would draw, and what no font here can draw."""
     from . import engine, glyphs
     meta = engine.load_meta()
-    theme = meta["themes"].get(args.theme, meta["themes"]["nixos"])
+    theme = meta["themes"].get(args.theme) or meta["themes"][engine.default_preset(meta)]
     said = []
     if isinstance(args.glyphs, dict):            # a settings file's sets
         r = glyphs.resolve(meta, theme, engine.DATA_DIR, args.glyphs, "the settings file", args.hieroglyphs)

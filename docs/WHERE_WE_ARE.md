@@ -1,4 +1,4 @@
-# Where we are, at build 22
+# Where we are, at build 23
 
 The project on one page. Detail: `docs/agent/HANDOFF.md`.
 
@@ -31,10 +31,12 @@ name, so everyone on a channel sees the same rain. Linux (Wayland, X11) and the 
   --config config.json`. Your desktop draws what the page showed.
 * **Your own look** (build 22): the rain's colours, how many at once (each column its own, by the
   channel or as a wave), a colour cycle like an RGB keyboard's, the background, any picture as the
-  logo (NixOS stays the default), the hidden words. NixOS and Matrix are presets to start from.
+  logo, the hidden words. Presets to start from: **Syncrain** (your look, the default, with your logo
+  redrawn as a clean SVG), NixOS and Matrix; the NixOS logo stays a choice. One colour over any logo
+  (build 23).
 * **A review of build 17**: builds 18 and 19 fixed what matters now; a few small items are open
   (`docs/ROADMAP.md`, "Open items").
-* **On GitHub**: github.com/Atyzze/syncrain, every build up to 21.
+* **On GitHub**: github.com/Atyzze/syncrain, every build up to 22.
 
 ## What comes next
 

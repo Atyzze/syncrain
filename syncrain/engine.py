@@ -61,8 +61,14 @@ def cycles_per_hour(seconds) -> float:
 
 
 #: The settings `compose` puts over a preset, by their command-line names (the options' dests).
-LOOK_OPTIONS = ("rain_colors", "glow_color", "background_colors", "vignette", "logo_size", "logo_cycle", "cycle",
-                "flavours", "flavour_layout", "words")
+LOOK_OPTIONS = ("rain_colors", "glow_color", "background_colors", "vignette", "logo_size", "logo_cycle",
+                "logo_color", "cycle", "flavours", "flavour_layout", "words")
+
+
+def default_preset(meta) -> str:
+    """The preset with nothing said (themes.json's "default")."""
+    return meta.get("default", "nixos")
+
 
 #: What --rainbow all cycles the rain at, in seconds a turn of the hue wheel, so a setting that
 #: names it keeps the picture it had.
@@ -86,12 +92,12 @@ def colour(value):
     raise ValueError(f"not a colour: {value!r} (#rrggbb, or three numbers 0 to 1)")
 
 
-def compose(meta, preset="nixos", rainbow=None, rain_colors=None, glow_color=None, background_colors=None,
-            vignette=None, logo_size=None, logo_cycle=None, cycle=None, flavours=None, flavour_layout=None,
-            words=None):
+def compose(meta, preset=None, rainbow=None, rain_colors=None, glow_color=None, background_colors=None,
+            vignette=None, logo_size=None, logo_cycle=None, logo_color=None, cycle=None, flavours=None,
+            flavour_layout=None, words=None):
     """The look a frame is drawn with: a preset (themes.json's "themes") with the settings over it.
     The page does the same (`composeLook` in index.html)."""
-    th = json.loads(json.dumps(meta["themes"][preset]))
+    th = json.loads(json.dumps(meta["themes"][preset or default_preset(meta)]))
     if rainbow == "off":
         th["logo"]["hueCycle"] = 0
     elif rainbow == "all":
@@ -112,6 +118,11 @@ def compose(meta, preset="nixos", rainbow=None, rain_colors=None, glow_color=Non
         th["background"]["vignette"] = float(vignette)
     if logo_size is not None:
         th["logo"]["size"] = float(logo_size)
+    if logo_color is not None:                # one colour over the logo's own ("" for its own again)
+        if logo_color == "":
+            th["logo"].pop("color", None)
+        else:
+            th["logo"]["color"] = colour(logo_color)
     if flavours is not None:
         th["rain"]["flavours"] = int(flavours)
     if flavour_layout is not None:

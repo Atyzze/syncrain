@@ -2,12 +2,13 @@
 
 A live code-rain wallpaper that never loops and stays in sync across machines: every frame is a
 function of the UTC clock and a channel name. Your colours (one, or many at once, cycling like an
-RGB keyboard), your logo and your symbols, starting from two presets: **nixos** (blue rain, snow,
-the NixOS snowflake) and **matrix** (green). A wallpaper on Linux (Wayland, X11) and a web page.
+RGB keyboard), your logo and your symbols, starting from a preset: **syncrain** (the default: green,
+64 colours at once turning, syncrain's own logo), **nixos** (blue rain, snow, the NixOS snowflake)
+or **matrix** (green). A wallpaper on Linux (Wayland, X11) and a web page.
 
 <p align="center">
+  <img src="docs/images/syncrain.jpg" width="49%" alt="The syncrain preset: katakana, digits and hieroglyphs falling in columns over black, each column its own colour, around syncrain's logo, a ring with a figure inside">
   <img src="docs/images/nixos.jpg" width="49%" alt="The nixos preset: pale blue characters and Egyptian hieroglyphs falling in columns over dark blue, with snowflakes and the NixOS snowflake in rainbow colours in the middle">
-  <img src="docs/images/matrix.jpg" width="49%" alt="The matrix preset: green katakana, digits, letters and hieroglyphs falling in columns over black">
 </p>
 <p align="center"><sub>The channel <code>public</code> at 2026-10-07 00:00:07 UTC.
 <code>syncrain --window --time 1791331207</code> draws that moment on any machine.</sub></p>
@@ -73,12 +74,13 @@ browser (Chromium), nix. What each needs: `docs/agent/ENVIRONMENT.md`.
 
     syncrain/          app.py (options, GTK host), native.py (starts the native wallpaper), renderer.py,
                        gl.py, pacing.py, hidden.py (KWin), engine.py, glyphs.py (symbols), build.py,
-                       diagnose.py, bench.py, power.py, cover.py, logo.py, data/ (shaders, presets, atlas, logos)
+                       diagnose.py, bench.py, power.py, cover.py, logo.py, data/ (shaders, presets, atlas, logos and
+                       syncrain's logo drawing)
     syncrain/          the login screen: greeter.py (the box), greetd.py, greetdconf.py, handover.py,
                        login/ (greetd's command)
     syncrain/native/   the native wallpaper in C
     nix/               package, web bundle, NixOS and home-manager modules and their options
-    tools/             package_release.py, test_suite.py, stream_freeze.py, build_web.py, build_assets.py,
+    tools/             package_release.py, test_suite.py, stream_freeze.py, build_web.py, build_assets.py, build_logo.py,
                        prepare_environment.sh
     tests/             one folder per lane; fixtures/stream_freeze.json
     index.html         the web page: open it, try every setting, save them (its data filled in by tools/build_web.py)

@@ -264,6 +264,8 @@ def static_uniforms(r):
     put("composite", "uHasLogo", "i", 1 if (r.logo_choice != "none" and not r.background) else 0)
     put("composite", "uHasMask", "i", 1 if r.mask else 0)
     put("composite", "cGlow", "f3", *c["glow"]); put("composite", "cLogoGlow", "f3", *th["logo"]["glow"])
+    tint = th["logo"].get("color")
+    put("composite", "uLogoTint", "f4", *(tint + [1.0] if tint else [0.0] * 4))
     put("composite", "uBloomK", "f", rain["bloom"] * r.look["bloom"]); put("composite", "uVeil", "f", rain["veil"])
     put("composite", "uLogoSize", "f", th["logo"]["size"])
     put("composite", "uLogoGlowK", "f", th["logo"]["glowStrength"] * r.look["glow"])
@@ -394,11 +396,12 @@ def from_args(args, **override):
 
 
 class Renderer:
-    def __init__(self, theme="nixos", channel="public", logo=None, background=None, mask=None,
+    def __init__(self, theme=None, channel="public", logo=None, background=None, mask=None,
                  bg_gamma=None, bg_gain=None, rainbow=None, spin=None, drift=None, speed=None, density=None,
                  snow=None, glow=None, bloom=None, hieroglyphs=None, glyphs=None, data_dir=engine.DATA_DIR,
                  **look):
         self.meta = engine.load_meta(data_dir)
+        theme = theme or engine.default_preset(self.meta)
         if theme not in self.meta["themes"]:
             raise SystemExit(f"unknown preset {theme!r}; available: {', '.join(self.meta['themes'])}")
         # the preset with the settings over it: colours, background, logo size and colour cycle, the

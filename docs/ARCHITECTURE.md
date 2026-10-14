@@ -62,17 +62,19 @@ GTK draws more pixels and scales them down), the page within texture filtering.
 
 ## The look (`syncrain/engine.py`, `compose`)
 
-* A look is a preset (themes.json's `themes`: nixos, matrix) with the settings over it: the rain's
+* A look is a preset (themes.json's `themes`: syncrain, the default, nixos, matrix) with the settings over it: the rain's
   gradient (dark, middle, bright, leading) and glow, the background gradient and vignette, the logo
   and its size and colour cycle, the rain's colour cycle and flavours, the hidden words. Every host
   draws from the composed look (the page's `composeLook` does the same).
 * **Flavours** (`rain.glsl`, `flavourTurns`): each of the 64 columns turns the gradient round the
   hue wheel by k/N of a turn, k by the channel's hash or, as a wave, in order across the stream; the
   glow beside a column follows it. **Cycle** turns every flavour together (`uRainHueCph`). One
-  flavour skips the turn, so the default picture is the one it always was.
-* **The logo** (`syncrain/logo.py`): the shipped snowflakes, or a picture made into the same kind
+  flavour skips the turn, so a preset with one (nixos) draws the picture it always drew.
+* **The logo** (`syncrain/logo.py`): syncrain's own (drawn in `logo-syncrain.svg`, its texture made
+  by `tools/build_logo.py`), the shipped snowflakes, or a picture made into the same kind
   of texture (a square, the picture in its middle two thirds, its own average colour under its
   see-through pixels). The page makes it and keeps it in the settings file as a PNG, used as it is.
+  One colour over it (`uLogoTint`) keeps its shape and replaces its colours, and its glow's.
 
 ## The settings file (`syncrain/app.py`, `CONFIG_KEYS`)
 

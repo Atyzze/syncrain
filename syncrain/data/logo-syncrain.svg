@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-340 -340 680 680" width="680" height="680">
+  <!-- syncrain's logo, drawn from the operator's picture: a ring, a head, arms raised in a V, and a
+       body of two lobes either side of the spine. Its texture is made from this file
+       (tools/build_logo.py makes it); the colour is the settings' to change. -->
+  <defs>
+    <clipPath id="inside"><circle r="312"/></clipPath>
+  </defs>
+  <g fill="none" stroke="#000" stroke-width="38">
+    <circle r="312"/>
+    <circle cy="-170" r="60"/>
+    <g clip-path="url(#inside)">
+      <path d="M-237.2 -202.7 L0 34.5 L237.2 -202.7" stroke-linejoin="miter"/>
+      <path d="M0 15 V350" stroke-width="46"/>
+      <path d="M-70.5 137 H70.5 A73 73 0 0 1 143.5 210 A92 92 0 0 1 51.5 302 H-51.5 A92 92 0 0 1 -143.5 210 A73 73 0 0 1 -70.5 137 Z"/>
+    </g>
+    <rect x="-135" y="37" width="270" height="103" rx="50"/>
+  </g>
+</svg>

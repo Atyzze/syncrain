@@ -107,7 +107,7 @@ SYMBOLS = '{"balance": "glyphs", "sets": [{"name": "a", "chars": "Ж★ΩअД�
 
 
 @pytest.mark.parametrize("look", [[], ["--speed", "2", "--density", "0.5", "--glow", "0", "--bloom", "1.5",
-                                        "--bg-gain", "0.5", "--snow", "off", "--hieroglyphs", "1"], ["--glyphs"],
+                                        "--bg-gain", "0.5", "--snow", "on", "--hieroglyphs", "1"], ["--glyphs"],
                                   ["--logo"]],
                          ids=["defaults", "every-option", "a-symbols-file", "a-look-of-one-s-own"])
 def test_the_native_wallpaper_draws_the_gtk_host_s_frame(root, sway, tmp_path, look):
@@ -124,7 +124,7 @@ def test_the_native_wallpaper_draws_the_gtk_host_s_frame(root, sway, tmp_path, l
         look = ["--preset", "matrix", "--rain-colors", "#202040,#8040c0,0.9/0.7/1,#ffffff", "--flavours", "9",
                 "--flavour-layout", "wave", "--cycle", "30", "--logo", str(tmp_path / "picture.png"),
                 "--logo-size", "0.3", "--background-colors", "#050008,#0a0010,#200838", "--vignette", "0.2",
-                "--words", "HELLO,SYNC", "--glow-color", "#6030a0"]
+                "--words", "HELLO,SYNC", "--glow-color", "#6030a0", "--logo-color", "#ffaa33"]
     shots = {}
     for host in ("native", "gtk"):
         proc, line = start(root, wallpaper_env(root, session), "--time", str(MOMENT), "--host",

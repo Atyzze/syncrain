@@ -60,7 +60,7 @@ def test_the_settings_file_is_read_from_its_place_unless_told_none(tmp_path, mon
     (tmp_path / "syncrain/config.json").write_text('{"contract": "syncrain-config-1", "theme": "matrix"}')
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
     assert parse_args([]).theme == "matrix"
-    assert parse_args(["--config", "none"]).theme == "nixos"
+    assert parse_args(["--config", "none"]).theme == "syncrain"
 
 
 @pytest.mark.parametrize("values, says", [({"spin": "fast"}, "--spin"), ({"colour": "red"}, "no setting 'colour'"),
@@ -207,14 +207,14 @@ def test_the_words_hold_at_most_254_different_characters(capsys):
 def test_rainbow_goes_over_a_settings_file_as_any_option_does(tmp_path):
     from syncrain import engine
     from syncrain.renderer import from_args
-    path = settings(tmp_path, logo_cycle=90, cycle=0)
+    path = settings(tmp_path, preset="nixos", logo_cycle=90, cycle=0)
     def cycles(argv):
         motion = engine.motion(from_args(parse_args(argv), glyphs="theme").th)
         return motion["uLogoHueCph"], motion["uRainHueCph"]
     assert cycles(["--config", path, "--rainbow", "off"]) == (0, 0)
     assert cycles(["--config", path, "--rainbow", "all"]) == (40, 6)
     assert cycles(["--config", path, "--rainbow", "off", "--logo-cycle", "60"]) == (60, 0), "what comes after goes over"
-    assert cycles(["--config", settings(tmp_path, rainbow="all")]) == (40, 6), "build 21's files as they were"
+    assert cycles(["--config", settings(tmp_path, theme="nixos", rainbow="all")]) == (40, 6), "build 21's files as they were"
 
 
 def test_build_21_s_matrix_files_still_have_no_snow(tmp_path):
@@ -231,3 +231,28 @@ def test_a_logo_file_that_is_no_picture_is_refused_at_once(tmp_path, capsys):
     with pytest.raises(SystemExit) as stop:
         parse_args(["--config", "none", "--logo", str(svg)])
     assert stop.value.code == 2 and "not a picture syncrain reads" in capsys.readouterr().err
+
+
+def test_one_colour_over_the_logo_and_its_own_again(tmp_path):
+    from syncrain.renderer import from_args, static_uniforms
+    def tint(argv):
+        r = from_args(parse_args(["--config", "none", *argv]), glyphs="theme")
+        return next(v for p, n, k, v in static_uniforms(r) if n == "uLogoTint")
+    assert tint([]) == (0.0, 0.0, 0.0, 0.0), "the logo's own colours"
+    assert tint(["--logo-color", "#ff0000"]) == (1.0, 0.0, 0.0, 1.0)
+    path = settings(tmp_path, logo_color="#00ff00")
+    r = from_args(parse_args(["--config", path]), glyphs="theme")
+    assert r.th["logo"]["color"] == [0.0, 1.0, 0.0], "the settings file's colour"
+    r = from_args(parse_args(["--config", path, "--logo-color", "own"]), glyphs="theme")
+    assert "color" not in r.th["logo"], "own, on the command line, goes over the file's colour"
+
+
+def test_the_default_is_the_operator_s_own_look():
+    from syncrain import engine
+    from syncrain.renderer import from_args
+    r = from_args(parse_args(["--config", "none"]), glyphs="theme")
+    assert (r.theme_name, r.logo_choice, r.th["rain"]["flavours"], r.th["rain"]["cycle"]) == ("syncrain", "syncrain", 64, 55)
+    assert "sSs" in r.th["wordText"] and r.look["snow"] is False
+    nixos = from_args(parse_args(["--config", "none", "--preset", "nixos"]), glyphs="theme")
+    assert nixos.logo_choice == "white" and nixos.th["rain"]["flavours"] == 1, "nixos as it was"
+    assert from_args(parse_args(["--config", "none", "--logo", "nixos"]), glyphs="theme").logo_choice == "white"

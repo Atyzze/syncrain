@@ -137,7 +137,7 @@ def test_diagnose_without_opengl_says_so_first(app):
 
 
 @pytest.mark.parametrize("option", [["--speed", "2"], ["--density", "2"], ["--glow", "0"], ["--bloom", "0"],
-                                    ["--bg-gain", "0.3"], ["--snow", "off"], ["--hieroglyphs", "0"]],
+                                    ["--bg-gain", "0.3"], ["--snow", "on"], ["--hieroglyphs", "0"]],
                          ids=lambda o: o[0][2:])
 def test_each_picture_option_changes_the_picture(app, tmp_path, option):
     plain, changed = tmp_path / "plain.png", tmp_path / "changed.png"

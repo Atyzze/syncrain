@@ -6,10 +6,11 @@ Outputs (into syncrain/data/):
                  centred, so its glow can spill into the neighbouring cells). R = coverage, G = near
                  glow, B = tight bloom for the white heads. A wallpaper copies the ones its symbols
                  use into its own atlas (syncrain/glyphs.py).
-  themes.json    palettes, each theme's symbol sets and hidden words, snow and logo settings, and the
-                 list of glyphs.png's slots.
+  themes.json    the presets (each one's palette, symbol sets, hidden words, snow and logo settings),
+                 which one is the default, and the list of glyphs.png's slots.
   logo-white.png / logo-colours.png   the official NixOS snowflake (CC-BY 4.0), with colour bled into the
                  transparent area so mipmapped edges stay clean (only with --nixos-artwork).
+                 logo-syncrain.png comes from its drawing, by tools/build_logo.py.
 
 Run from the repository root:  python3 tools/build_assets.py [--nixos-artwork /path/to/nixos-artwork]
 Fonts: Noto Sans Mono CJK JP and DejaVu Sans (Debian's fonts-noto-cjk, fonts-dejavu-core), Noto Sans
@@ -80,7 +81,32 @@ SNOW = [
 RAIN = {'density': 0.43, 'wordRate': 0.085, 'glintRate': 0.23, 'veil': 0.35, 'contrast': 1,
         'cycle': 0, 'flavours': 1, 'flavourLayout': 'random'}
 
+MATRIX_GLYPHS = {'balance': 'sets', 'sets': [
+    # build 12's weights: each mirrored katakana 3, each digit 1.6, each symbol 0.6
+    {'name': 'katakana', 'chars': G.KATAKANA, 'weight': 135, 'mirror': True},
+    {'name': 'digits', 'chars': G.DIGITS, 'weight': 16},
+    {'name': 'symbols', 'chars': G.MATRIX_SYMS, 'weight': 7.2},
+    {'name': 'hieroglyphs', 'chars': G.HIEROGLYPHS + G.HIEROGLYPHS_MORE, 'share': 0.15}]}
+MATRIX_COLORS = {'deep': [0.0, 0.62, 0.22], 'mid': [0.12, 1.0, 0.36], 'pale': [0.6, 1.0, 0.68],
+                 'head': [0.85, 1.0, 0.9], 'glow': [0.04, 0.6, 0.22]}
+MATRIX_BACKGROUND = {'mode': 'gradient', 'top': rgb('#020604'), 'bottom': rgb('#03090a'),
+                     'center': rgb('#06180f'), 'vignette': 0.4}
+
 themes = {
+    # the operator's own (their settings file of 2026-10-14): the matrix colours, 64 of them at once
+    # turning every 55 s, their logo (drawn as logo-syncrain.svg) in its own colour, more bloom
+    'syncrain': {
+        'label': 'Syncrain',
+        'glyphs': MATRIX_GLYPHS,
+        'wordText': ['AI', 'sSs', 'NEURAL', 'TENSOR', 'AGENT', 'LINUX', 'ONLINE', 'MATRIX'],
+        'colors': MATRIX_COLORS,
+        'background': MATRIX_BACKGROUND,
+        'logo': {'default': 'syncrain', 'size': 0.34, 'glow': [0.3, 0.9, 0.6], 'glowStrength': 0.0,
+                 'spin': 180, 'hueCycle': 0, 'drift': 0.03},
+        'rain': dict(RAIN, bloom=2.5, cycle=55, flavours=64, flavourLayout='random'),
+        'snow': SNOW,
+        'snowDefault': False,
+    },
     'nixos': {
         'label': 'NixOS snow',
         # the weights build 12 drew them with: each base-32 character 1, the lambda 2.6, the snowflakes
@@ -106,17 +132,10 @@ themes = {
     },
     'matrix': {
         'label': 'Matrix green',
-        # build 12's weights: each mirrored katakana 3, each digit 1.6, each symbol 0.6
-        'glyphs': {'balance': 'sets', 'sets': [
-            {'name': 'katakana', 'chars': G.KATAKANA, 'weight': 135, 'mirror': True},
-            {'name': 'digits', 'chars': G.DIGITS, 'weight': 16},
-            {'name': 'symbols', 'chars': G.MATRIX_SYMS, 'weight': 7.2},
-            {'name': 'hieroglyphs', 'chars': G.HIEROGLYPHS + G.HIEROGLYPHS_MORE, 'share': 0.15}]},
+        'glyphs': MATRIX_GLYPHS,
         'wordText': ['AI', 'NEURAL', 'TENSOR', 'AGENT', 'LINUX', 'ONLINE', 'MATRIX'],
-        'colors': {'deep': [0.0, 0.62, 0.22], 'mid': [0.12, 1.0, 0.36], 'pale': [0.6, 1.0, 0.68],
-                   'head': [0.85, 1.0, 0.9], 'glow': [0.04, 0.6, 0.22]},
-        'background': {'mode': 'gradient', 'top': rgb('#020604'), 'bottom': rgb('#03090a'),
-                       'center': rgb('#06180f'), 'vignette': 0.4},
+        'colors': MATRIX_COLORS,
+        'background': MATRIX_BACKGROUND,
         'logo': {'default': 'none', 'size': 0.40, 'glow': [0.3, 0.9, 0.6], 'glowStrength': 0.0,
                  'spin': 180, 'hueCycle': 90, 'drift': 0.03},
         'rain': dict(RAIN, bloom=1.25),
@@ -132,6 +151,7 @@ meta = {
     'library': {'file': 'glyphs.png', 'grid': G.GRID, 'slot': G.SLOT, 'cell': G.CELL,
                 'glyphs': [k for k, _, _ in library]},
     'themes': themes,
+    'default': 'syncrain',          # the preset with nothing said
 }
 for name, theme in themes.items():                    # every symbol a theme names is shipped
     for s in theme['glyphs']['sets']:

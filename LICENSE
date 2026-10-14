@@ -20,6 +20,6 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-The NixOS logo files in syncrain/data (logo-*.png) are derived from
+The NixOS logo files in syncrain/data (logo-white.png, logo-colours.png) are derived from
 https://github.com/NixOS/nixos-artwork and are licensed CC BY 4.0
 (Simon Frankau, Tim Cuthbertson). They are not covered by the MIT license above.

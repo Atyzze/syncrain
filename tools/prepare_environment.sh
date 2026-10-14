@@ -17,7 +17,7 @@ esac
 
 if [ -n "$VENV" ]; then
   [ -x "$VENV/bin/python" ] || python3 -m venv "$VENV" || exit 1
-  "$VENV/bin/pip" install -q PyGObject Pillow pycairo pytest pyflakes "setuptools>=64" wheel || exit 1
+  "$VENV/bin/pip" install -q PyGObject Pillow pycairo pytest pyflakes "setuptools>=64" wheel cairosvg || exit 1
   export PATH="$VENV/bin:$PATH"
 fi
 

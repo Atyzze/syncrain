@@ -25,9 +25,12 @@ in
   };
 
   theme = mkOption {
-    type = types.nullOr (types.enum [ "nixos" "matrix" ]);
+    type = types.nullOr (types.enum [ "syncrain" "nixos" "matrix" ]);
     default = null;
-    description = "The preset the look starts from: `nixos` (ice blue, snow, NixOS logo; null: the settings file's, else this) or `matrix` (green).";
+    description = ''
+      The preset the look starts from: `syncrain` (green, 64 colours turning, syncrain's logo),
+      `nixos` (ice blue, snow, the NixOS logo) or `matrix` (green). Null: the settings file's, else syncrain.
+    '';
   };
 
   rainColors = mkOption {
@@ -58,7 +61,7 @@ in
   flavours = mkOption {
     type = types.nullOr (types.ints.between 1 64);
     default = null;
-    description = "Colours at once: each column of rain one of this many hues round the colour wheel (null: 1).";
+    description = "Colours at once: each column of rain one of this many hues round the colour wheel (null: the preset's).";
   };
 
   flavourLayout = mkOption {
@@ -70,7 +73,7 @@ in
   cycle = mkOption {
     type = types.nullOr types.ints.unsigned;
     default = null;
-    description = "Seconds a turn of the rain's colour wheel, every flavour together (null and 0: the colours stay).";
+    description = "Seconds a turn of the rain's colour wheel, every flavour together (null: the preset's; 0: the colours stay).";
   };
 
   words = mkOption {
@@ -96,21 +99,27 @@ in
   };
 
   logo = mkOption {
-    type = types.nullOr (types.either (types.enum [ "nixos" "nixos-colours" "white" "colours" "none" ]) types.path);
+    type = types.nullOr (types.either (types.enum [ "syncrain" "nixos" "nixos-colours" "white" "colours" "none" ]) types.path);
     default = null;
-    description = "The logo: `nixos`, `nixos-colours`, `none` or a picture (null: the preset's, `nixos` for nixos).";
+    description = "The logo: `syncrain`, `nixos`, `nixos-colours`, `none` or a picture (null: the preset's).";
+  };
+
+  logoColor = mkOption {
+    type = types.nullOr (types.either colour (types.enum [ "own" ]));
+    default = null;
+    description = "One colour over the logo's shape, `#rrggbb`, or `own` for its own colours (null: the preset's or the settings file's).";
   };
 
   logoSize = mkOption {
     type = types.nullOr (types.numbers.between 0.05 0.9);
     default = null;
-    description = "The logo's height in screen heights (null: 0.4).";
+    description = "The logo's height in screen heights (null: the preset's).";
   };
 
   logoCycle = mkOption {
     type = types.nullOr types.ints.unsigned;
     default = null;
-    description = "Seconds a turn of the logo's rainbow (null: 90; 0: the logo's own colours).";
+    description = "Seconds a turn of the logo's rainbow (null: the preset's; 0: the logo's own colours).";
   };
 
   background = mkOption {
@@ -179,7 +188,7 @@ in
   snow = mkOption {
     type = types.nullOr types.bool;
     default = null;
-    description = "The falling snowflakes (null: the preset's, on for nixos, off for matrix).";
+    description = "The falling snowflakes (null: the preset's, on for nixos, off for syncrain and matrix).";
   };
 
   hieroglyphs = mkOption {

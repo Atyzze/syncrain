@@ -12,6 +12,10 @@ Open questions, planned builds, the cadence and the constraints. What shipped: `
 
 ## Decisions answered
 
+* **2026-10-14 19:53**: their settings file as a preset and the default, "nixos logo remains
+  selectable"; their logo cleaned up, "perhaps turn it into a svg"; "a color slider for the
+  potential logo in the middle, as an overide color channel on a user chosen png". Build 23.
+
 * **2026-10-14 18:25**: build 21 "working beautifully"; then a colour gradient for the rain so the
   nixos and matrix themes can go and the look is general; any logo, the NixOS one the default; no
   CachyOS remnants; colours that cycle and "how many color flavors at the same time ... every ray

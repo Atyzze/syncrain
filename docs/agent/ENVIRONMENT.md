@@ -22,7 +22,8 @@ The release runs every lane with `--require-all`: a missing environment fails it
 
 1. Packages: `libgtk-4-dev gobject-introspection libcairo2-dev meson xvfb sway grim shellcheck zstd
    gcc pkg-config libwayland-dev libdbus-1-dev`; node 22; Playwright's Chromium; Nix.
-2. A venv outside the tree: `pip install PyGObject Pillow pycairo pytest pyflakes "setuptools>=64" wheel`.
+2. A venv outside the tree: `pip install PyGObject Pillow pycairo pytest pyflakes "setuptools>=64" wheel cairosvg`
+   (CairoSVG draws `logo-syncrain.svg` for `tools/build_logo.py` where there is no rsvg-convert).
 3. gtk4-layer-shell v1.3.0 from source (`meson setup build -Dintrospection=true`, `ninja -C build
    install`), then `export GI_TYPELIB_PATH=/usr/local/lib/x86_64-linux-gnu/girepository-1.0`.
 4. `npm i -g playwright`.

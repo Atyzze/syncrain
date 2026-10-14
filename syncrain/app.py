@@ -96,6 +96,13 @@ def _colours(count):
     return parse
 
 
+def _logo_colour(text):
+    """One colour over the logo, or "" for the logo's own ("own", or empty)."""
+    if text.strip() in ("", "own", "none"):
+        return ""
+    return _colours(1)(text)
+
+
 def _flavours(text):
     """How many colours at once, 1 to 64 (a whole number; 3.0 is 3)."""
     try:
@@ -158,12 +165,12 @@ CONFIG_CONTRACT = "syncrain-config-1"
 CONFIG_KEYS = {"preset": "--preset", "theme": "--preset", "channel": "--channel", "rainbow": "--rainbow",
                "rain_colors": "--rain-colors", "glow_color": "--glow-color", "background_colors": "--background-colors",
                "vignette": "--vignette", "cycle": "--cycle", "flavours": "--flavours",
-               "flavour_layout": "--flavour-layout", "logo": "--logo", "logo_size": "--logo-size",
+               "flavour_layout": "--flavour-layout", "logo": "--logo", "logo_color": "--logo-color", "logo_size": "--logo-size",
                "logo_cycle": "--logo-cycle", "spin": "--spin", "drift": "--drift", "speed": "--speed",
                "density": "--density", "glow": "--glow", "bloom": "--bloom", "bg_gain": "--bg-gain", "snow": "--snow",
                "hieroglyphs": "--hieroglyphs", "words": "--words", "fps": "--fps", "pause_under": "--pause-under"}
 #: The settings whose values are colours: (how many, as a list).
-COLOUR_KEYS = {"rain_colors": 4, "background_colors": 3, "glow_color": 1}
+COLOUR_KEYS = {"rain_colors": 4, "background_colors": 3, "glow_color": 1, "logo_color": 1}
 
 
 def default_config_path() -> str:
@@ -269,8 +276,9 @@ def parse_args(argv=None):
     # no shortened options: --conf would be --config to argparse and not to _config_path
     ap = argparse.ArgumentParser(prog="syncrain", description="Never-repeating, clock-synchronised code rain wallpaper.",
                                  allow_abbrev=False)
-    ap.add_argument("--preset", "--theme", dest="theme", type=_theme, default="nixos",
-                    help="where the look starts: nixos (default) or matrix; every option below goes over it")
+    ap.add_argument("--preset", "--theme", dest="theme", type=_theme,
+                    help="where the look starts: syncrain (the default), nixos or matrix; every option below "
+                         "goes over it")
     ap.add_argument("--channel", default="public",
                     help="stream name; everyone on the same channel with a synced clock sees the same frame")
     ap.add_argument("--fps", type=_number(above=0, high=1000), default=30.0,
@@ -285,11 +293,13 @@ def parse_args(argv=None):
                          "else Python and GTK), native (the native program only) or gtk (Python and GTK, as on "
                          "X11 and in a window)")
     ap.add_argument("--logo", type=_logo, metavar="LOGO",
-                    help="nixos (the default), nixos-colours, none, or a picture file (PNG or JPEG)")
+                    help="syncrain, nixos, nixos-colours, none, or a picture file (PNG or JPEG); the preset's otherwise")
+    ap.add_argument("--logo-color", type=_logo_colour, metavar="C",
+                    help="one colour over the logo, #rrggbb (the default: the logo's own; 'own' for its own again)")
     ap.add_argument("--logo-size", type=_number(low=0.05, high=0.9), metavar="F",
-                    help="the logo's height, in screen heights (default 0.4)")
+                    help="the logo's height, in screen heights (the preset's otherwise)")
     ap.add_argument("--logo-cycle", type=_number(low=0), metavar="SECONDS",
-                    help="seconds a turn of the logo's rainbow (default 90; 0 = the logo's own colours)")
+                    help="seconds a turn of the logo's rainbow (the preset's otherwise; 0 = the logo's own colours)")
     ap.add_argument("--rain-colors", type=_colours(4), metavar="C,C,C,C",
                     help="the rain's gradient, dark to bright, then the leading symbol: #rrggbb each")
     ap.add_argument("--glow-color", type=_colours(1), metavar="C", help="the glow round the rain: #rrggbb")
@@ -298,11 +308,12 @@ def parse_args(argv=None):
     ap.add_argument("--vignette", type=_number(low=0, high=1), metavar="F",
                     help="how much darker the corners are, 0 to 1 (the preset's otherwise)")
     ap.add_argument("--flavours", type=_flavours, metavar="N",
-                    help="colours at once, 1 (default) to 64: each column of rain one of N hues round the wheel")
+                    help="colours at once, 1 to 64 (the preset's otherwise): each column of rain one of N hues round the wheel")
     ap.add_argument("--flavour-layout", choices=("random", "wave"),
-                    help="random (default): the columns' hues by the channel; wave: in order across the screen")
+                    help="random: the columns' hues by the channel; wave: in order across the screen (the preset's otherwise)")
     ap.add_argument("--cycle", type=_number(low=0), metavar="SECONDS",
-                    help="seconds a turn of the rain's hue wheel, every flavour together (default 0: the colours stay)")
+                    help="seconds a turn of the rain's hue wheel, every flavour together (the preset's otherwise; "
+                         "0 = the colours stay)")
     ap.add_argument("--words", type=_words, metavar="W,W,...",
                     help="the hidden words that fall now and then, comma-separated ('' for none)")
     ap.add_argument("--background", type=_image, metavar="IMAGE", help="use an image as the background instead of the background gradient")
@@ -325,7 +336,7 @@ def parse_args(argv=None):
                     help="the glow around the centre and the logo, times the preset's (default 1; 0 = none)")
     ap.add_argument("--bloom", type=_number(low=0), metavar="F",
                     help="the glow around the falling symbols, times the preset's (default 1; 0 = none)")
-    ap.add_argument("--snow", choices=("on", "off"), help="the falling snowflakes (default: on for nixos, off for matrix)")
+    ap.add_argument("--snow", choices=("on", "off"), help="the falling snowflakes (the preset's otherwise: on for nixos, off for syncrain and matrix)")
     ap.add_argument("--hieroglyphs", type=_number(low=0, high=1), metavar="SHARE",
                     help="share of the changing symbols that are Egyptian hieroglyphs (default: as the symbol sets "
                          "say, 0.15 in the presets; 0 = none, 1 = only)")
@@ -377,6 +388,9 @@ def parse_args(argv=None):
             path = None
     args = ap.parse_args(settings + argv)        # the command line's last, so it goes over the file
     args.config_file = path
+    if args.theme is None:                        # the preset with nothing said
+        from .engine import default_preset, load_meta
+        args.theme = default_preset(load_meta())
     if sets is not None and args.glyphs is None:
         args.glyphs = sets                        # the file's symbol sets, unless --glyphs names others
     # the channel as the web page takes it: spaces around it (what JavaScript's trim() takes, which is

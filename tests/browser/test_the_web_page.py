@@ -39,7 +39,7 @@ def page(root):
 
 
 #: Every picture option, as the page's URL says it and as the command line does.
-LOOK = {"speed": "0.5", "density": "1.7", "glow": "0.3", "bloom": "0.5", "bg-gain": "0.6", "snow": "off",
+LOOK = {"speed": "0.5", "density": "1.7", "glow": "0.3", "bloom": "0.5", "bg-gain": "0.6", "snow": "on",
         "hieroglyphs": "0.6"}
 
 
@@ -93,10 +93,10 @@ def test_the_page_turns_the_logo_as_the_desktop_does(page):
 
 
 def test_a_theme_that_is_no_theme_gives_the_default_one(page):
-    """Names every object has (constructor, toString) are not themes; the page draws NixOS snow."""
-    nixos = page("state", 1280, 720, f"t={MOMENT}&hud=0&theme=nixos")
+    """Names every object has (constructor, toString) are not presets; the page draws the default one."""
+    default = page("state", 1280, 720, f"t={MOMENT}&hud=0&preset=syncrain")
     for name in ("constructor", "toString", "__proto__"):
-        assert page("state", 1280, 720, f"t={MOMENT}&hud=0&theme={name}") == nixos, name
+        assert page("state", 1280, 720, f"t={MOMENT}&hud=0&theme={name}") == default, name
 
 
 #: A settings file with every setting moved, and symbol sets of the shipped glyphs only (others are
@@ -178,7 +178,7 @@ def test_a_settings_file_with_only_sets_leaves_nothing_of_the_last_one(page, tmp
     sets.write_text(json.dumps({"contract": "syncrain-config-1", "glyphs": {"sets": [{"name": "d", "chars": "0123"}]}}))
     symbols.write_text(json.dumps({"sets": [{"name": "e", "chars": "4567"}]}))
     said = page("symbols", first, sets)
-    assert said["loaded"] == "" and (said["exported"]["speed"], said["exported"]["preset"]) == (1, "nixos")
+    assert said["loaded"] == "" and (said["exported"]["speed"], said["exported"]["preset"]) == (1, "syncrain")
     said = page("symbols", first, symbols)
     assert said["loaded"] == "" and said["exported"]["speed"] == 2
     assert [s["name"] for s in said["exported"]["glyphs"]["sets"]] == ["e"]
@@ -207,7 +207,7 @@ def test_the_new_look_settings_draw_the_same_frame_on_the_page_and_the_desktop(p
                 "rain_colors": ["#202040", "#8040c0", [0.9, 0.7, 1.0], "#ffffff"], "glow_color": "#6030a0",
                 "background_colors": ["#050008", "#0a0010", "#200838"], "vignette": 0.3, "cycle": 45, "flavours": 7,
                 "flavour_layout": "random", "logo": "data:image/png;base64," + base64.b64encode(texture.read_bytes()).decode(),
-                "logo_size": 0.3, "logo_cycle": 0, "snow": True, "words": ["HELLO", "SYNC"]}
+                "logo_size": 0.3, "logo_cycle": 0, "logo_color": "#ffaa33", "snow": True, "words": ["HELLO", "SYNC"]}
     path, web, native = tmp_path / "config.json", tmp_path / "web.png", tmp_path / "native.png"
     for layout in ("random", "wave"):
         path.write_text(json.dumps(dict(settings, flavour_layout=layout)), encoding="utf-8")
@@ -222,11 +222,11 @@ def test_the_new_look_settings_draw_the_same_frame_on_the_page_and_the_desktop(p
 def test_one_flavour_and_no_cycle_is_the_picture_as_it_was(page, tmp_path):
     """The default stays: flavours 1 draws what a page without flavours drew."""
     plain, one = tmp_path / "plain.png", tmp_path / "one.png"
-    page("shot", plain, 640, 360, f"t={MOMENT}&hud=0")
-    page("shot", one, 640, 360, f"t={MOMENT}&hud=0&flavours=1&cycle=0")
+    page("shot", plain, 640, 360, f"t={MOMENT}&hud=0&preset=nixos")
+    page("shot", one, 640, 360, f"t={MOMENT}&hud=0&preset=nixos&flavours=1&cycle=0")
     assert mean_abs_diff(plain, one) == 0
     many = tmp_path / "many.png"
-    page("shot", many, 640, 360, f"t={MOMENT}&hud=0&flavours=12")
+    page("shot", many, 640, 360, f"t={MOMENT}&hud=0&preset=nixos&flavours=12")
     assert mean_abs_diff(plain, many) > 1.0, "twelve flavours are another picture"
 
 
@@ -252,7 +252,7 @@ def test_a_picture_picked_as_the_logo_goes_into_the_settings_file(page, tmp_path
 @pytest.mark.parametrize("given, then", [
     ({"theme": "matrix", "snow": True, "rainbow": "off"}, {"preset": "matrix", "snow": False, "logo_cycle": 0}),
     ({"theme": "matrix", "preset": None}, {"preset": "matrix"}),
-    ({"rainbow": "off", "logo_cycle": None}, {"logo_cycle": 0}),
+    ({"preset": "nixos", "rainbow": "off", "logo_cycle": None}, {"logo_cycle": 0}),
     ({"logo_cycle": 30, "rainbow": "off"}, {"logo_cycle": 0}),
     ({"words": [" HI", "THERE "]}, {"words": ["HI", "THERE"]}),
 ], ids=["build-21-matrix", "a-null-is-no-value", "rainbow-off", "rainbow-where-it-stands", "words-as-the-desktop-reads"])

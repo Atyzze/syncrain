@@ -49,7 +49,7 @@ git clone https://github.com/Atyzze/syncrain && cd syncrain   # or unpack SYNCRA
 with `syncrain.nixosModules.default` (or `homeManagerModules.default`). Options: `enable`,
 `package`, `settings` (a `config.json` from the page), `theme` (the preset), `channel`, `fps`,
 `rainColors`, `glowColor`, `backgroundColors`, `vignette`, `flavours`, `flavourLayout`, `cycle`,
-`logo` (a name or a picture), `logoSize`, `logoCycle`, `words`, `background`, `mask`, `rainbow`,
+`logo` (a name or a picture), `logoColor`, `logoSize`, `logoCycle`, `words`, `background`, `mask`, `rainbow`,
 `spin`, `drift`, `speed`, `density`, `glow`, `bloom`, `bgGain`, `snow`, `hieroglyphs`, `scale`,
 `pauseUnder`, `layer`, `extraArgs` (`nix/options.nix`). Without installing:
 `nix run github:Atyzze/syncrain -- --window`.
@@ -60,7 +60,7 @@ the session's environment.
 
 **Browser**: `index.html` at the top of the folder, one self-contained file; Settings tries every
 option live and saves them for the desktop (below). As a wallpaper page, URL parameters: `preset`,
-`channel`, `fps`, `logo`, `logo-size`, `logo-cycle`, `cycle`, `flavours`, `flavour-layout`,
+`channel`, `fps`, `logo` (`syncrain`, `nixos`, `nixos-colours`, `none`), `logo-size`, `logo-cycle`, `cycle`, `flavours`, `flavour-layout`,
 `vignette`, `spin`, `drift`, `speed`, `density`, `glow`, `bloom`, `bg-gain`, `snow=off`,
 `hieroglyphs`, `scale`, `hud=0` (no control strip or settings), `t=<unix seconds>` (frozen clock).
 A Plasma web-wallpaper plugin can host it, behind the desktop icons.
@@ -69,21 +69,22 @@ A Plasma web-wallpaper plugin can host it, behind the desktop icons.
 
 | Flag | Default | Meaning |
 | --- | --- | --- |
-| `--preset` | `nixos` | Where the look starts: `nixos` or `matrix` (`--theme` is the earlier name); `--list-themes` prints them |
+| `--preset` | `syncrain` | Where the look starts: `syncrain`, `nixos` or `matrix` (`--theme` is the earlier name); `--list-themes` prints them |
 | `--channel` | `public` | Stream name: same name, synced clock, same frame |
 | `--fps` | `30` | Cap; frames land on whole refreshes (every 2nd at 60 Hz) |
 | `--host` | `auto` | Wayland: `auto` (native when built, else GTK), `native` (only), `gtk` |
 | `--pause-under` | `maximized` | KDE: stop a screen under a maximized or full-screen window; `fullscreen`, `never` |
 | `--rain-colors C,C,C,C` | preset's | The rain's gradient, dark, middle, bright, then the leading symbol: `#rrggbb` (or `r/g/b`, 0 to 1) |
 | `--glow-color C` | preset's | The glow round the rain |
-| `--flavours N` | `1` | Colours at once, 1 to 64: each column one of N hues round the colour wheel |
-| `--flavour-layout` | `random` | `random`: the columns' hues by the channel; `wave`: in order across the screen |
-| `--cycle S` | `0` | Seconds a turn of the colour wheel, every flavour together (an RGB keyboard's rainbow); 0 = the colours stay |
+| `--flavours N` | preset's | Colours at once, 1 to 64: each column one of N hues round the colour wheel |
+| `--flavour-layout` | preset's | `random`: the columns' hues by the channel; `wave`: in order across the screen |
+| `--cycle S` | preset's | Seconds a turn of the colour wheel, every flavour together (an RGB keyboard's rainbow); 0 = the colours stay |
 | `--background-colors C,C,C` | preset's | The background gradient: top, bottom, centre glow |
 | `--vignette F` | preset's | How much darker the corners are, 0 to 1 |
-| `--logo` | preset's | `nixos`, `nixos-colours`, `none`, or a picture file (PNG or JPEG) |
-| `--logo-size F` | `0.4` | The logo's height in screen heights, 0.05 to 0.9 |
-| `--logo-cycle S` | `90` | Seconds a turn of the logo's rainbow; 0 = its own colours |
+| `--logo` | preset's | `syncrain`, `nixos`, `nixos-colours`, `none`, or a picture file (PNG or JPEG) |
+| `--logo-color C` | its own | One colour over the logo's shape, any logo or picture; `own` for its own colours |
+| `--logo-size F` | preset's | The logo's height in screen heights, 0.05 to 0.9 |
+| `--logo-cycle S` | preset's | Seconds a turn of the logo's rainbow (over its colour); 0 = its own colours |
 | `--words W,W` | preset's | The hidden words that fall now and then (`--words=` for none) |
 | `--background IMAGE` | - | An image instead of the gradient, darkened by `--bg-gamma` (2.0) and `--bg-gain` (0.42) |
 | `--mask IMAGE` | - | Greyscale mask for the background: white stays bright, rain passes behind |
@@ -138,7 +139,8 @@ other desktop. Then **Save config.json** (or **Copy**) and, in the syncrain fold
   too, so a symbols file cannot draw others. Colours are `"#rrggbb"`, or three numbers 0 to 1.
 * A picture as the logo is made into the logo's texture by the page (a square, the picture in its
   middle two thirds) and kept in the file as a PNG (`data:image/png;base64,...`): the desktop draws
-  those very pixels. `--logo FILE` makes one the same way from a file.
+  those very pixels. `--logo FILE` makes one the same way from a file. **Colour** puts one colour
+  over any logo's shape (a picture's too), and over its glow.
 * **Colours at once**: each column of rain takes one of that many hues, the gradient turned round
   the colour wheel; by the channel (the same columns on every machine) or as a wave across the
   screen. **Colour cycle** turns them all round the wheel together, like an RGB keyboard's rainbow.
@@ -206,19 +208,22 @@ picture or font it cannot use).
 * **A video**: `syncrain --time 1791331200 --record /tmp/frames --size 1920x1080`, then
   `ffmpeg -framerate 30 -i /tmp/frames/frame_%05d.png -c:v libx264 -crf 17 -pix_fmt yuv420p rain.mp4`.
 * **The README's pictures** (`docs/images/`; redo when the stream changes): under Xvfb with
-  `GDK_BACKEND=x11`, `syncrain --window --size 1600x900 --time 1791331207 --screenshot nixos.png`
-  (and `--preset matrix`); save as JPEG with Pillow, `quality=90, subsampling=0, progressive=True`.
+  `GDK_BACKEND=x11`, `syncrain --config none --window --size 1600x900 --time 1791331207 --screenshot
+  syncrain.png` (and `--preset nixos`); save as JPEG with Pillow, `quality=90, subsampling=0, progressive=True`.
 * **An RGB keyboard's rainbow**: `syncrain --flavours 64 --flavour-layout wave --cycle 20` (a rainbow
   across the screen, turning every 20 s); `--flavours 6 --cycle 60` for six colours by the channel.
 * **A picture behind the rain**: `syncrain --background <picture.png>`, with `--mask <mask.png>` to
   keep part of it bright and the rain behind it.
+* **syncrain's logo**: `syncrain/data/logo-syncrain.svg` is its drawing; after a change,
+  `python3 tools/build_logo.py` makes the texture (and the stream changes).
 * **New assets**: `python3 tools/build_assets.py --hieroglyph-font <NotoSansEgyptianHieroglyphs.ttf>`
   (add `--nixos-artwork <checkout>` to redraw the logos), then `python3 tools/build_web.py`; a new
   atlas or preset changes the stream.
 
 ## Credits and licences
 
-Code: MIT (`LICENSE`). The NixOS snowflake: Simon Frankau and Tim Cuthbertson (NixOS/nixos-artwork),
+Code: MIT (`LICENSE`). syncrain's logo (`syncrain/data/logo-syncrain.svg`): the operator's, drawn
+from their picture. The NixOS snowflake: Simon Frankau and Tim Cuthbertson (NixOS/nixos-artwork),
 CC BY 4.0; NixOS is a trademark of the NixOS Foundation. Glyphs from Noto Sans Mono CJK JP (OFL 1.1)
 and DejaVu Sans; Egyptian hieroglyphs from Noto Sans Egyptian Hieroglyphs (OFL 1.1). Wayland
 protocol files in `syncrain/native/protocols/`: wayland-protocols and wlr-protocols, MIT-style, as
