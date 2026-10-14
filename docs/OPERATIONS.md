@@ -89,10 +89,10 @@ A Plasma web-wallpaper plugin can host it, behind the desktop icons.
 | `--background IMAGE` | - | An image instead of the gradient, darkened by `--bg-gamma` (2.0) and `--bg-gain` (0.42) |
 | `--mask IMAGE` | - | Greyscale mask for the background: white stays bright, rain passes behind |
 | `--rainbow` | `logo` | The earlier spelling: `all` is `--cycle 600`, `off` is `--logo-cycle 0` |
-| `--spin S` | `180` | Seconds per logo turn; 0 = still |
-| `--drift F` | `0.03` | Logo orbit (or image pan) in screen heights; 0 = fixed |
-| `--bg-gain F` | `1` | Background brightness; lower is darker (0.42 with `--background`) |
-| `--glow F` | `1` | Glow around the centre and the logo, 0 (none) to 2 |
+| `--spin S` | preset's (300; 180 nixos, matrix) | Seconds per logo turn; 0 = still |
+| `--drift F` | preset's (0; 0.03 nixos, matrix) | Logo orbit (or image pan) in screen heights; 0 = fixed |
+| `--bg-gain F` | `1` | Background brightness; lower is darker (0.42 with `--background`). The syncrain preset's background is black: give it `--background-colors` to see this |
+| `--glow F` | `1` | Glow around the centre and the logo, 0 (none) to 2; the syncrain preset has none to scale |
 | `--bloom F` | `1` | Glow around the falling symbols, 0 (none) to 2 |
 | `--speed F` | `1` | Fall speed, 0.25 to 4 |
 | `--density F` | `1` | How often a column starts a stream, 0 to 2.3 |

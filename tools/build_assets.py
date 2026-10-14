@@ -87,23 +87,33 @@ MATRIX_GLYPHS = {'balance': 'sets', 'sets': [
     {'name': 'digits', 'chars': G.DIGITS, 'weight': 16},
     {'name': 'symbols', 'chars': G.MATRIX_SYMS, 'weight': 7.2},
     {'name': 'hieroglyphs', 'chars': G.HIEROGLYPHS + G.HIEROGLYPHS_MORE, 'share': 0.15}]}
+SYNCRAIN_GLYPHS = {'balance': 'sets', 'sets': [
+    {'name': 'katakana', 'chars': G.KATAKANA, 'weight': 135, 'mirror': True},
+    {'name': 'digits', 'chars': '01234589', 'weight': 16},
+    {'name': 'symbols', 'chars': 'Z:.=*+-<>¦|sSs"', 'weight': 7.2},
+    {'name': 'hieroglyphs', 'chars': G.HIEROGLYPHS + G.HIEROGLYPHS_MORE, 'share': 0.15}]}
 MATRIX_COLORS = {'deep': [0.0, 0.62, 0.22], 'mid': [0.12, 1.0, 0.36], 'pale': [0.6, 1.0, 0.68],
                  'head': [0.85, 1.0, 0.9], 'glow': [0.04, 0.6, 0.22]}
 MATRIX_BACKGROUND = {'mode': 'gradient', 'top': rgb('#020604'), 'bottom': rgb('#03090a'),
                      'center': rgb('#06180f'), 'vignette': 0.4}
 
 themes = {
-    # the operator's own (their settings file of 2026-10-14): the matrix colours, 64 of them at once
-    # turning every 55 s, their logo (drawn as logo-syncrain.svg) in its own colour, more bloom
+    # the operator's own (their settings file of 2026-10-14, 22:33): the matrix colours with a white
+    # tail and a bright glow, 64 of them at once in a wave across the screen turning every 440 s, the
+    # NixOS logo turning its rainbow every 30 s, a black background, twice build 23's bloom; their
+    # digits (no 6 or 7) and `sSs` among the symbols
     'syncrain': {
         'label': 'Syncrain',
-        'glyphs': MATRIX_GLYPHS,
+        'glyphs': SYNCRAIN_GLYPHS,
         'wordText': ['AI', 'sSs', 'NEURAL', 'TENSOR', 'AGENT', 'LINUX', 'ONLINE', 'MATRIX'],
-        'colors': MATRIX_COLORS,
-        'background': MATRIX_BACKGROUND,
-        'logo': {'default': 'syncrain', 'size': 0.34, 'glow': [0.3, 0.9, 0.6], 'glowStrength': 0.0,
-                 'spin': 180, 'hueCycle': 0, 'drift': 0.03},
-        'rain': dict(RAIN, bloom=2.5, cycle=55, flavours=64, flavourLayout='random'),
+        'colors': dict(MATRIX_COLORS, deep=[1.0, 1.0, 1.0], glow=rgb('#00ff51')),
+        # their background gain 0 drew it black whatever its colours: black colours draw the same
+        'background': {'mode': 'gradient', 'top': [0.0, 0.0, 0.0], 'bottom': [0.0, 0.0, 0.0],
+                       'center': [0.0, 0.0, 0.0], 'vignette': 0.66},
+        'logo': {'default': 'white', 'size': 0.35, 'glow': [0.3, 0.9, 0.6], 'glowStrength': 0.0,
+                 'spin': 300, 'hueCycle': 30, 'drift': 0.0},
+        # bloom 5: their 2 times build 23's 2.5, so the slider's 1 is their look
+        'rain': dict(RAIN, bloom=5.0, cycle=440, flavours=64, flavourLayout='wave'),
         'snow': SNOW,
         'snowDefault': False,
     },

@@ -28,7 +28,7 @@ in
     type = types.nullOr (types.enum [ "syncrain" "nixos" "matrix" ]);
     default = null;
     description = ''
-      The preset the look starts from: `syncrain` (green, 64 colours turning, syncrain's logo),
+      The preset the look starts from: `syncrain` (green, 64 colours in a wave, the NixOS logo),
       `nixos` (ice blue, snow, the NixOS logo) or `matrix` (green). Null: the settings file's, else syncrain.
     '';
   };
@@ -146,13 +146,13 @@ in
   spin = mkOption {
     type = types.nullOr types.ints.unsigned;
     default = null;
-    description = "Seconds per logo revolution (null: 180; 0: still).";
+    description = "Seconds per logo revolution (null: the preset's, 300 for syncrain, 180 for nixos and matrix; 0: still).";
   };
 
   drift = mkOption {
     type = types.nullOr (types.numbers.between 0.0 0.2);
     default = null;
-    description = "Slow orbit of the logo, or pan of a background image, in screen heights (null: 0.03; 0: fixed).";
+    description = "Slow orbit of the logo, or pan of a background image, in screen heights (null: the preset's, 0 for syncrain, 0.03 for nixos and matrix; 0: fixed).";
   };
 
   speed = mkOption {

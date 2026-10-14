@@ -140,8 +140,10 @@ def test_diagnose_without_opengl_says_so_first(app):
                                     ["--bg-gain", "0.3"], ["--snow", "on"], ["--hieroglyphs", "0"]],
                          ids=lambda o: o[0][2:])
 def test_each_picture_option_changes_the_picture(app, tmp_path, option):
+    # the syncrain preset has no logo glow and a black background, so those two are seen under nixos
+    base = ["--preset", "nixos"] if option[0] in ("--glow", "--bg-gain") else []
     plain, changed = tmp_path / "plain.png", tmp_path / "changed.png"
-    for path, extra in ((plain, []), (changed, option)):
+    for path, extra in ((plain, base), (changed, base + option)):
         done = app(["--window", "--size", "640x360", "--time", str(MOMENT), "--screenshot", str(path), *extra])
         assert done.returncode == 0, done.stderr
     assert mean_abs_diff(plain, changed) > 0.05

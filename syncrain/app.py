@@ -320,20 +320,24 @@ def parse_args(argv=None):
     ap.add_argument("--mask", type=_image, metavar="IMAGE", help="greyscale mask (same framing as --background): white = keep bright, no rain")
     ap.add_argument("--bg-gamma", type=_number(above=0), help="darkening curve for --background (default 2.0; 1 = unchanged)")
     ap.add_argument("--bg-gain", type=_number(low=0),
-                    help="background brightness: the gradient's (default 1; lower is darker) or --background's "
-                         "(default 0.42; 1 = unchanged)")
+                    help="background brightness: the gradient's (default 1; lower is darker; the syncrain preset's "
+                         "gradient is black) or --background's (default 0.42; 1 = unchanged)")
     ap.add_argument("--rainbow", choices=("logo", "all", "off"), action=_Rainbow,
                     help="the earlier spelling of --logo-cycle and --cycle: logo (as is), all (--cycle 600) or "
                          "off (--logo-cycle 0)")
-    ap.add_argument("--spin", type=_number(), metavar="SECONDS", help="seconds per logo revolution (default 180, 0 = still)")
+    ap.add_argument("--spin", type=_number(), metavar="SECONDS",
+                    help="seconds per logo revolution (the preset's otherwise: 300 for syncrain, 180 for nixos "
+                         "and matrix; 0 = still)")
     ap.add_argument("--drift", type=_number(), metavar="FRACTION",
-                    help="slow orbit of the logo / pan of the image, in screen heights (default 0.03, 0 = fixed)")
+                    help="slow orbit of the logo / pan of the image, in screen heights (the preset's otherwise: "
+                         "0 for syncrain, 0.03 for nixos and matrix; 0 = fixed)")
     ap.add_argument("--speed", type=_number(above=0), metavar="F",
                     help="how fast the symbols fall, times the preset's (default 1; 0.25 to 4)")
     ap.add_argument("--density", type=_number(low=0), metavar="F",
                     help="how often a column starts a new stream, times the preset's (default 1; 0 to 2.3)")
     ap.add_argument("--glow", type=_number(low=0), metavar="F",
-                    help="the glow around the centre and the logo, times the preset's (default 1; 0 = none)")
+                    help="the glow around the centre and the logo, times the preset's (default 1; 0 = none; the "
+                         "syncrain preset has none)")
     ap.add_argument("--bloom", type=_number(low=0), metavar="F",
                     help="the glow around the falling symbols, times the preset's (default 1; 0 = none)")
     ap.add_argument("--snow", choices=("on", "off"), help="the falling snowflakes (the preset's otherwise: on for nixos, off for syncrain and matrix)")

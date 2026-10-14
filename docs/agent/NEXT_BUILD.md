@@ -1,13 +1,13 @@
-# The next build is 24
+# The next build is 25
 
 The first line is parsed: `# The next build is <N>`, exactly one above `BUILD_NUMBER`.
 
-## Build 24: what the operator asks next
+## Build 25: what the operator asks next
 
 * Read what the operator sent last, and answer it in one plain sentence first.
-* Build 23 made their own look the default (the `syncrain` preset, their logo as an SVG) and added
-  one colour over any logo; fix first what they find, and ask whether the logo is right.
-* With nothing asked: the boot splash (`docs/ROADMAP.md`, "Planned builds"), or an open item.
+* Build 24 made their settings file of 2026-10-14 22:33 the default; fix first what they find.
+* Then the lock screen (`docs/ROADMAP.md`, "Planned builds" 1): the rain and syncrain's own box,
+  optional; the boot splash through the LUKS prompt after it.
 
 **Known blockers**: watts, NVIDIA's driver and Plasma's shell exist only on the operator's machine;
 a real greetd and PAM only there too (the lanes speak to a stand-in). The page's Save inside the

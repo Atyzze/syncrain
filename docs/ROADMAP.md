@@ -12,6 +12,11 @@ Open questions, planned builds, the cadence and the constraints. What shipped: `
 
 ## Decisions answered
 
+* **2026-10-14 22:44**: the lock screen too, "a login box in the midde of our own", and "booted up
+  as soon as possible, even before LUKS pwd is asked". Builds 25 and 26 (below).
+* **2026-10-14 22:33**: "can we push this as new default template for syncrain on our github
+  please", their settings file attached; the lock screen "still goes back to plasma thing" (Plasma's
+  kscreenlocker; syncrain has not drawn it since build 15). Build 24.
 * **2026-10-14 19:53**: their settings file as a preset and the default, "nixos logo remains
   selectable"; their logo cleaned up, "perhaps turn it into a svg"; "a color slider for the
   potential logo in the middle, as an overide color channel on a user chosen png". Build 23.
@@ -37,8 +42,12 @@ Open questions, planned builds, the cadence and the constraints. What shipped: `
 
 ## Planned builds
 
-1. **The boot splash**: a still frame of the rain (Plymouth), until the login screen's live one.
-2. **A NixOS image** with syncrain as its wallpaper and login screen.
+1. **The lock screen** (25): the rain with syncrain's own box in the middle, as the login screen
+   has; optional, as the login screen is. First: what KWin 6 on their machine offers a locker
+   (ext-session-lock-v1, or kscreenlocker's greeter), measured there.
+2. **The boot splash through the LUKS prompt** (26): a Plymouth theme drawing the rain, with the
+   disk password asked in syncrain's box, until the login screen's live rain. Optional.
+3. **A NixOS image** with syncrain as its wallpaper and login screen.
 
 ## Open items
 

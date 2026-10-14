@@ -248,11 +248,18 @@ def test_one_colour_over_the_logo_and_its_own_again(tmp_path):
 
 
 def test_the_default_is_the_operator_s_own_look():
-    from syncrain import engine
-    from syncrain.renderer import from_args
+    from syncrain.renderer import from_args, static_uniforms
     r = from_args(parse_args(["--config", "none"]), glyphs="theme")
-    assert (r.theme_name, r.logo_choice, r.th["rain"]["flavours"], r.th["rain"]["cycle"]) == ("syncrain", "syncrain", 64, 55)
+    assert (r.theme_name, r.logo_choice, r.th["rain"]["flavours"], r.th["rain"]["cycle"],
+            r.th["rain"]["flavourLayout"]) == ("syncrain", "white", 64, 440, "wave")
     assert "sSs" in r.th["wordText"] and r.look["snow"] is False
+    # their settings file of 2026-10-14 22:33 over build 23's preset: bloom 2 times 2.5, the background
+    # at gain 0 (black colours draw the same), no glow, the NixOS logo's rainbow every 30 s
+    uniforms = {n: v for _, n, _, v in static_uniforms(r)}
+    assert uniforms["uBloomK"] == (5.0,) and uniforms["uLogoGlowK"] == (0.0,)
+    assert r.th["background"]["top"] == r.th["background"]["center"] == [0.0, 0.0, 0.0]
+    assert r.th["colors"]["deep"] == [1.0, 1.0, 1.0] and r.th["colors"]["glow"] == [0.0, 1.0, 0.3176]
+    assert (r.th["logo"]["spin"], r.th["logo"]["hueCycle"], r.th["logo"]["drift"], r.th["logo"]["size"]) == (300, 30, 0.0, 0.35)
     nixos = from_args(parse_args(["--config", "none", "--preset", "nixos"]), glyphs="theme")
     assert nixos.logo_choice == "white" and nixos.th["rain"]["flavours"] == 1, "nixos as it was"
-    assert from_args(parse_args(["--config", "none", "--logo", "nixos"]), glyphs="theme").logo_choice == "white"
+    assert from_args(parse_args(["--config", "none", "--logo", "syncrain"]), glyphs="theme").logo_choice == "syncrain"

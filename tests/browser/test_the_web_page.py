@@ -39,11 +39,16 @@ def page(root):
 
 
 #: Every picture option, as the page's URL says it and as the command line does.
-LOOK = {"speed": "0.5", "density": "1.7", "glow": "0.3", "bloom": "0.5", "bg-gain": "0.6", "snow": "on",
+LOOK = {"speed": "0.5", "density": "1.7", "glow": "0.3", "bloom": "0.25", "bg-gain": "0.6", "snow": "on",
         "hieroglyphs": "0.6"}
+#: The bloom is blurred in 8-bit textures, whose last bit Chromium's rasterizer and Mesa's round
+#: differently, and the bloom's gain multiplies that: with it off the two are 0.03 apart, at the
+#: syncrain preset's gain of 5 1.24, all of it spread evenly. So the frames are compared at a gain of
+#: 1.25 (the option's 0.25, as matrix draws), and every other pass with the bloom off, to 0.15.
+EVEN_BLOOM = {"bloom": "0.25"}
 
 
-@pytest.mark.parametrize("look", [{}, LOOK], ids=["defaults", "every-option"])
+@pytest.mark.parametrize("look", [EVEN_BLOOM, LOOK], ids=["defaults", "every-option"])
 def test_the_page_and_the_app_draw_the_same_frame(page, app, tmp_path, look):
     web, native = tmp_path / "web.png", tmp_path / "native.png"
     page("shot", web, 1280, 720, f"t={MOMENT}&hud=0" + "".join(f"&{k}={v}" for k, v in look.items()))
@@ -56,10 +61,25 @@ def test_the_page_and_the_app_draw_the_same_frame(page, app, tmp_path, look):
 def test_a_narrow_wallpaper_page_draws_what_a_narrow_desktop_does(page, app, tmp_path):
     """Under 768 px a cell stops shrinking at 12 px on both, so both show the middle of the stream."""
     web, native = tmp_path / "web.png", tmp_path / "native.png"
-    page("shot", web, 640, 360, f"t={MOMENT}&hud=0")
-    done = app(["--window", "--size", "640x360", "--time", str(MOMENT), "--screenshot", str(native)])
+    page("shot", web, 640, 360, f"t={MOMENT}&hud=0&bloom={EVEN_BLOOM['bloom']}")
+    done = app(["--window", "--size", "640x360", "--time", str(MOMENT), "--screenshot", str(native),
+                "--bloom", EVEN_BLOOM["bloom"]])
     assert done.returncode == 0, done.stderr
     assert mean_abs_diff(web, native) < 1.0
+
+
+@pytest.mark.parametrize("look", [{}, LOOK, dict(LOOK, preset="nixos")],
+                         ids=["defaults", "every-option", "every-option-nixos"])
+def test_with_the_bloom_off_the_page_and_the_app_agree_closely(page, app, tmp_path, look):
+    """Every pass but the bloom: the preset's colours, wave, logo and background as they are; under
+    nixos, whose background and logo glow the syncrain preset lacks, the glow and bg-gain too."""
+    look = dict(look, bloom="0")
+    web, native = tmp_path / "web.png", tmp_path / "native.png"
+    page("shot", web, 1280, 720, f"t={MOMENT}&hud=0" + "".join(f"&{k}={v}" for k, v in look.items()))
+    options = [x for k, v in look.items() for x in ("--" + k, v)]
+    done = app(["--window", "--size", "1280x720", "--time", str(MOMENT), "--screenshot", str(native), *options])
+    assert done.returncode == 0, done.stderr
+    assert mean_abs_diff(web, native) < 0.15
 
 
 def test_screens_of_one_shape_share_one_stream(page):

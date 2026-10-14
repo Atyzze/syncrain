@@ -2,12 +2,13 @@
 
 A live code-rain wallpaper that never loops and stays in sync across machines: every frame is a
 function of the UTC clock and a channel name. Your colours (one, or many at once, cycling like an
-RGB keyboard), your logo and your symbols, starting from a preset: **syncrain** (the default: green,
-64 colours at once turning, syncrain's own logo), **nixos** (blue rain, snow, the NixOS snowflake)
+RGB keyboard), your logo and your symbols, starting from a preset: **syncrain** (the default: 64
+colours at once, a rainbow across the screen turning every 440 s, the NixOS logo in a turning rainbow,
+black behind), **nixos** (blue rain, snow, the NixOS snowflake)
 or **matrix** (green). A wallpaper on Linux (Wayland, X11) and a web page.
 
 <p align="center">
-  <img src="docs/images/syncrain.jpg" width="49%" alt="The syncrain preset: katakana, digits and hieroglyphs falling in columns over black, each column its own colour, around syncrain's logo, a ring with a figure inside">
+  <img src="docs/images/syncrain.jpg" width="49%" alt="The syncrain preset: katakana, digits and hieroglyphs falling in columns over black, the colours in a rainbow wave across the screen, around the NixOS snowflake in rainbow colours">
   <img src="docs/images/nixos.jpg" width="49%" alt="The nixos preset: pale blue characters and Egyptian hieroglyphs falling in columns over dark blue, with snowflakes and the NixOS snowflake in rainbow colours in the middle">
 </p>
 <p align="center"><sub>The channel <code>public</code> at 2026-10-07 00:00:07 UTC.
