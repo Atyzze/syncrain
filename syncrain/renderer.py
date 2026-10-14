@@ -407,13 +407,17 @@ class Renderer:
         self.motion = engine.motion(self.th, rainbow=rainbow, spin=spin, drift=drift)
         self.look = engine.look(self.th, speed=speed, density=density, snow=snow, glow=glow, bloom=bloom,
                                 hieroglyphs=hieroglyphs)
-        # the symbols: a symbols file (`glyphs`, else ~/.config/syncrain/glyphs.json if there is one),
-        # else the theme's own sets
+        # the symbols: a settings file's sets, or a symbols file (`glyphs`, else
+        # ~/.config/syncrain/glyphs.json if there is one), else the theme's own sets
         def warn(why):
             print(f"syncrain: {why}", file=sys.stderr, flush=True)
         try:
-            self.glyphs = glyph_sets.for_theme(self.meta, self.th, data_dir, path=glyphs,
-                                               hieroglyphs=self.look["hieroglyphs"], warn=warn)
+            if isinstance(glyphs, dict):          # a settings file's sets (syncrain/app.py, --config)
+                self.glyphs = glyph_sets.resolve(self.meta, self.th, data_dir, glyphs, "the settings file",
+                                                 self.look["hieroglyphs"])
+            else:
+                self.glyphs = glyph_sets.for_theme(self.meta, self.th, data_dir, path=glyphs,
+                                                   hieroglyphs=self.look["hieroglyphs"], warn=warn)
         except Exception as e:  # noqa: BLE001 - a file's characters or font it cannot use: the theme's still work
             self.theme_glyphs(e, data_dir)
         self.data_dir = data_dir

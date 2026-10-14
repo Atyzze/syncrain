@@ -24,10 +24,14 @@ syncrain                     # as your wallpaper (Ctrl+C stops it)
 ./install.sh --login-screen  # optional: also the login screen (greetd)
 ```
 
+**Try every setting first**: open `web/index.html`, press Settings, move anything and watch the rain
+change, then Save config.json and run `./install.sh --config config.json`. The desktop draws what the
+page showed.
+
 * **The login screen is optional**: without `--login-screen` the installer leaves yours as it is,
   and `./install.sh --login-screen-off` puts it back.
 * **NixOS**: `nix run github:Atyzze/syncrain -- --window`; the flake has NixOS and home-manager modules.
-* **Browser**: open `web/index.html`.
+* **Browser**: open `web/index.html`; as a web wallpaper, its URL takes the options (`hud=0` hides the controls).
 
 Options, other systems, power and recipes: [`docs/OPERATIONS.md`](docs/OPERATIONS.md).
 

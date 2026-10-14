@@ -1,4 +1,4 @@
-# Where we are, at build 20
+# Where we are, at build 21
 
 The project on one page. Detail: `docs/agent/HANDOFF.md`.
 
@@ -26,17 +26,16 @@ name, so everyone on a channel sees the same rain. Linux (Wayland, X11) and the 
   and a login box on every screen (a second factor asked there too), then Plasma, its splash and
   wallpaper a still of the rain. A failure falls back to a text login. Optional: without it the
   installer never touches your login, and `--login-screen-off` puts back what started at boot.
+* **Try every setting on the page** (build 21): open `web/index.html` (or the live page), press
+  Settings, move anything, watch the rain change, Save config.json, then `./install.sh --config
+  config.json`. Your desktop draws what the page showed.
 * **A review of build 17**: builds 18 and 19 fixed what matters now; a few small items are open
   (`docs/ROADMAP.md`, "Open items").
-* **Build 20** changes nothing on screen: the documents are checked against the code and short
-  again.
-* **On GitHub**: github.com/Atyzze/syncrain, every build up to 19.
+* **On GitHub**: github.com/Atyzze/syncrain, every build up to 20.
 
 ## What comes next
 
-* **Build 21**: the page as a live previewer of every option and symbol set, exporting a
-  `config.json` the desktop draws exactly alike.
-* **Then**: the boot splash; a NixOS image.
+* **Next**: what you ask for; else the boot splash, then a NixOS image.
 * **Build 30**: the next consolidation (every number ending in 0).
 
 ## The decision in front of you

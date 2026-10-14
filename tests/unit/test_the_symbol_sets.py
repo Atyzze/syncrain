@@ -68,7 +68,7 @@ def test_a_wallpaper_s_atlas_holds_only_what_its_sets_use():
 def test_the_web_page_resolves_the_shares_the_same_way():
     """setShares in web/template.html is this function in JavaScript: the same steps in the same order."""
     page = open(engine.DATA_DIR.replace("syncrain/data", "web/template.html"), encoding="utf-8").read()
-    assert "function setShares(cfg, hieroglyphs)" in page and "rest * weights[i] / total" in page
+    assert "function setShares(g, hieroglyphs)" in page and "rest * weights[i] / total" in page
 
 
 @pytest.mark.parametrize("cfg, says", [

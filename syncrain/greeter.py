@@ -161,8 +161,18 @@ def remember(user: str, session_id: str) -> None:
 
 
 def rain_command(config: dict) -> list[str]:
+    """The rain as the login screen runs it: the operator's settings file where install.sh copied it
+    (else none: the greeter's own folder holds none of theirs), then the options login.json names."""
     args = [str(a) for a in config.get("rain") or []]
-    return [sys.executable, "-m", "syncrain", *args, "--pause-under", "never"]
+    settings = LIB / "config.json"
+    try:
+        has_sets = isinstance(json.loads(settings.read_text(encoding="utf-8")).get("glyphs"), dict)
+    except (OSError, ValueError, AttributeError):
+        has_sets = False
+    if has_sets:                                  # the settings file's sets, as the wallpaper draws them
+        args = [a for i, a in enumerate(args) if a != "--glyphs" and (i == 0 or args[i - 1] != "--glyphs")]
+    return [sys.executable, "-m", "syncrain", "--config", str(settings) if settings.is_file() else "none", *args,
+            "--pause-under", "never"]
 
 
 def preload_layer_shell(argv: list[str]) -> None:

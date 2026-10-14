@@ -19,7 +19,7 @@ ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
 DATA = os.path.join(ROOT, 'syncrain', 'data')
 SH = os.path.join(DATA, 'shaders')
 sys.path.insert(0, ROOT)
-from syncrain import build  # noqa: E402
+from syncrain import build, glyphs  # noqa: E402
 
 SHADER_FILES = {'common': 'common.glsl', 'rain': 'rain.glsl', 'vert': 'fullscreen.vert', 'state': 'state.frag',
                 'field': 'field.frag', 'glyphs': 'glyphs.frag', 'blur': 'blur.frag', 'composite': 'composite.frag'}
@@ -43,6 +43,7 @@ def pages():
     tpl = tpl.replace('/*@META@*/null', json.dumps(meta, ensure_ascii=False, separators=(',', ':')))
     tpl = tpl.replace('/*@SHADERS@*/null', json.dumps(shaders))
     tpl = tpl.replace('/*@IMAGES@*/null', json.dumps(images))
+    tpl = tpl.replace('/*@STARTER@*/null', json.dumps(glyphs.starter()['sets'], ensure_ascii=False, separators=(',', ':')))
     tpl = tpl.replace('/*@BUILD@*/0', str(build.BUILD_NUMBER)).replace('/*@STREAM@*/', build.stream_id())
     tpl = tpl.replace('@BUILD@', str(build.BUILD_NUMBER)).replace('@STREAM@', build.stream_id())
     head = re.search(r'<!--@HEAD-->\n(.*?)<!--@/HEAD-->', tpl, re.S).group(1)

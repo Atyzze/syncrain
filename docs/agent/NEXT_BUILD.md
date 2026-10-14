@@ -1,21 +1,19 @@
-# The next build is 21
+# The next build is 22
 
 The first line is parsed: `# The next build is <N>`, exactly one above `BUILD_NUMBER`.
 
-## Build 21: the previewer page
+## Build 22: what the operator asks next
 
 * Read what the operator sent last, and answer it in one plain sentence first.
-* The operator's request (2026-10-14 15:26): the page becomes a live previewer of every option and
-  symbol set, which exports a `config.json`; the desktop given that file (`./install.sh --config
-  config.json`, or the file in `~/.config/syncrain/`) draws exactly what the page showed.
-* First the open items it depends on (`docs/ROADMAP.md`, "Open items"): L11, L12 and L20, and the
-  page's ranges for `scale` and `fps`.
+* Build 21 made the page a live previewer that saves a settings file; ask how it felt and whether
+  a saved file looks the same on their desktop, and fix what they find first.
+* With nothing asked: the boot splash (`docs/ROADMAP.md`, "Planned builds"), or an open item.
 
 **Known blockers**: watts, NVIDIA's driver and Plasma's shell exist only on the operator's machine;
-a real greetd and PAM only there too (the lanes speak to a stand-in).
+a real greetd and PAM only there too (the lanes speak to a stand-in). The page's Save inside the
+claude.ai viewer needs the `downloads` capability on the artifact (publish with it).
 
-**Acceptance**: the page and the desktop draw the same frame from the same exported config (a
-browser-lane test); every lane passes.
+**Acceptance**: what the operator asked works on the lanes that can show it; every lane passes.
 
 ## How to make a build
 

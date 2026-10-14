@@ -282,8 +282,12 @@ def base_args(args) -> list[str]:
         value = getattr(args, key, None)
         default = {"theme": "nixos", "channel": "public", "scale": 1.0, "fps": 30.0, "pause_under": "maximized",
                    "host": "auto"}.get(key)
+        if key == "glyphs" and not isinstance(value, str):
+            continue                              # the settings file's sets: it is passed on below
         if value is not None and value != default:
-            out += ["--" + key.replace("_", "-"), str(value)]
+            out.append(f"--{key.replace('_', '-')}={value}")
+    if getattr(args, "config_file", None):
+        out.append(f"--config={args.config_file}")
     return out
 
 

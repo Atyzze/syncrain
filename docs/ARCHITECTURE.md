@@ -51,7 +51,20 @@ against burn-in; nothing flashes.
   `--record`, and the fallback. A GLArea per viewport, OpenGL through libepoxy (`syncrain/gl.py`),
   `GSK_RENDERER=gl` and `GDK_DISABLE=dmabuf`.
 * **Web page** (`web/template.html`): WebGL2; `tools/build_web.py` generates `web/index.html` and
-  `web/artifact.html`.
+  `web/artifact.html`. Its settings panel edits one settings object, drawn live, and saves it as
+  the settings file the desktop reads (below). It builds the atlas as `glyphs.resolve` does (only
+  the glyphs used, the words' first), copying shipped glyphs from `glyphs.png` and drawing others
+  with the browser's fonts.
+
+## The settings file (`syncrain/app.py`, `CONFIG_KEYS`)
+
+* `syncrain-config-1`: the picture options by name (`bg_gain` for `--bg-gain`), `null` for the
+  theme's, and `glyphs`, a symbols file's sets. Read before the command line, as if its options were
+  typed first, so they are checked the same way and the command line goes over them.
+* `--config FILE`, else `~/.config/syncrain/config.json` when it is there. The page checks what it
+  loads and saves the same way (`readSettings`, `checkGlyphs`), so a file it saves is one the
+  desktop takes; the browser lane draws one on both and compares.
+* The login screen's rain reads a copy in `/usr/local/lib/syncrain/config.json`.
 
 The lanes compare them: native and GTK host to the pixel (at whole-number scales; at 125% or 150%
 GTK draws more pixels and scales them down), the page within texture filtering on screens

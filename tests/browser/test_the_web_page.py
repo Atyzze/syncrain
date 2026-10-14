@@ -53,6 +53,15 @@ def test_the_page_and_the_app_draw_the_same_frame(page, app, tmp_path, look):
     assert mean_abs_diff(web, native) < 1.0
 
 
+def test_a_narrow_wallpaper_page_draws_what_a_narrow_desktop_does(page, app, tmp_path):
+    """Under 768 px a cell stops shrinking at 12 px on both, so both show the middle of the stream."""
+    web, native = tmp_path / "web.png", tmp_path / "native.png"
+    page("shot", web, 640, 360, f"t={MOMENT}&hud=0")
+    done = app(["--window", "--size", "640x360", "--time", str(MOMENT), "--screenshot", str(native)])
+    assert done.returncode == 0, done.stderr
+    assert mean_abs_diff(web, native) < 1.0
+
+
 def test_screens_of_one_shape_share_one_stream(page):
     small = page("state", 1280, 720, f"t={MOMENT}&hud=0")
     large = page("state", 1920, 1080, f"t={MOMENT}&hud=0")
@@ -88,3 +97,88 @@ def test_a_theme_that_is_no_theme_gives_the_default_one(page):
     nixos = page("state", 1280, 720, f"t={MOMENT}&hud=0&theme=nixos")
     for name in ("constructor", "toString", "__proto__"):
         assert page("state", 1280, 720, f"t={MOMENT}&hud=0&theme={name}") == nixos, name
+
+
+#: A settings file with every setting moved, and symbol sets of the shipped glyphs only (others are
+#: drawn by each side's own fonts, which are not the same pixels).
+SETTINGS = {
+    "contract": "syncrain-config-1", "theme": "matrix", "channel": "friends", "rainbow": "all", "logo": "colours",
+    "spin": 60, "drift": 0.05, "speed": 1.3, "density": 1.2, "glow": 0.7, "bloom": 1.4, "bg_gain": 0.8,
+    "snow": False, "hieroglyphs": 0.3, "fps": 30, "pause_under": "never",
+    "glyphs": {"balance": "glyphs", "sets": [
+        {"name": "katakana", "chars": "アイウエオカキクケコ", "weight": 2, "mirror": True},
+        {"name": "greek", "chars": "ΓΔΘΛΞΠΣΦΨΩ", "share": 0.2},
+        {"name": "digits", "chars": "0123456789 ", "weight": 1},
+        {"name": "hieroglyphs", "chars": "\U00013000\U00013001\U0001302D\U00013050", "weight": 1},
+        {"name": "cyrillic", "chars": "АБВГД", "weight": 0}]},
+}
+
+
+def test_a_settings_file_draws_the_same_frame_on_the_page_and_the_desktop(page, app, tmp_path):
+    """What the settings panel shows is what the desktop draws from the file it saves."""
+    settings, web, native = tmp_path / "config.json", tmp_path / "web.png", tmp_path / "native.png"
+    settings.write_text(json.dumps(SETTINGS, ensure_ascii=False), encoding="utf-8")
+    said = page("configshot", web, 1280, 720, f"t={MOMENT}&hud=0", settings)
+    assert said["loaded"] == ""
+    done = app(["--window", "--size", "1280x720", "--time", str(MOMENT), "--screenshot", str(native),
+                "--config", str(settings)])
+    assert done.returncode == 0, done.stderr
+    assert mean_abs_diff(web, native) < 1.0
+
+
+def test_what_the_settings_panel_saves_the_desktop_takes(page, tmp_path):
+    """Used as a person would at a desk and on a phone: the panel fits, and the file it saves
+    holds what was chosen and is one the desktop reads."""
+    from syncrain.app import parse_args
+    for size, seen in page("studio").items():
+        saved = seen.pop("saved")
+        assert seen == {"overflow": False, "shown": True, "inside": True, "apart": True, "filename": "config.json",
+                        "symbols": {"slots": seen["symbols"]["slots"], "drawn": [], "missing": [], "error": ""}}, size
+        path = tmp_path / f"{size}.json"
+        path.write_text(saved, encoding="utf-8")
+        args = parse_args(["--config", str(path)])
+        assert (args.theme, args.channel, args.speed) == ("matrix", "friends", 1.5), size
+        assert [s["name"] for s in args.glyphs["sets"]] == ["katakana", "digits", "symbols", "hieroglyphs", "greek"]
+
+
+def test_symbols_the_shipped_atlas_does_not_have_are_drawn_by_the_browser(page, tmp_path):
+    path = tmp_path / "config.json"
+    path.write_text(json.dumps({"contract": "syncrain-config-1", "glyphs": {"sets": [
+        {"name": "stars", "chars": "★☆♥"}, {"name": "mirrored", "chars": "AB", "mirror": True},
+        {"name": "digits", "chars": "0123"}]}}, ensure_ascii=False), encoding="utf-8")
+    said = page("symbols", path)
+    assert said["loaded"] == "" and said["symbols"]["error"] == ""
+    assert sorted(said["symbols"]["drawn"] + said["symbols"]["missing"]) == sorted("★☆♥AB")
+
+
+@pytest.mark.parametrize("wrong, says", [
+    ({"speed": "fast"}, "speed is a number"),
+    ({"density": -1}, "density is 0 or more"),
+    ({"theme": "nope"}, "theme is"),
+    ({"colour": "red"}, "no setting"),
+    ({"glyphs": {"sets": [{"name": "a", "chars": "ab", "share": 0.7}, {"name": "b", "chars": "cd", "share": 0.6}]}},
+     "the shares add up to more than 1"),
+    ({"glyphs": {"sets": [{"name": "a", "chars": " \x1c "}]}}, 'a needs "chars"'),
+])
+def test_the_page_refuses_what_the_desktop_refuses(page, tmp_path, wrong, says):
+    from syncrain.app import parse_args
+    path = tmp_path / "config.json"
+    path.write_text(json.dumps(dict({"contract": "syncrain-config-1"}, **wrong)), encoding="utf-8")
+    assert says in page("symbols", path)["loaded"]
+    with pytest.raises(SystemExit) as stopped:
+        parse_args(["--config", str(path)])
+    assert stopped.value.code == 2
+
+
+def test_a_settings_file_with_only_sets_leaves_nothing_of_the_last_one(page, tmp_path):
+    """The desktop reads a missing setting as the default, so the page does too; a symbols file
+    (with or without its contract) changes the sets only."""
+    first, sets, symbols = tmp_path / "a.json", tmp_path / "b.json", tmp_path / "glyphs.json"
+    first.write_text(json.dumps({"contract": "syncrain-config-1", "speed": 2, "theme": "matrix"}))
+    sets.write_text(json.dumps({"contract": "syncrain-config-1", "glyphs": {"sets": [{"name": "d", "chars": "0123"}]}}))
+    symbols.write_text(json.dumps({"sets": [{"name": "e", "chars": "4567"}]}))
+    said = page("symbols", first, sets)
+    assert said["loaded"] == "" and (said["exported"]["speed"], said["exported"]["theme"]) == (1, "nixos")
+    said = page("symbols", first, symbols)
+    assert said["loaded"] == "" and said["exported"]["speed"] == 2
+    assert [s["name"] for s in said["exported"]["glyphs"]["sets"]] == ["e"]

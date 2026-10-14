@@ -27,11 +27,8 @@ Open questions, planned builds, the cadence and the constraints. What shipped: `
 
 ## Planned builds
 
-1. **The previewer page (build 21)**: every option and symbol set on the page, drawn live;
-   "Export config" saves `config.json`; the desktop reads it (`./install.sh --config config.json`,
-   or the file in `~/.config/syncrain/`) and draws the same frame. Needs L11, L12 and L20 first.
-2. **The boot splash**: a still frame of the rain (Plymouth), until the login screen's live one.
-3. **A NixOS image** with syncrain as its wallpaper and login screen.
+1. **The boot splash**: a still frame of the rain (Plymouth), until the login screen's live one.
+2. **A NixOS image** with syncrain as its wallpaper and login screen.
 
 ## Open items
 
@@ -40,12 +37,11 @@ What the documents and the review of build 17 leave to a build that changes code
 | Item | Where the fix goes |
 | --- | --- |
 | L8: KDE's wallet does not open after greetd's text login | not known yet; the wallet lines are `install.sh`'s, in greetd's PAM service |
-| L11: `--scale` below about 0.4 changes the picture | the cell size in `syncrain/renderer.py` (`geometry`), `syncrain/native/timing.c` (`geometry_compute`), `web/template.html` |
-| L12: on screens under about 900 px wide the page and the desktop differ: a cell is at least 12 device px in the hosts, 14 CSS px times the scale in the page | the same three places |
+| L11: `--scale` below about 0.4 changes the picture (the page as a wallpaper does the same, so the two agree) | the cell size in `syncrain/renderer.py` (`geometry`), `syncrain/native/timing.c` (`geometry_compute`), `web/template.html` |
 | L20: the stream id does not cover `renderer.py`'s geometry, `native/timing.c` or `web/template.html` | `syncrain/build.py` (`STREAM_FILES`) |
 | L21: no `flake.lock`, so a Nix build takes whatever nixpkgs is current | `flake.lock` |
 | A font file name that is not UTF-8 makes a symbols file fall back to the theme's symbols | `syncrain/glyphs.py`, a stream file: waits for a build that changes the stream |
-| The page clamps `scale` to 0.25 to 3 and `fps` to 1 to 240; the command line takes `--scale` up to 4 and `--fps` up to 1000 | `web/template.html` or `syncrain/app.py`, with the previewer |
+| The settings file holds no `background`, `mask`, `scale` or `layer` (the page cannot preview a picture file) | `syncrain/app.py` (`CONFIG_KEYS`) and the page, if wanted |
 
 ## Build cadence
 
@@ -53,7 +49,7 @@ Consolidation builds: every build number ending in 0, and no other build. Fixed:
 rule, adopted at build 3. A consolidation changes no behaviour: it folds older notes into the
 history, makes every document true and short again, and writes down what it finds as open items.
 
-Next consolidation: 20
+Next consolidation: 30
 
 `tests/contract/test_the_working_documents_are_current.py` reads the two lines above.
 

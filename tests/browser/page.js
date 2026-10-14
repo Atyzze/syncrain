@@ -4,6 +4,9 @@
 //   node page.js identity                              the build and stream the page says it is
 //   node page.js cph                                   cycles per hour for 0.5 to 7200 s, in halves
 //   node page.js controls                              the control strip at desk and phone sizes
+//   node page.js configshot <png> <w> <h> <query> <json> a screenshot with that settings file loaded
+//   node page.js symbols <json>...                     what the page drew its symbols from, with those files
+//   node page.js studio                                the settings panel used as a person would, and saved
 'use strict';
 const { chromium } = require('playwright');
 const crypto = require('crypto');
@@ -57,6 +60,51 @@ const PAGE = 'file://' + path.resolve(__dirname, '..', '..', 'web', 'index.html'
         shown: !document.getElementById('panel').hidden,
       }));
       await page.close();       // a software-rendered page left running slows the next one to a crawl
+    }
+  } else if (mode === 'configshot') {
+    const [png, w, h, query, json] = rest;
+    const page = await open(Number(w), Number(h), query + '&capture=1&scale=1&fps=1');
+    out.loaded = await page.evaluate(text => window.__syncrainLoad(text), require('fs').readFileSync(json, 'utf8'));
+    const data = await page.evaluate(() => {
+      window.__syncrainDraw(Number(new URLSearchParams(location.search).get('t')) * 1000);
+      return document.getElementById('c').toDataURL('image/png');
+    });
+    require('fs').writeFileSync(png, Buffer.from(data.split(',')[1], 'base64'));
+  } else if (mode === 'symbols') {
+    const page = await open(800, 450, 'hud=0&fps=1');
+    for (const json of rest)                     // one after another, as a person opens them
+      out.loaded = await page.evaluate(text => window.__syncrainLoad(text), require('fs').readFileSync(json, 'utf8'));
+    out.symbols = await page.evaluate(() => window.__syncrainSymbols());
+    out.exported = JSON.parse(await page.evaluate(() => window.__syncrainExport()));
+  } else if (mode === 'studio') {
+    for (const [name, w, h] of [['desk', 1440, 900], ['phone', 390, 844]]) {
+      const page = await browser.newPage({ viewport: { width: w, height: h }, deviceScaleFactor: 1, acceptDownloads: true });
+      page.on('pageerror', e => errors.push('pageerror ' + e.message));
+      page.on('console', m => { if (m.type() === 'error') errors.push('console ' + m.text()); });
+      await page.route(/fonts\.(googleapis|gstatic)\.com/, r => r.fulfill({ status: 200, contentType: 'text/css', body: '' }));
+      await page.goto(PAGE + '?fps=2', { waitUntil: 'domcontentloaded', timeout: 120000 });
+      await page.waitForFunction(() => window.__syncrainReady === true, null, { timeout: 120000 });
+      await page.mouse.move(w / 2, h / 2);
+      await page.click('#open');
+      await page.click('#themes button[data-v="matrix"]');
+      await page.fill('#motion input[type="number"] >> nth=0', '1.5');
+      await page.press('#motion input[type="number"] >> nth=0', 'Enter');
+      await page.selectOption('#add-set', 'greek');
+      await page.click('#add');
+      await page.fill('#channel', 'friends');
+      await page.waitForTimeout(400);
+      const seen = await page.evaluate(() => {
+        const r = e => e.getBoundingClientRect(), s = r(document.getElementById('studio')), c = r(document.getElementById('c'));
+        const apart = s.top >= c.bottom - 1 || s.left >= c.right - 1;
+        return { overflow: document.documentElement.scrollWidth > window.innerWidth, shown: !document.getElementById('studio').hidden,
+                 inside: s.left >= 0 && s.right <= window.innerWidth + 0.5 && s.bottom <= window.innerHeight + 0.5, apart,
+                 symbols: window.__syncrainSymbols() };
+      });
+      const [download] = await Promise.all([page.waitForEvent('download'), page.click('#save')]);
+      seen.saved = require('fs').readFileSync(await download.path(), 'utf8');
+      seen.filename = download.suggestedFilename();
+      out[name] = seen;
+      await page.close();
     }
   } else {
     throw new Error('unknown mode ' + mode);

@@ -113,7 +113,7 @@ def test_the_service_never_restarts_into_a_failure_a_restart_cannot_change(root,
     prevent = next(line for line in unit.splitlines() if line.startswith("RestartPreventExitStatus="))
     assert prevent.split("=", 1)[1].split() == [str(status) for status in NO_RESTART]
     value = next(line for line in unit.splitlines() if line.startswith("ExecStart="))[len("ExecStart="):]
-    assert systemd_exec_words(value) == [str(tmp / ".local/bin/syncrain"), "--channel", CHANNEL, "--rainbow", "all"]
+    assert systemd_exec_words(value) == [str(tmp / ".local/bin/syncrain"), f"--channel={CHANNEL}", "--rainbow=all"]
 
 
 def test_an_unknown_option_ends_with_a_status_the_service_does_not_restart_on(root):
@@ -150,3 +150,32 @@ def test_build_13_and_14_s_plasma_wallpaper_is_taken_away_again(root, home):
     assert not package.exists() and not (qml / "org/syncrain").exists()
     said = calls.read_text()
     assert "d.wallpaperPlugin = 'org.kde.image'" in said and "WallpaperPlugin --delete" in said, said
+
+
+def test_a_settings_file_from_the_page_is_kept_where_the_wallpaper_reads_it(root, home):
+    """./install.sh --config: checked, kept as ~/.config/syncrain/config.json, and the service written
+    again without the options an earlier install gave it, which would go over the file."""
+    import json
+    tmp, env = home
+    assert install(root, env, "--autostart", "--theme", "matrix").returncode == 0
+    page = tmp / "config.json"
+    page.write_text(json.dumps({"contract": "syncrain-config-1", "theme": "nixos", "speed": 1.5}))
+    done = install(root, env, "--config", str(page))
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert (tmp / "config/syncrain/config.json").read_text() == page.read_text()
+    unit = (tmp / "config/systemd/user/syncrain.service").read_text()
+    value = next(line for line in unit.splitlines() if line.startswith("ExecStart="))[len("ExecStart="):]
+    assert systemd_exec_words(value) == [str(tmp / ".local/bin/syncrain")]
+    said = subprocess.run([str(tmp / ".local/bin/syncrain"), "--check-config"], env=env, capture_output=True,
+                          text=True, timeout=60)
+    assert "theme nixos" in said.stdout, said.stdout + said.stderr
+    again = install(root, env, "--config", str(tmp / "config/syncrain/config.json"))
+    assert again.returncode == 0, "the kept file given again: " + again.stdout + again.stderr
+    page.write_text(json.dumps({"contract": "syncrain-config-1", "speed": "fast"}))
+    bad = install(root, env, "--config", str(page))
+    assert bad.returncode != 0 and "cannot be used" in bad.stderr
+    assert '"speed": 1.5' in (tmp / "config/syncrain/config.json").read_text(), "the file before stays"
+    (tmp / "config/syncrain/config.json").write_text('{"contract": "syncrain-config-1", "speeed": 1}')
+    page.write_text(json.dumps({"contract": "syncrain-config-1", "theme": "matrix"}))
+    mended = install(root, env, "--config", str(page))
+    assert mended.returncode == 0, "a broken file is put right: " + mended.stdout + mended.stderr

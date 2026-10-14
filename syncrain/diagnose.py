@@ -157,8 +157,11 @@ def symbol_lines(args) -> list[str]:
     meta = engine.load_meta()
     theme = meta["themes"].get(args.theme, meta["themes"]["nixos"])
     said = []
-    r = glyphs.for_theme(meta, theme, engine.DATA_DIR, path=args.glyphs, hieroglyphs=args.hieroglyphs,
-                         warn=said.append)
+    if isinstance(args.glyphs, dict):            # a settings file's sets
+        r = glyphs.resolve(meta, theme, engine.DATA_DIR, args.glyphs, "the settings file", args.hieroglyphs)
+    else:
+        r = glyphs.for_theme(meta, theme, engine.DATA_DIR, path=args.glyphs, hieroglyphs=args.hieroglyphs,
+                             warn=said.append)
     shipped = glyphs.Library(meta, engine.DATA_DIR).index
     lines = said + [f"from {r.source}: {len(r.sets)} sets, {len(r.keys)} symbols "
                     f"({sum(k not in shipped for k in r.keys)} drawn from this machine's fonts)"]

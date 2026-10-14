@@ -1,4 +1,4 @@
-# Handoff: the state of syncrain at build 20
+# Handoff: the state of syncrain at build 21
 
 What is true now, for a context that has just opened this tree. Where this page and the code
 disagree, the code is right; fix the page in the same build.
@@ -46,8 +46,13 @@ This page, `docs/agent/NEXT_BUILD.md`, `docs/agent/WORKING_WITH_THE_OPERATOR.md`
 * **Timing**: every frame on the refresh; 97 to 100% even and steady on their screens.
 * **Symbols**: sets with weights or shares (`syncrain/glyphs.py`); the themes' own, or the
   operator's `~/.config/syncrain/glyphs.json`. 489 shipped glyphs; others from the machine's fonts.
+* **The settings file** (build 21): the page's Settings panel tries every option and symbol set
+  live and saves `config.json` (`syncrain-config-1`); `./install.sh --config config.json` keeps it
+  as `~/.config/syncrain/config.json`, read under the command line (`syncrain/app.py`,
+  `CONFIG_KEYS`); the login screen's rain reads a copy. The browser lane draws one file on the page
+  and the desktop and compares the frames. `--theme` refuses an unknown theme with status 2.
 * **Stream**: `def5684f` since build 15; `c18f8be2` in 12 to 14; `48e6bf9c` 3 to 11.
-* **GitHub**: `main` holds builds 7 to 19, one commit each (`syncrain build <N>`).
+* **GitHub**: `main` holds builds 7 to 20, one commit each (`syncrain build <N>`).
 
 ## Waits on the operator
 
@@ -56,6 +61,7 @@ This page, `docs/agent/NEXT_BUILD.md`, `docs/agent/WORKING_WITH_THE_OPERATOR.md`
 * The memory record after a few hours of build 12 or later.
 * The time of the next glow flare-up: two hours of frames show none (`docs/HISTORY.md`, build 12).
 * The two questions in `docs/ROADMAP.md`.
+* How the Settings panel feels to them, and whether a saved file looks the same on their desktop.
 
 ## Their standing calls
 

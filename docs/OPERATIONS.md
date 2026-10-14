@@ -14,6 +14,7 @@ git clone https://github.com/Atyzze/syncrain && cd syncrain   # or unpack SYNCRA
 ./install.sh                  # pacman packages (sudo once), then everything in ~/.local
 ./install.sh --autostart      # also a systemd user service
 ./install.sh --login-screen   # optional: also the login screen, from the next boot (greetd)
+./install.sh --config config.json   # the settings the web page saved (see below)
 ./install.sh --uninstall      # remove it (the pacman packages stay)
 ```
 
@@ -22,6 +23,9 @@ git clone https://github.com/Atyzze/syncrain && cd syncrain   # or unpack SYNCRA
   why and Python and GTK draw instead.
 * `--theme`, `--channel`, `--rainbow` and `--arg ...` (repeatable) go into the autostart service and
   the login screen's rain. Also `--prefix DIR`, `--no-deps`, `--yes`; `./install.sh --help`.
+* `--config FILE`: a settings file from the web page, checked, then kept as
+  `~/.config/syncrain/config.json` (one there before is kept as `config.json.before`). The service
+  is written again without options, so the file decides; the login screen's rain gets a copy.
 * Builds 13 and 14's Plasma wallpaper (dropped in build 15) is removed by any later install.
 * The login screen is optional. Until `--login-screen` is run, the installer never touches how the
   machine logs in: installing, upgrading and removing the wallpaper leave the display manager,
@@ -52,10 +56,11 @@ with `syncrain.nixosModules.default` (or `homeManagerModules.default`). Options:
 For the native wallpaper: `sh syncrain/native/build.sh <path>` and `SYNCRAIN_WALLPAPER=<path>` in
 the session's environment.
 
-**Browser**: `web/index.html`, one self-contained file. URL parameters: `theme`, `channel`, `fps`,
+**Browser**: `web/index.html`, one self-contained file; Settings tries every option live and saves
+them for the desktop (below). As a wallpaper page, URL parameters: `theme`, `channel`, `fps`,
 `logo`, `rainbow`, `spin`, `drift`, `speed`, `density`, `glow`, `bloom`, `bg-gain`, `snow=off`,
-`hieroglyphs`, `scale`, `hud=0` (no control strip), `t=<unix seconds>` (frozen clock). A Plasma
-web-wallpaper plugin can host it, behind the desktop icons.
+`hieroglyphs`, `scale`, `hud=0` (no control strip or settings), `t=<unix seconds>` (frozen clock).
+A Plasma web-wallpaper plugin can host it, behind the desktop icons.
 
 ## Options
 
@@ -79,6 +84,8 @@ web-wallpaper plugin can host it, behind the desktop icons.
 | `--density F` | `1` | How often a column starts a stream, 0 to 2.3 |
 | `--snow` | `on` | `off`: no falling snowflakes |
 | `--hieroglyphs F` | sets' | Share of the changing symbols that are Egyptian hieroglyphs (the themes: 0.15) |
+| `--config FILE` | see below | A settings file (the web page saves one); `none` for none. Options given go over it |
+| `--check-config` | - | Read the settings file and the options, say what they come to, exit (2 if wrong) |
 | `--glyphs FILE` | see below | A symbols file; `theme` for the theme's own symbols |
 | `--write-glyphs` | - | Write a starter symbols file (a bit of everything) and exit |
 | `--scale` | `1.0` | Render resolution scale, up to 4 (0.75 on a weak GPU) |
@@ -100,6 +107,22 @@ Environment: `SYNCRAIN_DEBUG_FPS=<s>` reports each screen's frame rate and timin
 `SYNCRAIN_WALLPAPER=<path>` names the native program; `GSK_RENDERER` picks GTK's renderer.
 syncrain sets `__NV_DISABLE_EXPLICIT_SYNC=1` and `__GL_YIELD=USLEEP` for itself unless you set them
 (NVIDIA's driver leaks memory per frame with explicit sync on).
+
+## Settings from the web page
+
+Open `web/index.html` (or the live page), press **Settings** and move anything: theme, channel,
+colours, motion, light, the symbol sets (add, remove, weigh, type your own), frame rate. The rain
+changes as you go; **Screen shape** previews a 16:9, 21:9 or other desktop. Then **Save
+config.json** (or **Copy**) and, in the syncrain folder, `./install.sh --config config.json`.
+
+* The desktop draws what the page showed: the same frame at the same moment on the same channel.
+  Symbols that are not among the 489 shipped ones are drawn by each side's fonts and can differ a
+  little; the page names them.
+* The file is `~/.config/syncrain/config.json`, read at every start; `syncrain --config FILE
+  --window` tries one without installing it. It holds every setting (`null`: as the theme has it)
+  and the symbol sets, written out, so a symbols file cannot draw others.
+* Options on the command line go over the file. **Open a settings file** (or drop one on the page)
+  shows one again; a symbols file (`glyphs.json`) loads as the sets.
 
 ## Your own symbols
 

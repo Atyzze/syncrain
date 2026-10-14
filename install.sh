@@ -4,6 +4,7 @@
 #   ./install.sh                     install this build for your user (asks for sudo once, for pacman packages)
 #   ./install.sh --autostart         ...and start it with every graphical login
 #   ./install.sh --theme matrix --channel friends --autostart
+#   ./install.sh --config config.json  ...and draw what the web page showed (the settings it exported)
 #   ./install.sh --login-screen      ...and the rain as your login screen too (optional; greetd, yours stays installed)
 #   ./install.sh --login-screen-off  back to the login screen you had (undoes only what --login-screen did)
 #   ./install.sh --uninstall         remove it again (pacman packages are left installed)
@@ -21,14 +22,14 @@ BUILD_PACKAGES=(gcc pkgconf wayland dbus)
 PREFIX="${PREFIX:-$HOME/.local}"
 SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 AUTOSTART=0 UNINSTALL=0 NODEPS=0 YES=0 LOGIN=0 LOGIN_OFF=0
-THEME="" CHANNEL="" RAINBOW="" EXTRA=()
+THEME="" CHANNEL="" RAINBOW="" CONFIG="" EXTRA=()
 
 bold() { printf '\033[1m%s\033[0m\n' "$*"; }
 info() { printf '  %s\n' "$*"; }
 die()  { printf '\033[31merror:\033[0m %s\n' "$*" >&2; exit 1; }
 
 usage() {
-  sed -n '2,15p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+  sed -n '2,16p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
   cat <<'EOF'
 
 Options:
@@ -36,6 +37,8 @@ Options:
   --login-screen        optional: the rain and a login box as the login screen, from the next boot
                         (greetd); without it the installer never touches your login screen
   --login-screen-off    back to the login screen from before (undoes only what --login-screen did)
+  --config FILE         a settings file the web page exported: the wallpaper (and the login screen)
+                        draw what the page showed; kept as ~/.config/syncrain/config.json
   --theme NAME          nixos (default) or matrix
   --channel NAME        stream name (default: public)
   --rainbow MODE        logo (default), all or off
@@ -54,6 +57,7 @@ while [ $# -gt 0 ]; do
     --login-screen) LOGIN=1 ;;
     --login-screen-off) LOGIN_OFF=1 ;;
     --theme) THEME="${2:?--theme needs a value}"; shift ;;
+    --config) CONFIG="${2:?--config needs a file}"; shift ;;
     --channel) CHANNEL="${2:?--channel needs a value}"; shift ;;
     --rainbow) RAINBOW="${2:?--rainbow needs a value}"; shift ;;
     --arg) EXTRA+=("${2:?--arg needs a value}"); shift ;;
@@ -137,6 +141,15 @@ copy_kde_settings() {
   for f in kwinoutputconfig.json kxkbrc kcminputrc; do
     if [ -e "$conf/$f" ] || [ -L "$conf/$f" ]; then copy_to_root "$conf/$f" "$1/$f"; fi
   done
+}
+# The operator's settings file (the web page's export), for the login screen's rain to draw alike.
+copy_settings() {
+  local settings="${XDG_CONFIG_HOME:-$HOME/.config}/syncrain/config.json"
+  if [ -f "$settings" ]; then copy_to_root "$settings" "$1/config.json"; fi
+}
+# Whether the settings file names symbol sets of its own (they go over a symbols file).
+settings_have_sets() {
+  [ -f "$1" ] && python3 -c 'import json, sys; sys.exit(0 if isinstance(json.load(open(sys.argv[1], encoding="utf-8")).get("glyphs"), dict) else 1)' "$1" 2>/dev/null
 }
 # The copies of those settings login.sh made in the state folder go when they are copied anew: it
 # makes them again at its next start. (find does not go into a link in the folder's place.)
@@ -262,7 +275,7 @@ login_screen_on() {
   fi
   command -v kwin_wayland >/dev/null || die "the login screen runs in KWin (Plasma's compositor), which is not installed"
   command -v agreety >/dev/null || die "greetd's text login (agreety, pacman: greetd-agreety) is missing; the login screen falls back to it"
-  local tmp glyphs rain=("${ARGS[@]}") before now new="$LOGIN_LIB.new" f conf="${XDG_CONFIG_HOME:-$HOME/.config}"
+  local tmp glyphs settings rain=("${ARGS[@]}") before now new="$LOGIN_LIB.new" f conf="${XDG_CONFIG_HOME:-$HOME/.config}"
   # A record counts while greetd starts at boot. Once something else does (picked since), that is
   # what comes before; with greetd running syncrain's config and no record, it is not known.
   before="$(recorded_before)"
@@ -275,17 +288,25 @@ login_screen_on() {
   record_before "$before"
   tmp="$(mktemp -d)"
   # login.json: who logs in by default, and the rain's options as given to this installer
-  glyphs="$conf/syncrain/glyphs.json"
-  if [ -f "$glyphs" ]; then cp "$glyphs" "$tmp/glyphs.json"; rain+=(--glyphs "$LOGIN_LIB/glyphs.json"); fi
+  glyphs="$conf/syncrain/glyphs.json" settings="$conf/syncrain/config.json"
+  # a settings file's own sets go over a symbols file, as on the desktop (syncrain/greeter.py drops
+  # --glyphs for them too, for a login.json written before the settings file)
+  if [ -f "$glyphs" ] && ! settings_have_sets "$settings"; then
+    cp "$glyphs" "$tmp/glyphs.json"; rain+=(--glyphs "$LOGIN_LIB/glyphs.json")
+  fi
   write_login_json() {
     python3 -c 'import json, sys; json.dump({"user": sys.argv[2], "session": "plasma.desktop", "rain": sys.argv[3:]},
                 open(sys.argv[1], "w"), indent=1)' "$@"
   }
   write_login_json "$tmp/login.json" "$(id -un)" "${rain[@]}"
-  if [ -f "$tmp/glyphs.json" ]; then
+  if [ -f "$tmp/glyphs.json" ] || settings_have_sets "$settings"; then
     # Symbols not in syncrain's own set are drawn now, with this user's fonts, so the login screen
     # does not spend seconds drawing them at every boot.
-    write_login_json "$tmp/draw.json" "$(id -un)" "${ARGS[@]}" --glyphs "$tmp/glyphs.json"
+    if [ -f "$tmp/glyphs.json" ]; then
+      write_login_json "$tmp/draw.json" "$(id -un)" "${ARGS[@]}" --glyphs "$tmp/glyphs.json"
+    else
+      write_login_json "$tmp/draw.json" "$(id -un)" --config "$settings" "${ARGS[@]}"
+    fi
     XDG_CACHE_HOME="$tmp/cache" SYNCRAIN_LOGIN_CONFIG="$tmp/draw.json" PYTHONPATH="$APPDIR" PYTHONSAFEPATH=1 \
       python3 -m syncrain.greeter --draw-symbols || info "the symbols were not drawn now; the login screen draws them"
   fi
@@ -302,6 +323,7 @@ login_screen_on() {
     if [ -f "$f" ]; then copy_to_root "$f" "$new/cache/${f##*/}"; fi
   done
   copy_kde_settings "$new/kde"
+  copy_settings "$new"
   as_root chmod -R a+rX,go-w,ug-s "$new"
   as_root rm -rf "$LOGIN_LIB"
   as_root mv "$new" "$LOGIN_LIB"
@@ -397,9 +419,12 @@ login_screen_refresh() {
   as_root mkdir -p "$LOGIN_LIB.new/kde"
   copy_app_to_root "$LOGIN_LIB.new"
   copy_kde_settings "$LOGIN_LIB.new/kde"
+  copy_settings "$LOGIN_LIB.new"
   as_root chmod -R a+rX,go-w,ug-s "$LOGIN_LIB.new"
   as_root rm -rf "$LOGIN_LIB/syncrain" "$LOGIN_LIB/kde"
   as_root mv "$LOGIN_LIB.new/syncrain" "$LOGIN_LIB.new/kde" "$LOGIN_LIB/"
+  if [ -f "$LOGIN_LIB.new/config.json" ]; then as_root mv -f "$LOGIN_LIB.new/config.json" "$LOGIN_LIB/"
+  else as_root rm -f "$LOGIN_LIB/config.json"; fi
   as_root rm -rf "$LOGIN_LIB.new"
   clear_state_copies
   copy_to_root "$APPDIR/BUILD_NUMBER" "$LOGIN_LIB/BUILD_NUMBER"
@@ -532,16 +557,41 @@ PYTHONSAFEPATH=1; export PYTHONSAFEPATH
 exec "\${SYNCRAIN_PYTHON:-python3}" -m syncrain "\$@"
 EOF
 chmod +x "$BINDIR/syncrain"
-"$BINDIR/syncrain" --build >/dev/null || die "the launcher does not run"
-info "launcher: $BINDIR/syncrain ($("$BINDIR/syncrain" --build))"
+"$BINDIR/syncrain" --config none --build >/dev/null || die "the launcher does not run"
+info "launcher: $BINDIR/syncrain ($("$BINDIR/syncrain" --config none --build))"
+
+# The settings file the web page exported: checked as the wallpaper reads it, then kept where it
+# looks. Options given to this installer still go over it; a service written by an earlier
+# install is written again, so options it kept from then do not.
+if [ -n "$CONFIG" ]; then
+  settings="${XDG_CONFIG_HOME:-$HOME/.config}/syncrain/config.json"
+  "$BINDIR/syncrain" --config "$CONFIG" --check-config >/dev/null || die "$CONFIG cannot be used (see above)"
+  mkdir -p "$(dirname "$settings")"
+  # the file itself given again (edited where it is) is kept as it is; another one replaces it
+  # whole, through a new file, so a link in its place (dotfiles) is replaced and not written through
+  if ! [ "$CONFIG" -ef "$settings" ]; then
+    if [ -f "$settings" ] && [ "$(cat "$settings")" != "$(cat "$CONFIG")" ]; then cp "$settings" "$settings.before"; fi
+    cp "$CONFIG" "$settings.new"
+    mv -f "$settings.new" "$settings"
+  fi
+  info "settings: $settings (from $CONFIG)"
+  if [ -f "$UNIT" ]; then
+    AUTOSTART=1
+    was="$(sed -n 's/^ExecStart=//p' "$UNIT")"
+    case "$was" in
+      *" "*) info "the service's options from before go, so the settings file decides: $was (give them again with --arg to keep one)" ;;
+    esac
+  fi
+fi
 
 remove_plasma_wallpaper
 
 # ---- 4. autostart
 ARGS=()
-[ -n "$THEME" ] && ARGS+=(--theme "$THEME")
-[ -n "$CHANNEL" ] && ARGS+=(--channel "$CHANNEL")
-[ -n "$RAINBOW" ] && ARGS+=(--rainbow "$RAINBOW")
+# --option=value: a channel that starts with "-" is then no option
+[ -n "$THEME" ] && ARGS+=("--theme=$THEME")
+[ -n "$CHANNEL" ] && ARGS+=("--channel=$CHANNEL")
+[ -n "$RAINBOW" ] && ARGS+=("--rainbow=$RAINBOW")
 ARGS+=("${EXTRA[@]}")
 # Shell words, for the compositor hints below.
 quote() { local out="" a; for a in "$@"; do out+=" '${a//\'/\'\\\'\'}'"; done; printf '%s' "$out"; }

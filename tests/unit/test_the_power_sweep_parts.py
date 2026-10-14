@@ -76,13 +76,16 @@ def test_every_phase_is_named_once_and_the_sweep_starts_from_nothing():
     assert plan[2]["args"] == ["--host", "gtk"], "the Python and GTK host right after, to compare with"
 
 
-def test_the_phases_run_with_the_wallpaper_s_own_options():
-    args = parse_args(["--power-sweep", "--channel", "friends", "--rainbow", "all"])
-    assert power.base_args(args) == ["--channel", "friends", "--rainbow", "all"]
-    assert power.base_args(parse_args(["--power-sweep"])) == []
-    assert power.base_args(parse_args(["--power-sweep", "--pause-under", "fullscreen"])) == \
-        ["--pause-under", "fullscreen"]
-    assert power.base_args(parse_args(["--power-sweep", "--host", "gtk"])) == ["--host", "gtk"]
+def test_the_phases_run_with_the_wallpaper_s_own_options(tmp_path):
+    args = parse_args(["--power-sweep", "--config", "none", "--channel=-friends", "--rainbow", "all"])
+    assert power.base_args(args) == ["--channel=-friends", "--rainbow=all"]
+    assert power.base_args(parse_args(["--power-sweep", "--config", "none"])) == []
+    assert power.base_args(parse_args(["--power-sweep", "--config", "none", "--pause-under", "fullscreen"])) == \
+        ["--pause-under=fullscreen"]
+    assert power.base_args(parse_args(["--power-sweep", "--config", "none", "--host", "gtk"])) == ["--host=gtk"]
+    settings = tmp_path / "config.json"
+    settings.write_text('{"contract": "syncrain-config-1", "glyphs": {"sets": [{"name": "a", "chars": "ab"}]}}')
+    assert power.base_args(parse_args(["--power-sweep", "--config", str(settings)])) == [f"--config={settings}"]
 
 
 def test_each_phase_says_what_drew_it():

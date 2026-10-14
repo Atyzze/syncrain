@@ -69,6 +69,16 @@ def _number(low=None, high=None, above=None):
     return parse
 
 
+def _theme(text):
+    """A theme there is: refused here (status 2, which the service does not restart on), not when
+    the wallpaper starts (status 1, which it restarts on, for good)."""
+    from .engine import load_meta
+    themes = load_meta()["themes"]
+    if text not in themes:
+        raise argparse.ArgumentTypeError(f"no theme {text!r} (the themes: {', '.join(themes)})")
+    return text
+
+
 def _image(text):
     """A picture file that is there to be read (the native wallpaper and the GTK host read it later)."""
     if not (os.path.isfile(text) and os.access(text, os.R_OK)):
@@ -76,9 +86,91 @@ def _image(text):
     return text
 
 
+#: What a settings file is (the web page writes it): the options it may hold, as their command-line names.
+CONFIG_CONTRACT = "syncrain-config-1"
+CONFIG_KEYS = {"theme": "--theme", "channel": "--channel", "rainbow": "--rainbow", "logo": "--logo",
+               "spin": "--spin", "drift": "--drift", "speed": "--speed", "density": "--density",
+               "glow": "--glow", "bloom": "--bloom", "bg_gain": "--bg-gain", "snow": "--snow",
+               "hieroglyphs": "--hieroglyphs", "fps": "--fps", "pause_under": "--pause-under"}
+
+
+def default_config_path() -> str:
+    base = os.environ.get("XDG_CONFIG_HOME") or os.path.join(os.path.expanduser("~"), ".config")
+    return os.path.join(base, "syncrain", "config.json")
+
+
+def _config_path(argv):
+    """The settings file: --config's, else the default one when it is there; None for none."""
+    named = None
+    for i, a in enumerate(argv):
+        if a == "--config" and i + 1 < len(argv):
+            named = argv[i + 1]
+        elif a.startswith("--config="):
+            named = a.split("=", 1)[1]
+    if named is not None:
+        return None if named in ("", "none") else named
+    path = default_config_path()
+    return path if os.path.isfile(path) else None
+
+
+def _read_settings(ap, path):
+    """The settings file as options (checked as the command line's are) and its symbol sets."""
+    import json
+
+    def wrong(why):
+        ap.error(f"{path}: {why}")
+    try:
+        with open(path, encoding="utf-8") as fh:
+            cfg = json.load(fh)
+    except OSError as e:
+        wrong(e.strerror or str(e))
+    except ValueError as e:
+        wrong(f"not JSON ({e})")
+    if not isinstance(cfg, dict) or cfg.get("contract") != CONFIG_CONTRACT:
+        wrong(f'not a syncrain settings file (it says "contract": "{CONFIG_CONTRACT}")')
+    out = []
+    for key, value in cfg.items():
+        if key in ("contract", "about", "glyphs"):
+            continue
+        if key not in CONFIG_KEYS:
+            wrong(f"no setting {key!r} (the settings: {', '.join(CONFIG_KEYS)}, glyphs)")
+        if value is None:                         # as the theme or the sets have it
+            continue
+        if isinstance(value, bool):
+            value = "on" if value else "off"
+        elif isinstance(value, (int, float)):
+            try:
+                value = repr(float(value))
+            except OverflowError:
+                wrong(f"{key} is a number too large")
+        elif not isinstance(value, str):
+            wrong(f"{key} is a {type(value).__name__}")
+        # one word, --option=value: a value that starts with "-" (a channel, -5e-05) is then no option
+        out.append(f"{CONFIG_KEYS[key]}={value}")
+    sets = cfg.get("glyphs")
+    if sets is not None:
+        from . import glyphs
+        try:
+            sets = glyphs.check_config(sets, f"{path}'s glyphs")
+        except glyphs.GlyphsError as e:
+            ap.error(str(e))
+    try:
+        ap.parse_args(out)                        # said as from the file, not as from the command line
+    except SystemExit:
+        print(f"syncrain: that is in {path}", file=sys.stderr)
+        raise
+    return out, sets
+
+
+#: Options that only say something and exit, whatever the settings file holds.
+INFO_ONLY = {"--build", "--version", "-h", "--help", "--list-themes"}
+
+
 def parse_args(argv=None):
-    ap = argparse.ArgumentParser(prog="syncrain", description="Never-repeating, clock-synchronised code rain wallpaper.")
-    ap.add_argument("--theme", default="nixos", help="nixos (default) or matrix")
+    # no shortened options: --conf would be --config to argparse and not to _config_path
+    ap = argparse.ArgumentParser(prog="syncrain", description="Never-repeating, clock-synchronised code rain wallpaper.",
+                                 allow_abbrev=False)
+    ap.add_argument("--theme", type=_theme, default="nixos", help="nixos (default) or matrix")
     ap.add_argument("--channel", default="public",
                     help="stream name; everyone on the same channel with a synced clock sees the same frame")
     ap.add_argument("--fps", type=_number(above=0, high=1000), default=30.0,
@@ -116,6 +208,11 @@ def parse_args(argv=None):
     ap.add_argument("--hieroglyphs", type=_number(low=0, high=1), metavar="SHARE",
                     help="share of the changing symbols that are Egyptian hieroglyphs (default: as the symbol sets "
                          "say, 0.15 in the themes; 0 = none, 1 = only)")
+    ap.add_argument("--config", metavar="FILE",
+                    help="a settings file, as the web page exports it (default: ~/.config/syncrain/config.json "
+                         "if there is one; 'none' for none); options given here go over it")
+    ap.add_argument("--check-config", action="store_true",
+                    help="read the settings file and the options, say what they come to, exit (status 2 if wrong)")
     ap.add_argument("--glyphs", metavar="FILE",
                     help="a symbols file: sets of characters and how often each falls (default: "
                          "~/.config/syncrain/glyphs.json if there is one, else the theme's; 'theme' for the theme's)")
@@ -144,7 +241,23 @@ def parse_args(argv=None):
                     help="check whether syncrain can draw on this machine, print what it found, exit")
     ap.add_argument("--build", action=_ShowBuild, help="print the build number and the stream fingerprint, exit")
     ap.add_argument("--version", action=_ShowBuild, help=argparse.SUPPRESS)   # the reflex spelling; says the build
-    args = ap.parse_args(argv)
+    argv = list(sys.argv[1:] if argv is None else argv)
+    # what says the build or the help reads no settings file, so a broken one cannot stop it (the
+    # installer runs --build before it puts a good one in its place); --diagnose says it and goes on
+    path = None if INFO_ONLY.intersection(argv) else _config_path(argv)
+    settings, sets = [], None
+    if path:
+        try:
+            settings, sets = _read_settings(ap, path)
+        except SystemExit:
+            if "--diagnose" not in argv:
+                raise
+            print(f"syncrain: {path} is not used (see above)", file=sys.stderr)
+            path = None
+    args = ap.parse_args(settings + argv)        # the command line's last, so it goes over the file
+    args.config_file = path
+    if sets is not None and args.glyphs is None:
+        args.glyphs = sets                        # the file's symbol sets, unless --glyphs names others
     # the channel as the web page takes it: spaces around it (what JavaScript's trim() takes, which is
     # not quite what str.strip() takes) are no part of the name, and none is public
     args.channel = args.channel.strip(JS_SPACE) or "public"
@@ -352,7 +465,24 @@ def main(argv=None):
         return 0
     if args.write_glyphs:
         from . import glyphs
-        print(f"syncrain: {glyphs.write_starter(args.glyphs or glyphs.default_path())}")
+        named = args.glyphs if isinstance(args.glyphs, str) else None
+        print(f"syncrain: {glyphs.write_starter(named or glyphs.default_path())}")
+        return 0
+    if args.check_config:
+        from . import glyphs
+        from .engine import DATA_DIR, load_meta
+        from .renderer import from_args
+        if isinstance(args.glyphs, dict):         # the wallpaper would fall back to the theme's: say it
+            meta = load_meta()
+            try:
+                glyphs.resolve(meta, meta["themes"][args.theme], DATA_DIR, args.glyphs, str(args.config_file),
+                               args.hieroglyphs)
+            except glyphs.GlyphsError as e:
+                print(f"syncrain: {e}", file=sys.stderr)
+                return 2
+        r = from_args(args)
+        print(f"syncrain: {args.config_file or 'no settings file'}: theme {r.theme_name}, channel "
+              f"{r.channel!r}, {len(r.glyphs.sets)} symbol sets from {r.glyphs.source}")
         return 0
     # Before GTK is imported: PyGObject initialises GTK on import, and GDK reads GDK_DISABLE then.
     use_gl_renderer()
