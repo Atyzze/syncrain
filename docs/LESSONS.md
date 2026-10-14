@@ -52,6 +52,14 @@ Rules learned by shipping their opposite, one line each. When and how: `docs/HIS
 * **GTK waits seconds for the desktop portal** where there is none (a login screen):
   `GDK_DEBUG=no-portals`.
 * **greetd's PAM does not open KDE's wallet**; SDDM's does. Add its lines, as SDDM has them.
+* **root copying a user's file follows the user's links**, and `chmod -R` follows a link it is
+  given by name: the user reads, root only writes, into a folder root made.
+* **A record of what to put back lives outside what gets removed**, goes last, and counts only
+  while what replaced it still runs. Without one, leave things as they are rather than guess.
+* **greetd joins a command's words with spaces and has sh run them**: send one word, quoted for sh.
+* **greetd signals the greeter alone**: a greeter that starts a compositor in its own session
+  stops it on SIGTERM.
+* **A shared folder such as /tmp is no fallback for state**: any user can leave a file there.
 
 ## Launching, services, releases
 
@@ -61,6 +69,10 @@ Rules learned by shipping their opposite, one line each. When and how: `docs/HIS
 * **Two trees under one name is what build numbers prevent.**
 * **A reviewer who didn't write the build finds what the gate can't.**
 * **Generated files go stale silently**: the release regenerates them and the gate compares.
+* **With RestartSec=3, systemd's start limit never trips**: every status a restart cannot change
+  goes in RestartPreventExitStatus, or the service retries it for good.
+* **The lanes run a newer Python than pyproject.toml promises**: f-strings changed in 3.12, so a
+  test reads the app as 3.10 and 3.11 do.
 
 ## Rendering and sync
 

@@ -89,7 +89,9 @@ def scene_bytes(args, fallback: list[str] | None) -> bytes:
     script = hidden.script_template(maximized=args.pause_under == "maximized")
     header.append(f"kwin-script {put(script.encode())}")
     if fallback:
-        header.append(f"fallback {put(b''.join(a.encode() + b'\0' for a in fallback))}")
+        # joined outside the f-string: before Python 3.12 an f-string's expression cannot hold a backslash
+        argv = b"".join(a.encode() + b"\0" for a in fallback)
+        header.append(f"fallback {put(argv)}")
     header.append("end")
     return ("\n".join(header) + "\n").encode() + b"".join(blobs)
 

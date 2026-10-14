@@ -26,15 +26,16 @@ def sessions(share):
     (folder / "gone.desktop").write_text("[Desktop Entry]\nExec=gone\nTryExec=/nonexistent/gone\nName=Gone\n")
 
 
-def run_login(tmp_path, typed):
-    """login.sh as greetd runs it, KWin headless with two screens; (exit status, log, greetd stand-in)."""
+def run_login(tmp_path, typed, delay=0.0):
+    """login.sh as greetd runs it, KWin headless with two screens; (log, greetd stand-in). `delay` is
+    how long greetd takes to check a password."""
     needs()
     kwin = os.environ.get("SYNCRAIN_KWIN") or shutil.which("kwin_wayland")
     run = tmp_path / "run"
     run.mkdir(mode=0o700)
     sessions(tmp_path / "share")
     (tmp_path / "login.json").write_text(json.dumps({"user": "op", "rain": ["--theme", "matrix", "--fps", "10"]}))
-    greetd = FakeGreetd(tmp_path / "greetd.sock")
+    greetd = FakeGreetd(tmp_path / "greetd.sock", delay=delay)
     text = tmp_path / "text-login"
     text.write_text(f"#!/bin/sh\necho \"$@\" > {tmp_path}/text-login.ran\n")
     text.chmod(0o755)
@@ -66,7 +67,7 @@ def test_a_login_through_the_box_starts_plasma(tmp_path, native_wallpaper):
     assert len(set(shown)) == 2, f"a box on each of the two screens:\n{log[-4000:]}"
     assert "native wallpaper, 2 screens" in log, f"the rain never drew:\n{log[-4000:]}"
     assert re.search(r"syncrain-login: [0-9:.]+ not logged in: Welcome / Wrong password", log)
-    assert greetd.started() == [{"type": "start_session", "cmd": PLASMA.split(),
+    assert greetd.started() == [{"type": "start_session", "cmd": [PLASMA],
                                  "env": ["XDG_SESSION_TYPE=wayland", "XDG_SESSION_DESKTOP=KDE",
                                          "XDG_CURRENT_DESKTOP=KDE"]}]
     assert {"type": "cancel_session"} in greetd.requests
@@ -79,3 +80,11 @@ def test_text_login_in_the_box_hands_over_to_greetd_s_own(tmp_path, native_wallp
     assert re.search(r"syncrain-login: [0-9:.]+ text login asked for", log), log[-4000:]
     assert not greetd.started()
     assert (tmp_path / "text-login.ran").read_text().startswith("--cmd env XDG_SESSION_TYPE=wayland")
+
+
+def test_text_login_waits_while_greetd_checks_a_login(tmp_path, native_wallpaper):
+    """Leaving for the text login then would leave greetd holding that half-made session."""
+    log, greetd = run_login(tmp_path, [{"password": "right"}, {"text": True, "during": True, "wait": 0.5}], delay=3)
+    assert re.search(r"syncrain-login: [0-9:.]+ text login: not while a login is under way", log), log[-4000:]
+    assert len(greetd.started()) == 1 and not (tmp_path / "text-login.ran").exists(), log[-4000:]
+    assert (tmp_path / "state" / "logged-in").read_text() == "plasma.desktop\n"

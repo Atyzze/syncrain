@@ -59,6 +59,8 @@ overlay layer, one per screen sharing what is typed. The box speaks greetd's IPC
 and starts the session once KWin is gone. No login, no marker file: `login.sh` hands over to
 greetd's text login. Installed to `/usr/local/lib/syncrain`, logs in `/var/lib/syncrain-login`.
 After the login, Plasma's splash and wallpaper show a still frame of the rain (`syncrain/handover.py`).
+Only `install.sh --login-screen` puts any of it there, with a record of what started at boot
+before (`/etc/greetd/display-manager.before-syncrain`) that `--login-screen-off` goes back to.
 
 The lanes compare them: native and GTK host to the pixel (at whole-number scales; at 125% or 150%
 GTK draws more pixels and scales them down), the page within texture filtering.

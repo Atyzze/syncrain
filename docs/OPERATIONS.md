@@ -13,7 +13,7 @@ Wayland, a compositor with layer-shell (not GNOME: use `--window` or the web pag
 git clone https://github.com/Atyzze/syncrain && cd syncrain   # or unpack SYNCRAIN<N>.tar.zst
 ./install.sh                  # pacman packages (sudo once), then everything in ~/.local
 ./install.sh --autostart      # also a systemd user service
-./install.sh --login-screen   # also the login screen, from the next boot (greetd)
+./install.sh --login-screen   # optional: also the login screen, from the next boot (greetd)
 ./install.sh --uninstall      # remove it (the pacman packages stay)
 ```
 
@@ -22,10 +22,20 @@ git clone https://github.com/Atyzze/syncrain && cd syncrain   # or unpack SYNCRA
   why and Python and GTK draw instead.
 * `--theme`, `--channel`, `--rainbow` and `--arg ...` (repeatable) go into the autostart service.
 * Builds 13 and 14's Plasma wallpaper (dropped in build 15) is removed by any later install.
+* The login screen is optional. Until `--login-screen` is run, the installer never touches how the
+  machine logs in: installing, upgrading and removing the wallpaper leave the display manager,
+  what starts at boot and their files as they are.
 * `--login-screen`: greetd instead of SDDM (or Plasma Login); the rain and the same box on every
-  screen, then Plasma, with its splash and wallpaper a still frame of the rain. If it fails (or after "Text login" in the box), greetd's text login asks. Back: `./install.sh
-  --login-screen-off`, or from a text console (Ctrl+Alt+F3) `sudo systemctl enable --force sddm &&
-  sudo reboot`. `--diagnose` shows its last starts.
+  screen, then Plasma, with its splash and wallpaper a still frame of the rain. If it fails (or
+  after "Text login" in the box), greetd's text login asks. What started at boot before is kept in
+  `/etc/greetd/display-manager.before-syncrain`. The installs of the user who set it up keep it
+  current, and their `--uninstall` takes it out; other users' installs leave it alone.
+* Back: `./install.sh --login-screen-off` puts back what started at boot before (SDDM, Plasma Login,
+  greetd's own login, or none) and greetd's config and PAM file. A display manager picked since
+  stays; one removed since leaves greetd with its own config; if systemctl fails otherwise, running
+  it again finishes. Where syncrain's login screen is not installed, it changes nothing.
+* From a text console (Ctrl+Alt+F3), with SDDM or Plasma Login recorded: `sudo systemctl enable
+  --force` and its unit, then `sudo reboot`. `--diagnose` shows the record and the last starts.
 * Upgrading: run the newer `./install.sh`; it names the build it replaces and restarts the
   wallpaper. `syncrain --build` says what is installed.
 
@@ -113,7 +123,8 @@ syncrain sets `__NV_DISABLE_EXPLICIT_SYNC=1` and `__GL_YIELD=USLEEP` for itself 
 
 `syncrain --diagnose`, inside the desktop session: a verdict first, then the session, libraries,
 cards, OpenGL, screens, the native wallpaper and, on KDE, KWin's answer about covered screens. If
-OpenGL cannot start, syncrain exits with status 69 and the service does not retry.
+OpenGL cannot start, syncrain exits with status 69. The service does not retry that, nor 2 (no
+wallpaper layer, or an unknown option) or 70 (a native wallpaper from another build).
 `journalctl --user -u syncrain` shows the startup line.
 
 ## Power and memory

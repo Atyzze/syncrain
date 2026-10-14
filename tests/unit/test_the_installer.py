@@ -14,6 +14,7 @@ import sys
 import pytest
 
 from syncrain import build
+from syncrain.app import NO_RESTART
 from tests.conftest import native_build_tools, need
 from tests.support import systemd_exec_words
 
@@ -102,14 +103,23 @@ def test_an_older_install_is_upgraded_and_named(root, home):
     assert f"Upgrading syncrain from build {build.BUILD_NUMBER - 1} to build {build.BUILD_NUMBER}" in again.stdout
 
 
-def test_the_service_never_restarts_into_a_machine_without_opengl(root, home):
+def test_the_service_never_restarts_into_a_failure_a_restart_cannot_change(root, home):
+    """No OpenGL, no wallpaper layer (GNOME), an unknown option, a native wallpaper from another
+    build: each would otherwise start again every 3 s, for good."""
     tmp, env = home
     done = install(root, env, "--autostart", "--channel", CHANNEL, "--rainbow", "all")
     assert done.returncode == 0, done.stdout + done.stderr
     unit = (tmp / "config/systemd/user/syncrain.service").read_text()
-    assert "RestartPreventExitStatus=69" in unit
+    prevent = next(line for line in unit.splitlines() if line.startswith("RestartPreventExitStatus="))
+    assert prevent.split("=", 1)[1].split() == [str(status) for status in NO_RESTART]
     value = next(line for line in unit.splitlines() if line.startswith("ExecStart="))[len("ExecStart="):]
     assert systemd_exec_words(value) == [str(tmp / ".local/bin/syncrain"), "--channel", CHANNEL, "--rainbow", "all"]
+
+
+def test_an_unknown_option_ends_with_a_status_the_service_does_not_restart_on(root):
+    done = subprocess.run([sys.executable, "-m", "syncrain", "--no-such-option"], cwd=root, capture_output=True,
+                          text=True, timeout=60, env=dict(os.environ, PYTHONPATH=str(root), PYTHONSAFEPATH="1"))
+    assert done.returncode in NO_RESTART and "--no-such-option" in done.stderr, done.stderr
 
 
 def test_uninstall_takes_everything_it_put_there(root, home):

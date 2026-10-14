@@ -123,13 +123,23 @@ def login_lines(log_lines=8) -> list[str]:
     manager = os.path.basename(os.readlink(link)) if os.path.islink(link) else "none set"
     lines = [f"display manager at boot: {manager}"]
     lib = env("SYNCRAIN_LOGIN_LIB") or "/usr/local/lib/syncrain"
-    config = _read(env("SYNCRAIN_GREETD_CONFIG") or "/etc/greetd/config.toml") or ""
+    config_path = env("SYNCRAIN_GREETD_CONFIG") or "/etc/greetd/config.toml"
+    config = _read(config_path) or ""
     if manager == "greetd.service":
         ours = f"{lib}/syncrain/login/login.sh" in config
         lines.append("greetd runs syncrain's login screen" if ours else "greetd runs another greeter")
     built = (_read(os.path.join(lib, "BUILD_NUMBER")) or "").strip()
     if built:
         lines.append(f"syncrain's login screen: build {built} in {lib}")
+    # install.sh's record of what started at boot before --login-screen; --login-screen-off goes back to it
+    record = env("SYNCRAIN_LOGIN_BEFORE") or os.path.join(os.path.dirname(config_path), "display-manager.before-syncrain")
+    before = (_read(record) or _read(os.path.join(lib, "previous-display-manager")) or "").strip()
+    if before == "unknown":
+        lines.append("before syncrain's login screen: not known (--login-screen-off keeps greetd, with its own config)")
+    elif before == "none":
+        lines.append("before syncrain's login screen: no display manager (--login-screen-off goes back to that)")
+    elif before:
+        lines.append(f"before syncrain's login screen: {before} (--login-screen-off goes back to it)")
     state = env("SYNCRAIN_LOGIN_STATE") or "/var/lib/syncrain-login"
     for name in ("login.log", "login.log.1"):
         said = [line for line in (_read(os.path.join(state, name)) or "").splitlines()

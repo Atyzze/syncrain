@@ -4,8 +4,8 @@
 #   ./install.sh                     install this build for your user (asks for sudo once, for pacman packages)
 #   ./install.sh --autostart         ...and start it with every graphical login
 #   ./install.sh --theme matrix --channel friends --autostart
-#   ./install.sh --login-screen      ...and make the rain your login screen (greetd; SDDM stays installed)
-#   ./install.sh --login-screen-off  back to the login screen from before
+#   ./install.sh --login-screen      ...and the rain as your login screen too (optional; greetd, yours stays installed)
+#   ./install.sh --login-screen-off  back to the login screen you had (undoes only what --login-screen did)
 #   ./install.sh --uninstall         remove it again (pacman packages are left installed)
 #
 # Run from a newer build's folder, it upgrades in place and restarts a running wallpaper.
@@ -28,13 +28,14 @@ info() { printf '  %s\n' "$*"; }
 die()  { printf '\033[31merror:\033[0m %s\n' "$*" >&2; exit 1; }
 
 usage() {
-  sed -n '2,16p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+  sed -n '2,15p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
   cat <<'EOF'
 
 Options:
   --autostart           start with every graphical login (systemd user service)
-  --login-screen        the rain and a login box as the login screen, from the next boot (greetd)
-  --login-screen-off    back to the login screen from before (SDDM)
+  --login-screen        optional: the rain and a login box as the login screen, from the next boot
+                        (greetd); without it the installer never touches your login screen
+  --login-screen-off    back to the login screen from before (undoes only what --login-screen did)
   --theme NAME          nixos (default) or matrix
   --channel NAME        stream name (default: public)
   --rainbow MODE        logo (default), all or off
@@ -99,21 +100,86 @@ remove_plasma_wallpaper() {
   fi
 }
 
-# ---- the login screen (build 16): greetd runs syncrain/login/login.sh as its user `greeter`, so the
-# app is copied where that user can read it. SDDM (or whichever was the display manager) stays
-# installed; switching back is `systemctl enable --force` of it again.
+# ---- the login screen, only with --login-screen: greetd runs syncrain/login/login.sh as its user
+# `greeter`, so the app is copied where that user can read it. The display manager it replaces (SDDM,
+# Plasma Login) stays installed, and --login-screen-off switches back to it. Without --login-screen
+# none of this runs: installing, upgrading and removing the wallpaper leave the login screen alone.
 LOGIN_LIB="${SYNCRAIN_LOGIN_LIB:-/usr/local/lib/syncrain}"
 LOGIN_STATE="${SYNCRAIN_LOGIN_STATE:-/var/lib/syncrain-login}"
 GREETD_CONFIG="${SYNCRAIN_GREETD_CONFIG:-/etc/greetd/config.toml}"
 GREETD_PAM="${SYNCRAIN_GREETD_PAM:-/etc/pam.d/greetd}"
 DM_LINK="${SYNCRAIN_DM_LINK:-/etc/systemd/system/display-manager.service}"
+# What started at boot before --login-screen: a unit (sddm.service, plasmalogin.service,
+# greetd.service), "none" or "unknown". Written by --login-screen before anything else changes,
+# beside greetd's config rather than in the app copy, so removing the copy never loses it;
+# --login-screen-off deletes it last.
+LOGIN_BEFORE="${SYNCRAIN_LOGIN_BEFORE:-$(dirname "$GREETD_CONFIG")/display-manager.before-syncrain}"
 as_root() { if [ "$(id -u)" = 0 ]; then "$@"; else sudo "$@"; fi; }
+# One of this user's files, copied to where root keeps the login screen: the user reads it, root only
+# writes. root opening a path the user controls would follow a link there to root's own files and
+# make them readable by everyone. A file this user cannot read stays out.
+copy_to_root() {
+  if [ -f "$1" ] && [ -r "$1" ]; then cat -- "$1" | as_root tee "$2" >/dev/null
+  else info "not copied, this user cannot read it: $1"; fi
+}
+# KWin on the login screen reads this user's screen layout, keyboard layout and Num Lock (kcminputrc)
+# from copies, made into the folder root made, $1.
+copy_kde_settings() {
+  local f conf="${XDG_CONFIG_HOME:-$HOME/.config}"
+  for f in kwinoutputconfig.json kxkbrc kcminputrc; do
+    if [ -e "$conf/$f" ] || [ -L "$conf/$f" ]; then copy_to_root "$conf/$f" "$1/$f"; fi
+  done
+}
+# The copies of those settings login.sh made in the state folder go when they are copied anew: it
+# makes them again at its next start. (find does not go into a link in the folder's place.)
+clear_state_copies() {
+  if [ -d "$LOGIN_STATE/config" ]; then
+    as_root find "$LOGIN_STATE/config" -maxdepth 1 \( -name kwinoutputconfig.json -o -name kxkbrc -o -name kcminputrc \) -delete
+  fi
+}
 # The hand-over after a login (syncrain/handover.py): Plasma's splash and wallpaper become a still
 # frame of the rain. It needs this user's Plasma session (its shell sets the wallpaper).
 in_plasma() { case "${XDG_CURRENT_DESKTOP:-}" in *KDE*) [ -n "${WAYLAND_DISPLAY:-}${DISPLAY:-}" ] ;; *) false ;; esac; }
 handover() { PYTHONPATH="$1" PYTHONSAFEPATH=1 python3 -m syncrain.handover "${@:2}"; }
+HANDOVER_STATE="${XDG_STATE_HOME:-$HOME/.local/state}/syncrain/handover.json"
+# This user's splash and wallpaper as they were: this folder's code, or the installed one's when this
+# folder is too old to have it.
+handover_off() {
+  if [ -f "$SRC/syncrain/handover.py" ]; then handover "$SRC" off || true
+  elif [ -f "$APPDIR/syncrain/handover.py" ]; then handover "$APPDIR" off || true; fi
+}
+# Who set the login screen up (login.json), or nothing. On a machine with more users, another user's
+# installs, upgrades and removals of the wallpaper leave it as that user set it up.
+login_user() {
+  python3 -c 'import json, sys; print(json.load(open(sys.argv[1], encoding="utf-8")).get("user", ""))' \
+    "$LOGIN_LIB/login.json" 2>/dev/null || true
+}
+mine() { [ -f "$LOGIN_LIB/login.json" ] && [ "$(login_user)" = "$(id -un)" ]; }
 
-display_manager() { local t; t="$(readlink "$DM_LINK" 2>/dev/null)" && basename "$t"; }
+unit_name() { case "$1" in *[!A-Za-z0-9@._-]*|"") return 1 ;; *.service) return 0 ;; *) return 1 ;; esac; }
+# What starts at boot now: the display manager's unit, "none" without one, "unknown" for anything else.
+display_manager() {
+  local t
+  if [ -L "$DM_LINK" ]; then
+    t="$(basename "$(readlink "$DM_LINK")")"
+    if unit_name "$t"; then printf '%s\n' "$t"; else printf 'unknown\n'; fi
+  elif [ -e "$DM_LINK" ]; then printf 'unknown\n'
+  else printf 'none\n'; fi
+}
+# The record of what started at boot before syncrain's login screen, or nothing. Builds 16 and 17 kept
+# it inside the app copy, and only for a display manager other than greetd.
+recorded_before() {
+  local v=""
+  if [ -f "$LOGIN_BEFORE" ]; then v="$(head -n 1 "$LOGIN_BEFORE")"
+  elif [ -f "$LOGIN_LIB/previous-display-manager" ]; then v="$(head -n 1 "$LOGIN_LIB/previous-display-manager")"; fi
+  case "$v" in none|unknown) printf '%s\n' "$v" ;; *) if unit_name "$v"; then printf '%s\n' "$v"; fi ;; esac
+}
+record_before() {
+  as_root mkdir -p "$(dirname "$LOGIN_BEFORE")"
+  printf '%s\n' "$1" | as_root tee "$LOGIN_BEFORE" >/dev/null
+  as_root chmod 644 "$LOGIN_BEFORE"             # read back as this user, whatever root's umask
+}
+keep_record() { if [ ! -f "$LOGIN_BEFORE" ] && [ -n "$1" ]; then record_before "$1"; fi; }
 
 login_screen_on() {
   bold "Making the rain your login screen (greetd)"
@@ -124,13 +190,20 @@ login_screen_on() {
   fi
   command -v kwin_wayland >/dev/null || die "the login screen runs in KWin (Plasma's compositor), which is not installed"
   command -v agreety >/dev/null || die "greetd's text login (agreety, pacman: greetd-agreety) is missing; the login screen falls back to it"
-  local tmp glyphs rain=("${ARGS[@]}") previous new="$LOGIN_LIB.new"
-  # The display manager to go back to; kept where only root can change it, as root runs it.
-  previous="$(cat "$LOGIN_LIB/previous-display-manager" 2>/dev/null || display_manager || true)"
-  case "$previous" in greetd.service|*[!A-Za-z0-9@._-]*|"") previous="" ;; esac
+  local tmp glyphs rain=("${ARGS[@]}") before now new="$LOGIN_LIB.new" f conf="${XDG_CONFIG_HOME:-$HOME/.config}"
+  # A record counts while greetd starts at boot. Once something else does (picked since), that is
+  # what comes before; with greetd running syncrain's config and no record, it is not known.
+  before="$(recorded_before)"
+  now="$(display_manager)"
+  if [ "$now" != greetd.service ]; then before="$now"
+  elif [ -z "$before" ]; then
+    before=greetd.service
+    if grep -qs syncrain "$GREETD_CONFIG"; then before=unknown; fi
+  fi
+  record_before "$before"
   tmp="$(mktemp -d)"
-  # login.json: who logs in by default, and the rain's options as the wallpaper has them
-  glyphs="${XDG_CONFIG_HOME:-$HOME/.config}/syncrain/glyphs.json"
+  # login.json: who logs in by default, and the rain's options as given to this installer
+  glyphs="$conf/syncrain/glyphs.json"
   if [ -f "$glyphs" ]; then cp "$glyphs" "$tmp/glyphs.json"; rain+=(--glyphs "$LOGIN_LIB/glyphs.json"); fi
   write_login_json() {
     python3 -c 'import json, sys; json.dump({"user": sys.argv[2], "session": "plasma.desktop", "rain": sys.argv[3:]},
@@ -144,27 +217,27 @@ login_screen_on() {
     XDG_CACHE_HOME="$tmp/cache" SYNCRAIN_LOGIN_CONFIG="$tmp/draw.json" PYTHONPATH="$APPDIR" PYTHONSAFEPATH=1 \
       python3 -m syncrain.greeter --draw-symbols || info "the symbols were not drawn now; the login screen draws them"
   fi
-  # Made beside the old copy and swapped in whole, so greetd never finds half of one.
+  # Made beside the old copy and swapped in whole, so greetd never finds half of one. The app goes
+  # over without following links (-P); every other file of this user's goes through copy_to_root.
+  # chmod -R is given only the folder root made: a link it meets inside, it leaves alone.
   as_root rm -rf "$new"
   as_root mkdir -p "$new/cache" "$new/kde"
-  as_root cp -r "$APPDIR/syncrain" "$APPDIR/BUILD_NUMBER" "$tmp/login.json" "$new/"
-  if [ -f "$tmp/glyphs.json" ]; then as_root cp "$tmp/glyphs.json" "$new/"; fi
-  if [ -n "$previous" ]; then printf '%s\n' "$previous" | as_root tee "$new/previous-display-manager" >/dev/null; fi
-  if [ -d "$tmp/cache/syncrain" ]; then
-    find "$tmp/cache/syncrain" -name 'glyphs-*.png' -exec cp {} "$tmp/" \;
-    for f in "$tmp"/glyphs-*.png; do if [ -f "$f" ]; then as_root cp "$f" "$new/cache/"; fi; done
-  fi
-  # KWin there reads your screen layout, keyboard layout and Num Lock (kcminputrc) from these copies
-  for f in kwinoutputconfig.json kxkbrc kcminputrc; do
-    f="${XDG_CONFIG_HOME:-$HOME/.config}/$f"
-    if [ -f "$f" ]; then as_root cp "$f" "$new/kde/"; fi
+  as_root cp -RP "$APPDIR/syncrain" "$new/"
+  copy_to_root "$APPDIR/BUILD_NUMBER" "$new/BUILD_NUMBER"
+  copy_to_root "$tmp/login.json" "$new/login.json"
+  if [ -f "$tmp/glyphs.json" ]; then copy_to_root "$tmp/glyphs.json" "$new/glyphs.json"; fi
+  for f in "$tmp/cache/syncrain"/glyphs-*.png; do
+    if [ -f "$f" ]; then copy_to_root "$f" "$new/cache/${f##*/}"; fi
   done
+  copy_kde_settings "$new/kde"
   as_root chmod -R a+rX "$new"
   as_root rm -rf "$LOGIN_LIB"
   as_root mv "$new" "$LOGIN_LIB"
-  as_root install -d -m 755 -o "${SYNCRAIN_LOGIN_OWNER:-greeter}" -g "${SYNCRAIN_LOGIN_OWNER:-greeter}" "$LOGIN_STATE"
+  local owner="${SYNCRAIN_LOGIN_OWNER:-greeter}"
+  as_root install -d -m 755 -o "$owner" -g "$(id -gn "$owner")" "$LOGIN_STATE"
+  clear_state_copies
   rm -rf "$tmp"
-  info "the app: $LOGIN_LIB (user $(id -un), Plasma, your wallpaper's options)"
+  info "the app: $LOGIN_LIB (user $(id -un), Plasma, the rain's options given to this installer)"
 
   if [ -f "$GREETD_CONFIG" ] && ! grep -q syncrain "$GREETD_CONFIG" && [ ! -f "$GREETD_CONFIG.before-syncrain" ]; then
     as_root cp "$GREETD_CONFIG" "$GREETD_CONFIG.before-syncrain"
@@ -192,36 +265,88 @@ login_screen_on() {
   else
     info "run this again from your Plasma session for the still frame after a login"
   fi
-  info "from your next boot the login screen is the rain (before: ${previous:-none})"
+  info "from your next boot the login screen is the rain (before: $before)"
   info "if it ever fails, greetd's text login asks instead, and Plasma starts as usual"
-  info "back: ./install.sh --login-screen-off, or from a text console (Ctrl+Alt+F3):"
-  info "  sudo systemctl enable --force ${previous:-sddm.service} && sudo reboot"
+  info "back: ./install.sh --login-screen-off"
+  if unit_name "$before" && [ "$before" != greetd.service ]; then
+    info "  or from a text console (Ctrl+Alt+F3): sudo systemctl enable --force $before && sudo reboot"
+  fi
 }
 
+# Puts back only what --login-screen changed, and only when syncrain changed it: with no record, no
+# app copy and no greetd config of syncrain's, the login screen is not syncrain's and stays as it is.
+# What starts at boot changes only while greetd still does: a display manager picked since stays,
+# and one that is gone leaves greetd with its own config rather than no way to log in. Run again
+# (for the hand-over, from Plasma), it finds nothing more of the login screen to put back.
 login_screen_off() {
-  local previous
-  previous="$(cat "$LOGIN_LIB/previous-display-manager" 2>/dev/null || true)"
-  case "$previous" in greetd.service|*[!A-Za-z0-9@._-]*|"") previous=sddm.service ;; esac
-  bold "Putting the login screen back on $previous"
-  as_root systemctl enable --force "$previous" >/dev/null || die "systemctl could not enable $previous"
-  if [ -f "$GREETD_CONFIG.before-syncrain" ]; then as_root mv -f "$GREETD_CONFIG.before-syncrain" "$GREETD_CONFIG"; fi
-  if [ -f "$GREETD_PAM.before-syncrain" ]; then as_root mv -f "$GREETD_PAM.before-syncrain" "$GREETD_PAM"; fi
-  # this build's hand-over, or the installed one when this folder is older than build 17
-  if [ -f "$SRC/syncrain/handover.py" ]; then handover "$SRC" off || true
-  elif [ -f "$APPDIR/syncrain/handover.py" ]; then handover "$APPDIR" off || true; fi
-  as_root rm -rf "$LOGIN_LIB" "$LOGIN_STATE"
-  info "from your next boot; greetd stays installed"
+  local before now keep="" again=""
+  before="$(recorded_before)"
+  now="$(display_manager)"
+  if [ -z "$before" ] && [ ! -d "$LOGIN_LIB" ] && ! grep -qs syncrain "$GREETD_CONFIG"; then
+    bold "syncrain's login screen is not installed: the login screen stays as it is"
+  else
+    if [ "$now" != greetd.service ]; then
+      bold "Taking syncrain's login screen out; what starts at boot ($now) stays"
+    else
+      case "$before" in
+        none) bold "Putting back what started at boot before: no display manager"
+              as_root systemctl disable greetd.service >/dev/null || again="systemctl could not disable greetd" ;;
+        greetd.service) bold "Putting greetd's own login back" ;;
+        ""|unknown) bold "Taking syncrain's login screen out"
+                    keep="what started at boot before is not known" ;;
+        *) bold "Putting the login screen back on $before"
+           if ! as_root systemctl enable --force "$before" >/dev/null; then
+             if systemctl cat "$before" >/dev/null 2>&1; then again="systemctl could not enable $before"
+             else keep="$before is not installed any more"; fi
+           fi ;;
+      esac
+    fi
+    if [ -f "$GREETD_CONFIG.before-syncrain" ] && grep -qs syncrain "$GREETD_CONFIG"; then
+      as_root mv -f "$GREETD_CONFIG.before-syncrain" "$GREETD_CONFIG"
+    fi
+    if [ -f "$GREETD_PAM.before-syncrain" ] && grep -qs "added by syncrain" "$GREETD_PAM"; then
+      as_root mv -f "$GREETD_PAM.before-syncrain" "$GREETD_PAM"
+    fi
+    as_root rm -rf "$LOGIN_LIB" "$LOGIN_STATE"
+    # The record goes once what it names is back; a run that could not do that leaves it for the next.
+    if [ -n "$again" ]; then
+      record_before "$before"                   # builds 16 and 17 kept it in the app copy, gone now
+      info "$again: greetd stays for now, with its own config; ./install.sh --login-screen-off again finishes this"
+    else
+      as_root rm -f "$LOGIN_BEFORE"
+    fi
+    if [ -n "$keep" ]; then
+      info "$keep, so greetd stays, with its own config;"
+      info "to switch: sudo systemctl enable --force <the one you want>.service"
+    fi
+    info "from your next boot; greetd stays installed"
+  fi
+  handover_off
 }
 
-# A newer build updates the login screen's copy too, keeping its settings.
+# A newer build updates the login screen's copy too, keeping its settings (and moving the record of
+# what started at boot before out of the copy, where builds 16 and 17 kept it). Only the user who
+# set the login screen up updates it.
 login_screen_refresh() {
-  [ -f "$LOGIN_LIB/login.json" ] || return 0
-  as_root rm -rf "$LOGIN_LIB/syncrain.new"
-  as_root cp -r "$APPDIR/syncrain" "$LOGIN_LIB/syncrain.new"
-  as_root chmod -R a+rX "$LOGIN_LIB/syncrain.new"
-  as_root rm -rf "$LOGIN_LIB/syncrain"
-  as_root mv "$LOGIN_LIB/syncrain.new" "$LOGIN_LIB/syncrain"
-  as_root cp "$APPDIR/BUILD_NUMBER" "$LOGIN_LIB/"
+  if ! mine; then
+    if [ -f "$LOGIN_LIB/login.json" ]; then info "the login screen stays as $(login_user) set it up"; fi
+    return 0
+  fi
+  keep_record "$(recorded_before)"
+  # Into a folder root makes, for chmod -R: given a link by name, it would follow it, and the copy
+  # is of a folder this user can change. The screen and keyboard settings go over again too, as this
+  # user reads them now, so a copy an earlier build made as root through a link goes.
+  as_root rm -rf "$LOGIN_LIB.new"
+  as_root mkdir -p "$LOGIN_LIB.new/kde"
+  as_root cp -RP "$APPDIR/syncrain" "$LOGIN_LIB.new/"
+  copy_kde_settings "$LOGIN_LIB.new/kde"
+  as_root chmod -R a+rX "$LOGIN_LIB.new"
+  as_root rm -rf "$LOGIN_LIB/syncrain" "$LOGIN_LIB/kde"
+  as_root mv "$LOGIN_LIB.new/syncrain" "$LOGIN_LIB.new/kde" "$LOGIN_LIB/"
+  as_root rm -rf "$LOGIN_LIB.new"
+  clear_state_copies
+  copy_to_root "$APPDIR/BUILD_NUMBER" "$LOGIN_LIB/BUILD_NUMBER"
+  as_root chmod a+r "$LOGIN_LIB/BUILD_NUMBER"
   info "the login screen: build $BUILD too"
   local rain=()
   # the login screen's options without its copy of the symbols file (here syncrain reads yours)
@@ -230,7 +355,7 @@ import json, sys
 args = json.load(open(sys.argv[1])).get("rain", [])
 skip = {i + 1 for i, a in enumerate(args) if a == "--glyphs"} | {i for i, a in enumerate(args) if a == "--glyphs"}
 [print(a) for i, a in enumerate(args) if i not in skip]' "$LOGIN_LIB/login.json" 2>/dev/null)
-  if in_plasma && [ -f "${XDG_STATE_HOME:-$HOME/.local/state}/syncrain/handover.json" ]; then
+  if in_plasma && [ -f "$HANDOVER_STATE" ]; then
     handover "$APPDIR" on "${rain[@]}" >/dev/null || true
   fi
 }
@@ -241,7 +366,13 @@ if [ "$LOGIN_OFF" = 1 ]; then
 fi
 
 if [ "$UNINSTALL" = 1 ]; then
-  if [ -f "$LOGIN_LIB/login.json" ]; then login_screen_off; fi
+  # syncrain's login screen goes too when this user set it up. Another user's stays, and without one
+  # the login screen is not touched at all.
+  if mine; then login_screen_off
+  else
+    if [ -f "$LOGIN_LIB/login.json" ]; then info "the login screen stays as $(login_user) set it up (--login-screen-off takes it out)"; fi
+    if [ -f "$HANDOVER_STATE" ]; then handover_off; fi
+  fi
   remove_plasma_wallpaper
   bold "Removing syncrain"
   if [ -f "$UNIT" ]; then
@@ -380,8 +511,10 @@ After=graphical-session.target
 ExecStart=$(unit_words "$BINDIR/syncrain" "${ARGS[@]}")
 Restart=on-failure
 RestartSec=3
-# exit status 69 means no OpenGL here; restarting would only cover the desktop again (syncrain --diagnose says why)
-RestartPreventExitStatus=69
+# statuses a restart cannot change, so it would only start the same failure every 3 s: 69 no OpenGL here,
+# 2 no wallpaper layer (GNOME) or an unknown option, 70 a native wallpaper from another build
+# (syncrain --diagnose says why)
+RestartPreventExitStatus=2 69 70
 
 [Install]
 WantedBy=graphical-session.target

@@ -52,6 +52,9 @@ showed within seconds, which is why syncrain draws every frame from the clock.
   in any locale (what broke the Plasma wallpaper).
 * **17** (2026-10-13): the box on every screen; after a login, Plasma's splash and wallpaper show a
   still frame of the rain.
+* **18** (2026-10-14): the first fixes from a review of 17. The login screen stays optional: only
+  `--login-screen` changes how the machine logs in, `--login-screen-off` puts back exactly what was
+  there, and root copies only what the operator could read.
 
 ## The operator's words
 
@@ -90,4 +93,7 @@ showed within seconds, which is why syncrain draws every frame from the clock.
 * **After 15**: a photo of the Plasma wallpaper, all white and all hieroglyphs; "yes, make it".
 * **After 16**: "Success!"; "I want it displayed always on all screens"; "the kde login logo with a
   black screen and then for 1s I still saw my old static wallpaper".
+* **After 17**: "Full in depth code review please"; "makes sure that the login screen replacement
+  remains fully optional, and that those who just want the wallpaper that their existing login
+  method isn't touched".
 * **Standing**: no long dashes in anything written to them.

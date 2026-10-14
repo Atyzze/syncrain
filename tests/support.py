@@ -2,9 +2,11 @@
 from __future__ import annotations
 
 import contextlib
+import getpass
 import os
 import signal
 import subprocess
+import sys
 import time
 from pathlib import Path
 
@@ -73,6 +75,117 @@ def headless_sway(run: Path, screen: str = "1280x720"):
 def grab(session: dict, path: Path) -> None:
     """What the Wayland session's screen shows, as a PNG (grim)."""
     subprocess.run(["grim", str(path)], env=dict(os.environ, **session), check=True, timeout=30)
+
+
+def stub(folder: Path, name: str, body: str) -> Path:
+    """`folder/name`, a shell script standing in for a command of the system's."""
+    folder.mkdir(parents=True, exist_ok=True)
+    path = folder / name
+    path.write_text("#!/bin/sh\n" + body + "\n")
+    path.chmod(0o755)
+    return path
+
+
+#: Where login_install puts the system's side of the login screen, under its base folder.
+LOGIN_PATHS = {"SYNCRAIN_LOGIN_LIB": "lib", "SYNCRAIN_LOGIN_STATE": "state",
+               "SYNCRAIN_GREETD_CONFIG": "etc/greetd/config.toml", "SYNCRAIN_GREETD_PAM": "etc/pam.d/greetd",
+               "SYNCRAIN_DM_LINK": "display-manager.service"}
+
+
+def login_install(base: Path, *args: str, src: Path = ROOT, prefix: tuple = (), user: str | None = None,
+                  timeout: float = 180) -> subprocess.CompletedProcess:
+    """install.sh --no-deps run for real from `src`, with home, config and cache under `base` and the
+    system's side of the login screen there too (LOGIN_PATHS; the record of what started at boot
+    lands beside greetd's config). sudo, KWin, greetd's text login and systemctl are stubs: sudo
+    writes each command it runs to base/sudo.calls; systemctl says there is no user session, writes
+    every other call to base/systemctl.calls and moves the display-manager link as systemd does (a
+    unit named gone*.service is not installed; a file base/systemctl.refuse fails the next call).
+    `prefix` runs it as `user` (setpriv)."""
+    bins = base / "bin"
+    link = base / LOGIN_PATHS["SYNCRAIN_DM_LINK"]
+    stub(bins, "sudo", f'echo "$@" >> {base}/sudo.calls; exec "$@"')
+    stub(bins, "kwin_wayland", "exit 0")
+    stub(bins, "agreety", "exit 0")
+    stub(bins, "systemctl", f'''[ "$1" = --user ] && exit 1
+case "$1 $2" in "cat gone"*) exit 1 ;; "cat "*) exit 0 ;; esac
+echo "$@" >> {base}/systemctl.calls
+if [ -f {base}/systemctl.refuse ]; then rm -f {base}/systemctl.refuse; echo "Access denied" >&2; exit 1; fi
+case "$1 $2 $3" in
+  *" gone"*) echo "Failed to enable unit: Unit file $3 does not exist." >&2; exit 1 ;;
+  "enable --force "*) ln -sfn "/usr/lib/systemd/system/$3" {link} ;;
+  "disable "*) if [ "$(basename "$(readlink {link})")" = "$2" ]; then rm -f {link}; fi ;;
+esac
+exit 0''')
+    env = {"HOME": str(base / "home"), "XDG_CONFIG_HOME": str(base / "config"), "LANG": "C.UTF-8",
+           "XDG_CACHE_HOME": str(base / "cache"), "TMPDIR": str(base), "PYTHONDONTWRITEBYTECODE": "1",
+           "PATH": f"{bins}:{os.path.dirname(sys.executable)}:/usr/bin:/bin", "CC": "no-compiler-here",
+           "SYNCRAIN_LOGIN_OWNER": user or getpass.getuser(),
+           **{key: str(base / path) for key, path in LOGIN_PATHS.items()}}
+    for key in ("GI_TYPELIB_PATH", "LD_LIBRARY_PATH"):
+        if key in os.environ:
+            env[key] = os.environ[key]
+    return subprocess.run([*prefix, "bash", str(src / "install.sh"), "--no-deps", *args], cwd=src, env=env,
+                          capture_output=True, text=True, timeout=timeout)
+
+
+#: The user root runs install.sh as here (setpriv), as no user of the operator's is root.
+NOBODY = 65534
+
+
+class AnotherUser:
+    """install.sh run by a user who is not root, as on the operator's desktop, so that everything it
+    does as root goes through the sudo stub and is written down (login_install). The lanes in the
+    cloud run as root, which becomes `nobody` here, in a folder of its own with a copy of the release
+    folder; anyone else runs as themselves, in tmp_path, from this tree. A folder named root-only
+    stays root's."""
+
+    def __init__(self, tmp_path: Path):
+        import pwd
+        import shutil
+        import tempfile
+        self.root = os.getuid() == 0
+        if not self.root:
+            self.name, self.base, self.src, self.prefix = None, tmp_path, ROOT, ()
+            return
+        entry = pwd.getpwuid(NOBODY)
+        self.name, self.gid = entry.pw_name, entry.pw_gid
+        self.base = Path(tempfile.mkdtemp(prefix="syncrain-user-"))
+        self.src = self.base / "src"
+        self.src.mkdir()
+        for name in ("install.sh", "BUILD_NUMBER"):
+            shutil.copy2(ROOT / name, self.src / name)
+        shutil.copytree(ROOT / "syncrain", self.src / "syncrain", ignore=shutil.ignore_patterns("__pycache__"))
+        self.prefix = ("setpriv", f"--reuid={NOBODY}", f"--regid={self.gid}", "--clear-groups")
+
+    def unreadable(self, text: str) -> Path:
+        """A file this user can see but not read: root's, or one of mode 000."""
+        folder = self.base / "root-only"
+        folder.mkdir(exist_ok=True)
+        folder.chmod(0o711)
+        path = folder / "secret"
+        path.write_text(text)
+        path.chmod(0o600 if self.root else 0)
+        return path
+
+    def install(self, *args: str, src: Path | None = None) -> subprocess.CompletedProcess:
+        """install.sh from the release folder `src` (by default this tree's, or its copy)."""
+        if self.root:                       # what the test made there is the user's, as at home
+            os.lchown(self.base, NOBODY, self.gid)
+            for top, dirs, files in os.walk(self.base):
+                dirs[:] = [d for d in dirs if d != "root-only"]
+                for name in dirs + files:
+                    os.lchown(os.path.join(top, name), NOBODY, self.gid)
+        return login_install(self.base, *args, src=src or self.src, prefix=self.prefix, user=self.name)
+
+    def calls(self, what: str) -> list[str]:
+        """What went through the sudo or systemctl stub ("sudo", "systemctl"), in order."""
+        path = self.base / f"{what}.calls"
+        return path.read_text().splitlines() if path.exists() else []
+
+    def close(self) -> None:
+        if self.root:
+            import shutil
+            shutil.rmtree(self.base, ignore_errors=True)
 
 
 def our_text_files() -> list[Path]:

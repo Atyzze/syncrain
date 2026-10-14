@@ -104,6 +104,13 @@ def session_env(session: dict) -> list[str]:
             f"XDG_CURRENT_DESKTOP={':'.join(desktop)}"]
 
 
+def session_command(session: dict) -> list[str]:
+    """The session's command as greetd takes it. greetd joins the words it is given with spaces and
+    has sh run the line, so the command goes as one word, quoted the way sh reads it: an Exec line's
+    quoted words arrive whole."""
+    return [shlex.join(session["cmd"])]
+
+
 def fallback_command(config: dict, dirs: list[Path] | None = None) -> str:
     """The command greetd's text login starts when this login screen did not come up (login.sh)."""
     found = sessions(dirs)
@@ -113,27 +120,41 @@ def fallback_command(config: dict, dirs: list[Path] | None = None) -> str:
     return shlex.join(["env", *session_env(s), *s["cmd"]])
 
 
-def state_dir() -> Path:
-    return Path(os.environ.get("SYNCRAIN_LOGIN_STATE") or os.environ.get("XDG_STATE_HOME") or "/tmp")
+def state_dir() -> Path | None:
+    """The login screen's own folder, which login.sh names; None anywhere else. install.sh's
+    --draw-symbols runs as the operator, and a fallback to a shared folder such as /tmp would read a
+    last.json any other user can leave there."""
+    named = os.environ.get("SYNCRAIN_LOGIN_STATE")
+    return Path(named) if named else None
+
+
+#: What the last login may say: who and which session, never the rain's options.
+LAST_KEYS = ("user", "session")
 
 
 def read_config() -> dict:
-    """login.json, then the last login on top of it."""
+    """login.json, then the last login (user and session) on top of it, on the login screen."""
     out: dict = {}
     path = Path(os.environ.get("SYNCRAIN_LOGIN_CONFIG") or LIB / "login.json")
-    for p in (path, state_dir() / "last.json"):
+    state = state_dir()
+    for p, keys in ((path, None), (state / "last.json" if state else None, LAST_KEYS)):
+        if p is None:
+            continue
         try:
             data = json.loads(p.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             continue
         if isinstance(data, dict):
-            out.update({k: v for k, v in data.items() if v not in (None, "")})
+            out.update({k: v for k, v in data.items() if v not in (None, "") and (keys is None or k in keys)})
     return out
 
 
 def remember(user: str, session_id: str) -> None:
+    state = state_dir()
+    if state is None:
+        return
     try:
-        (state_dir() / "last.json").write_text(json.dumps({"user": user, "session": session_id}), encoding="utf-8")
+        (state / "last.json").write_text(json.dumps({"user": user, "session": session_id}), encoding="utf-8")
     except OSError:
         pass
 
@@ -254,7 +275,7 @@ def run_box(config: dict, client: Greetd) -> int:
     def busy(on: bool):
         shared["busy"] = on
         for b in boxes:
-            for w in (b["user"], b["password"], b["chooser"], b["login"]):
+            for w in (b["user"], b["password"], b["chooser"], b["login"], b["text"]):
                 w.set_sensitive(not on)
 
     def choose(i):
@@ -285,6 +306,11 @@ def run_box(config: dict, client: Greetd) -> int:
         threading.Thread(target=work, daemon=True).start()
 
     def text_login():
+        # Not while greetd is checking a login: leaving now would leave greetd holding that half-made
+        # session, and the text login's first attempt would fail on it.
+        if shared["busy"]:
+            say("text login: not while a login is under way")
+            return
         # No marker: login.sh hands over to greetd's text login.
         say("text login asked for")
         loop.quit()
@@ -306,7 +332,7 @@ def run_box(config: dict, client: Greetd) -> int:
         tell("Logging in...")
 
         def work():
-            ok, said = client.login(name, secret, session["cmd"], session_env(session))
+            ok, said = client.login(name, secret, session_command(session), session_env(session))
             GLib.idle_add(done, ok, said, name, session)
         threading.Thread(target=work, daemon=True).start()
 
@@ -377,8 +403,9 @@ def run_box(config: dict, client: Greetd) -> int:
                             justify=Gtk.Justification.CENTER, visible=bool(shared["message"]))
         message.add_css_class("message")
         power = Gtk.Box(spacing=8, halign=Gtk.Align.CENTER)
+        buttons = {}
         for label, verb in (("Restart", "reboot"), ("Shut down", "poweroff"), ("Text login", "text")):
-            b = Gtk.Button(label=label)
+            b = buttons[verb] = Gtk.Button(label=label)
             b.add_css_class("flat")
             b.add_css_class("power")
             b.connect("clicked", lambda _b, verb=verb: text_login() if verb == "text" else power_off(verb))
@@ -398,7 +425,7 @@ def run_box(config: dict, client: Greetd) -> int:
             widget.add_controller(focus)
         name = (monitor.get_connector() if monitor is not None else None) or "a window"
         entry = {"win": win, "user": user, "password": password, "chooser": chooser, "login": login,
-                 "message": message, "name": name}
+                 "text": buttons["text"], "message": message, "name": name}
 
         def shown(*_):
             if name in shared["shown"]:
@@ -427,7 +454,8 @@ def run_box(config: dict, client: Greetd) -> int:
             make(monitor)
 
     # The tests type into the box through this: a list of {"user", "password", "session", "wait"
-    # (seconds before typing)} tried in turn; {"text": true} presses Text login.
+    # (seconds before typing)} tried in turn; {"text": true} presses Text login. An entry with
+    # "during": true comes while the login before it is still being checked.
     tests = json.loads(os.environ.get("SYNCRAIN_GREETER_TEST_INPUT") or "[]")
 
     def later(fn):
@@ -449,6 +477,8 @@ def run_box(config: dict, client: Greetd) -> int:
                 if s["id"] == t["session"]:
                     choose(i)
         attempt()
+        if tests and tests[0].get("during"):
+            later(next_test)
         return False
 
     display.get_monitors().connect("items-changed", lambda *_: GLib.idle_add(lambda: (place(), False)[1]))

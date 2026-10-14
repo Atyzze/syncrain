@@ -44,6 +44,19 @@ def build_number() -> int:
     return int((ROOT / "BUILD_NUMBER").read_text(encoding="utf-8").strip())
 
 
+@pytest.fixture
+def another_user(tmp_path):
+    """install.sh as a user who is not root (tests.support.AnotherUser)."""
+    from tests.support import AnotherUser
+    if os.getuid() == 0:
+        need(shutil.which("setpriv") is not None, "running as root without setpriv to become another user")
+    user = AnotherUser(tmp_path)
+    try:
+        yield user
+    finally:
+        user.close()
+
+
 def _free_display() -> int:
     for n in range(91, 130):
         if not Path(f"/tmp/.X11-unix/X{n}").exists() and not Path(f"/tmp/.X{n}-lock").exists():

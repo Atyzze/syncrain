@@ -1,4 +1,4 @@
-# Where we are, at build 17
+# Where we are, at build 18
 
 The project on one page. Detail: `docs/agent/HANDOFF.md`.
 
@@ -27,13 +27,16 @@ name, so everyone on a channel sees the same rain. Linux (Wayland, X11) and the 
   a weight or a share.
 * **The login screen** (build 16, working on your desktop): `./install.sh --login-screen`; greetd,
   the rain and a login box on every screen (17), then Plasma, its splash and wallpaper a still of
-  the rain (17). A failure falls back to a text login.
+  the rain (17). A failure falls back to a text login. Optional: without it the installer never
+  touches your login, and `--login-screen-off` puts back what started at boot before (18).
+* **A review of build 17**: build 18 fixes eight of its findings; five middling ones are open.
 * **Why the Plasma wallpaper went white**: Dutch number format inside Plasma; fixed in build 16.
-* **On GitHub**: github.com/Atyzze/syncrain, every build up to 17.
+* **On GitHub**: github.com/Atyzze/syncrain, every build up to 18.
 
 ## What comes next
 
-* **Build 18**: what you find in 17; then a boot splash (a still frame of the rain) before the login.
+* **Build 19**: what you find in 18; then the rest of the review or the boot splash (a still frame
+  of the rain before the login), your pick.
 * **Then**: a NixOS image.
 
 ## The decision in front of you
@@ -42,6 +45,8 @@ name, so everyone on a channel sees the same rain. Linux (Wayland, X11) and the 
    the fastest streams skip a row now and then. Recommended: try `syncrain --fps 20` for a day.
 2. **Pause behind maximized windows too, or only full-screen ones?** Both now; behind a see-through
    window the rain then stands still. Recommended: both.
+3. **Build 19: the rest of the review, or the boot splash first?** Recommended: the review (it
+   decides whether the login screen works on machines set up unlike yours).
 
 ## Words
 

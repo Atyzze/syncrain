@@ -23,8 +23,9 @@ in
         ExecStart = "${lib.getExe cfg.package} ${exec}";
         Restart = "on-failure";
         RestartSec = 3;
-        # exit status 69 means no OpenGL here; restarting would only cover the desktop again (`syncrain --diagnose`)
-        RestartPreventExitStatus = 69;
+        # statuses a restart cannot change: 69 no OpenGL here, 2 no wallpaper layer (GNOME) or an
+        # unknown option, 70 a native wallpaper from another build (`syncrain --diagnose`)
+        RestartPreventExitStatus = "2 69 70";
       };
       Install.WantedBy = [ "graphical-session.target" ];
     };

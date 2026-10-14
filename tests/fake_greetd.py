@@ -1,17 +1,21 @@
 """A stand-in for greetd's socket, as a greeter sees it (greetd-ipc(7)): one user and password,
-a PAM conversation of an info line and the password prompt, and a record of every request."""
+a PAM conversation of an info line and the password prompt, and a record of every request.
+`delay` is how long checking a password takes (a slow PAM module)."""
 from __future__ import annotations
 
 import json
 import socket
 import struct
 import threading
+import time
 from pathlib import Path
 
 
 class FakeGreetd:
-    def __init__(self, path: Path, user: str = "op", password: str = "right", info: str = "Welcome"):
+    def __init__(self, path: Path, user: str = "op", password: str = "right", info: str = "Welcome",
+                 delay: float = 0.0):
         self.path, self.user, self.password, self.info = str(path), user, password, info
+        self.delay = delay
         self.requests: list[dict] = []
         self.server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         self.server.bind(self.path)
@@ -60,6 +64,7 @@ class FakeGreetd:
                     step = 2
                     reply = {"type": "auth_message", "auth_message_type": "secret", "auth_message": "Password:"}
                 elif kind == "post_auth_message_response" and step == 2:
+                    time.sleep(self.delay)
                     step = 3 if (user == self.user and req.get("response") == self.password) else 0
                     reply = {"type": "success"} if step == 3 else \
                         {"type": "error", "error_type": "auth_error", "description": "pam_authenticate: AUTH_ERR"}

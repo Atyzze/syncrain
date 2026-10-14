@@ -19,6 +19,7 @@ import time
 import pytest
 
 from syncrain import build
+from syncrain.app import NO_RESTART
 from tests.conftest import need
 from tests.support import MOMENT, grab, headless_sway, mean_abs_diff, systemd_exec_words
 
@@ -56,7 +57,7 @@ def test_the_services_pass_the_channel_through_systemd_intact(evaluated, which):
     words = systemd_exec_words(exec_start)
     assert words[0].endswith("/bin/syncrain")
     assert words[words.index("--channel") + 1] == CHANNEL, words
-    assert service["prevent"] == 69
+    assert str(service["prevent"]).split() == [str(status) for status in NO_RESTART]
     if which == "nixos":                      # set there; the home-manager service keeps the defaults
         assert words[words.index("--pause-under") + 1] == "fullscreen", words
         assert [words[words.index(o) + 1] for o in ("--speed", "--glow", "--snow", "--hieroglyphs")] == \

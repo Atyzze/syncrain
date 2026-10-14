@@ -19,6 +19,13 @@ from . import build, hidden, native
 #: RestartPreventExitStatus, so a machine without working OpenGL is not covered by an endless
 #: restart loop of blank wallpapers; sysexits.h calls it EX_UNAVAILABLE.
 EXIT_NO_GL = 69
+#: The exit status when the compositor offers no wallpaper layer (GNOME); argparse's too, for an
+#: unknown option.
+EXIT_NO_LAYER = 2
+#: What every autostart service lists under RestartPreventExitStatus: a restart cannot change these,
+#: so it would only start the same failure again every few seconds, for good. 70 is the native
+#: wallpaper's for a scene from another build (syncrain/native/wallpaper.c).
+NO_RESTART = (EXIT_NO_LAYER, EXIT_NO_GL, 70)
 
 #: The oldest contexts the shaders compile on: GLSL 3.30 core, or GLSL ES 3.00 (what WebGL2 runs).
 MIN_GL = {False: (3, 3), True: (3, 0)}
@@ -362,7 +369,7 @@ def main(argv=None):
         if LayerShell is None:
             print("syncrain: this Wayland compositor has no wlr-layer-shell support (GNOME?). "
                   "Use --window, or the web version in web/index.html.", file=sys.stderr)
-            return 2
+            return EXIT_NO_LAYER
 
     # Until the first frame, and if OpenGL never comes, a window shows its theme background:
     # black, not the light grey a GTK window is by default.

@@ -6,13 +6,20 @@ from __future__ import annotations
 import getpass
 import json
 import os
+import shutil
+import signal
 import subprocess
 import sys
+import time
+from pathlib import Path
+
+import pytest
 
 from syncrain import build, greeter
 from syncrain.greetd import Greetd
 from tests.conftest import ROOT
 from tests.fake_greetd import FakeGreetd
+from tests.support import login_install, stub
 
 PLASMA = "/usr/lib/plasma-dbus-run-session-if-needed /usr/bin/startplasma-wayland"
 ENV = ["XDG_SESSION_TYPE=wayland", "XDG_SESSION_DESKTOP=KDE", "XDG_CURRENT_DESKTOP=KDE"]
@@ -79,12 +86,39 @@ def test_the_last_login_is_offered_next_time(tmp_path, monkeypatch):
     assert greeter.rain_command(config)[3:] == ["--fps", "20", "--pause-under", "never"]
 
 
-def stub(folder, name, body):
-    folder.mkdir(exist_ok=True)
-    path = folder / name
-    path.write_text("#!/bin/sh\n" + body + "\n")
-    path.chmod(0o755)
-    return path
+def test_away_from_the_login_screen_no_last_login_is_read_or_kept(tmp_path, monkeypatch):
+    """install.sh draws the symbols with the greeter's code as the operator, where login.sh names no
+    state folder: no last.json is read then, neither XDG_STATE_HOME's nor one in /tmp (any user can
+    leave one there). On the login screen the last login says who and which session, nothing more."""
+    login = {"user": "op", "session": "plasma.desktop", "rain": ["--fps", "20"]}
+    last = {"user": "guest", "session": "sway.desktop", "rain": ["--glyphs", "/tmp/planted.json"]}
+    (tmp_path / "login.json").write_text(json.dumps(login))
+    (tmp_path / "last.json").write_text(json.dumps(last))
+    monkeypatch.setenv("SYNCRAIN_LOGIN_CONFIG", str(tmp_path / "login.json"))
+    monkeypatch.delenv("SYNCRAIN_LOGIN_STATE", raising=False)
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path))
+    assert greeter.state_dir() is None
+    assert greeter.read_config() == login
+    greeter.remember("someone", "else.desktop")
+    assert json.loads((tmp_path / "last.json").read_text()) == last, "nothing kept away from the login screen"
+    monkeypatch.setenv("SYNCRAIN_LOGIN_STATE", str(tmp_path))
+    assert greeter.read_config() == {"user": "guest", "session": "sway.desktop", "rain": ["--fps", "20"]}
+
+
+def test_a_session_s_words_reach_greetd_as_its_exec_line_has_them(tmp_path):
+    """greetd joins the words of the command it is given with spaces and has sh run the line, so the
+    box sends the command as one word quoted for sh: a quoted word with spaces arrives whole."""
+    write_sessions(tmp_path)
+    (tmp_path / "wayland-sessions" / "words.desktop").write_text(
+        '[Desktop Entry]\nExec=printf [%s] "two  words" plain\nName=Words\n')
+    found = {s["id"]: s for s in greeter.sessions([tmp_path])}
+
+    def as_greetd_runs(cmd):
+        return subprocess.run(["/bin/sh", "-c", "exec " + " ".join(cmd)], cwd=tmp_path, capture_output=True,
+                              text=True, timeout=30).stdout
+
+    assert as_greetd_runs(greeter.session_command(found["words.desktop"])) == "[two  words][plain]"
+    assert greeter.session_command(found["plasma.desktop"]) == [PLASMA]
 
 
 def test_when_the_box_never_logs_anyone_in_greetd_s_text_login_starts_plasma(tmp_path):
@@ -101,27 +135,6 @@ def test_when_the_box_never_logs_anyone_in_greetd_s_text_login_starts_plasma(tmp
     assert f"build {build.BUILD_NUMBER}" in log and "greetd's text login takes over" in log
 
 
-def run_install(tmp_path, *args):
-    bins = tmp_path / "bin"
-    stub(bins, "sudo", 'exec "$@"')
-    stub(bins, "kwin_wayland", "exit 0")
-    stub(bins, "agreety", "exit 0")
-    stub(bins, "systemctl", f'[ "$1" = --user ] && exit 1; echo "$@" >> {tmp_path}/systemctl.calls')
-    env = {"HOME": str(tmp_path / "home"), "XDG_CONFIG_HOME": str(tmp_path / "config"), "LANG": "C.UTF-8",
-           "XDG_CACHE_HOME": str(tmp_path / "cache"),
-           "PATH": f"{bins}:{os.path.dirname(sys.executable)}:/usr/bin:/bin", "CC": "no-compiler-here",
-           "SYNCRAIN_LOGIN_LIB": str(tmp_path / "lib"), "SYNCRAIN_LOGIN_STATE": str(tmp_path / "state"),
-           "SYNCRAIN_GREETD_CONFIG": str(tmp_path / "etc/greetd/config.toml"),
-           "SYNCRAIN_GREETD_PAM": str(tmp_path / "etc/pam.d/greetd"),
-           "SYNCRAIN_DM_LINK": str(tmp_path / "display-manager.service"),
-           "SYNCRAIN_LOGIN_OWNER": getpass.getuser()}
-    for key in ("GI_TYPELIB_PATH", "LD_LIBRARY_PATH"):
-        if key in os.environ:
-            env[key] = os.environ[key]
-    return subprocess.run(["bash", str(ROOT / "install.sh"), "--no-deps", *args], cwd=ROOT, env=env,
-                          capture_output=True, text=True, timeout=180)
-
-
 def test_install_makes_the_rain_the_login_screen_and_puts_sddm_back_after(tmp_path):
     (tmp_path / "etc/greetd").mkdir(parents=True)
     (tmp_path / "etc/greetd/config.toml").write_text("[default_session]\ncommand = \"agreety --cmd /bin/sh\"\n")
@@ -134,7 +147,7 @@ def test_install_makes_the_rain_the_login_screen_and_puts_sddm_back_after(tmp_pa
                                                                                 "size": 1.2}]}))
     (tmp_path / "config/kwinoutputconfig.json").write_text("[]")
     (tmp_path / "config/kxkbrc").write_text("[Layout]\nLayoutList=us\n")
-    done = run_install(tmp_path, "--theme", "matrix", "--login-screen")
+    done = login_install(tmp_path, "--theme", "matrix", "--login-screen")
     assert done.returncode == 0, done.stdout + done.stderr
     lib = tmp_path / "lib"
     assert json.loads((lib / "login.json").read_text()) == {
@@ -152,23 +165,89 @@ def test_install_makes_the_rain_the_login_screen_and_puts_sddm_back_after(tmp_pa
     command = tomllib.loads(config)["default_session"]["command"]
     assert command == f"sh -c 'test -x {login} && exec {login}; exec agreety --cmd startplasma-wayland'"
     assert "agreety --cmd /bin/sh" in (tmp_path / "etc/greetd/config.toml.before-syncrain").read_text()
-    assert (lib / "previous-display-manager").read_text() == "sddm.service\n"
+    record = tmp_path / "etc/greetd/display-manager.before-syncrain"
+    assert record.read_text() == "sddm.service\n" and not (lib / "previous-display-manager").exists()
     added = (tmp_path / "etc/pam.d/greetd").read_text()
     assert added.startswith(pam) and "-auth       optional    pam_kwallet5.so" in added
     assert "-session    optional    pam_kwallet5.so         auto_start" in added
     assert "sudo systemctl enable --force sddm.service && sudo reboot" in done.stdout
 
-    again = run_install(tmp_path)                   # a newer build: the login screen's copy follows
+    again = login_install(tmp_path)                   # a newer build: the login screen's copy follows
     assert again.returncode == 0 and "the login screen: build" in again.stdout, again.stdout + again.stderr
     assert json.loads((lib / "login.json").read_text())["rain"][:2] == ["--theme", "matrix"]
 
-    off = run_install(tmp_path, "--login-screen-off")
+    off = login_install(tmp_path, "--login-screen-off")
     assert off.returncode == 0, off.stdout + off.stderr
     assert (tmp_path / "systemctl.calls").read_text().splitlines() == [
         "enable --force greetd.service", "enable --force sddm.service"]
     assert "agreety --cmd /bin/sh" in (tmp_path / "etc/greetd/config.toml").read_text()
     assert (tmp_path / "etc/pam.d/greetd").read_text() == pam
-    assert not lib.exists() and not (tmp_path / "state").exists()
+    assert not lib.exists() and not (tmp_path / "state").exists() and not record.exists()
+
+
+def test_a_link_among_the_operator_s_files_brings_nothing_of_root_s_into_the_login_screen(another_user):
+    """root writes the login screen's copies, but the user reads what goes into them: a link among the
+    operator's settings to a file only root may read is left out, said so, and the install goes on."""
+    user = another_user
+    secret = user.unreadable("root's own\n")
+    config = user.base / "config"
+    config.mkdir()
+    (config / "kxkbrc").symlink_to(secret)
+    (config / "kcminputrc").write_text("[Keyboard]\nNumLock=0\n")
+    done = user.install("--login-screen")
+    assert done.returncode == 0, done.stdout + done.stderr
+    lib = user.base / "lib"
+    assert sorted(p.name for p in (lib / "kde").iterdir()) == ["kcminputrc"]
+    assert f"not copied, this user cannot read it: {config}/kxkbrc" in done.stdout
+    assert not [p for p in lib.rglob("*") if p.is_file() and "root's own" in p.read_text(errors="replace")]
+    assert not [c for c in user.calls("sudo") if str(config) in c], "root opened none of the operator's settings"
+    (lib / "kde/kxkbrc").write_text("root's own\n")    # what build 17 made of that link, as root,
+    (user.base / "state/config").mkdir()                # and what login.sh copied of it at a start
+    (user.base / "state/config/kxkbrc").write_text("root's own\n")
+    again = user.install()                              # the next build copies the settings again, safely
+    assert again.returncode == 0, again.stdout + again.stderr
+    assert sorted(p.name for p in (lib / "kde").iterdir()) == ["kcminputrc"]
+    assert not (user.base / "state/config/kxkbrc").exists()
+    assert not [c for c in user.calls("sudo") if str(config) in c]
+
+
+def test_a_link_in_place_of_the_app_is_copied_as_a_link_and_nothing_it_points_at_changes(another_user):
+    """The app the login screen copies is a folder the operator can change. Were it a link, it is copied
+    as a link, and chmod -R, which follows a link it is given by name, is given only the folder root
+    made around the copy: what the link points at keeps its permissions."""
+    user = another_user
+    elsewhere = user.base / "elsewhere"
+    shutil.copytree(user.src / "syncrain", elsewhere / "syncrain", ignore=shutil.ignore_patterns("__pycache__"))
+    shutil.copy2(user.src / "BUILD_NUMBER", elsewhere / "BUILD_NUMBER")      # beside the package, where it looks
+    release = user.base / "release"
+    release.mkdir()
+    for name in ("install.sh", "BUILD_NUMBER"):
+        shutil.copy2(user.src / name, release / name)
+    (release / "syncrain").symlink_to(elsewhere / "syncrain")
+    first = user.install("--login-screen", src=release)
+    assert first.returncode == 0, first.stdout + first.stderr
+    (elsewhere / "syncrain").chmod(0o700)
+    (elsewhere / "syncrain/app.py").chmod(0o600)
+    again = user.install(src=release)                  # a newer build: the login screen's copy follows
+    assert again.returncode == 0 and "the login screen: build" in again.stdout, again.stdout + again.stderr
+    assert (user.base / "lib/syncrain").is_symlink()
+    assert [oct(p.stat().st_mode & 0o777) for p in (elsewhere / "syncrain", elsewhere / "syncrain/app.py")] == [
+        "0o700", "0o600"]
+
+
+def test_each_start_takes_the_settings_as_installed_now(tmp_path):
+    """A copy of a setting no longer installed (build 17 copied a link's target as root) goes."""
+    write_sessions(tmp_path / "share")
+    (tmp_path / "state/config").mkdir(parents=True)
+    (tmp_path / "state/config/kxkbrc").write_text("root's own\n")
+    (tmp_path / "state/config/kwinrc").write_text("[Wayland]\n")
+    env = dict(os.environ, XDG_DATA_DIRS=str(tmp_path / "share"), SYNCRAIN_LOGIN_STATE=str(tmp_path / "state"),
+               SYNCRAIN_LOGIN_KWIN="false", SYNCRAIN_LOGIN_TEXT=str(stub(tmp_path / "bin", "agreety", "exit 0")),
+               SYNCRAIN_PYTHON=sys.executable, SYNCRAIN_LOGIN_CONFIG=str(tmp_path / "none.json"))
+    done = subprocess.run(["sh", str(ROOT / "syncrain/login/login.sh")], env=env, capture_output=True, text=True,
+                          timeout=60)
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert sorted(p.name for p in (tmp_path / "state/config").iterdir()) == ["kwinrc"]
 
 
 def test_the_diagnosis_says_which_login_screen_starts_and_what_it_said(tmp_path, monkeypatch):
@@ -177,6 +256,7 @@ def test_the_diagnosis_says_which_login_screen_starts_and_what_it_said(tmp_path,
     (tmp_path / "lib").mkdir()
     (tmp_path / "lib/BUILD_NUMBER").write_text("16\n")
     (tmp_path / "config.toml").write_text(f'[default_session]\ncommand = "{tmp_path}/lib/syncrain/login/login.sh"\n')
+    (tmp_path / "display-manager.before-syncrain").write_text("plasmalogin.service\n")
     (tmp_path / "state").mkdir()
     (tmp_path / "state/login.log").write_text("syncrain-login: 07:00:01.2 rain started (pid 9)\nnoise\n"
                                               "syncrain: 30.0 fps at 2560x1440 (area 0)\n"
@@ -185,7 +265,9 @@ def test_the_diagnosis_says_which_login_screen_starts_and_what_it_said(tmp_path,
         monkeypatch.setenv(f"SYNCRAIN_{key}", str(tmp_path / value))
     assert login_lines() == [
         "display manager at boot: greetd.service", "greetd runs syncrain's login screen",
-        f"syncrain's login screen: build 16 in {tmp_path}/lib", f"the last start ({tmp_path}/state/login.log):",
+        f"syncrain's login screen: build 16 in {tmp_path}/lib",
+        "before syncrain's login screen: plasmalogin.service (--login-screen-off goes back to it)",
+        f"the last start ({tmp_path}/state/login.log):",
         "  syncrain-login: 07:00:01.2 rain started (pid 9)", "  syncrain-login: 07:00:01.9 box shown"]
 
 
@@ -202,3 +284,66 @@ def test_a_kwin_that_hangs_is_stopped_and_the_text_login_asks(tmp_path):
     log = (tmp_path / "state" / "login.log").read_text()
     assert "no box after 2 s; stopping KWin" in log and "greetd's text login takes over" in log, log
     assert (tmp_path / "text.ran").read_text().splitlines()[0] == "--cmd"
+
+
+#: Runs a command as greetd's machine would: what it leaves behind is reaped at once (systemd does
+#: that as PID 1; a sandbox's PID 1 may take a second or never), and SIGTERM is passed on to it.
+REAPER = """
+import ctypes, os, signal, sys
+ctypes.CDLL(None).prctl(36, 1, 0, 0, 0)            # PR_SET_CHILD_SUBREAPER: orphans come here
+child = os.fork()
+if child == 0:
+    os.execvp(sys.argv[1], sys.argv[1:])
+signal.signal(signal.SIGTERM, lambda *_: os.kill(child, signal.SIGTERM))
+while True:
+    pid, status = os.waitpid(-1, 0)
+    if pid == child:
+        sys.exit(os.waitstatus_to_exitcode(status) & 0xFF)
+"""
+
+
+def alive(pid: int) -> bool:
+    """The process is there and not a zombie waiting to be reaped."""
+    try:
+        return Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()[0] != "Z"
+    except (OSError, IndexError):
+        return False
+
+
+@pytest.mark.parametrize("hangs", [False, True], ids=["kwin goes", "kwin hangs"])
+def test_when_greetd_stops_the_login_screen_its_kwin_goes_too(tmp_path, hangs):
+    """greetd signals login.sh alone: when a login's session is due and the greeter is slow to go, and
+    when greetd itself stops or restarts. KWin runs in a session of its own, so login.sh stops it, and
+    goes only once it has gone: at once, or after 3 s for a KWin that hangs (greetd kills at 10)."""
+    write_sessions(tmp_path / "share")
+    started = tmp_path / "kwin.pid"
+    deaf = "trap '' TERM; " if hangs else ""
+    kwin = stub(tmp_path / "bin", "kwin", f"{deaf}echo $$ > {started}.new && mv {started}.new {started}; exec sleep 600")
+    env = dict(os.environ, XDG_DATA_DIRS=str(tmp_path / "share"), SYNCRAIN_LOGIN_STATE=str(tmp_path / "state"),
+               SYNCRAIN_LOGIN_KWIN=str(kwin), SYNCRAIN_LOGIN_TEXT=str(stub(tmp_path / "bin", "agreety", "exit 0")),
+               SYNCRAIN_PYTHON=sys.executable, SYNCRAIN_LOGIN_CONFIG=str(tmp_path / "none.json"),
+               SYNCRAIN_LOGIN_WATCHDOG="600")
+    with open(tmp_path / "out.txt", "w") as out:
+        login = subprocess.Popen([sys.executable, "-c", REAPER, "sh", str(ROOT / "syncrain/login/login.sh")],
+                                 env=env, stdout=out, stderr=out)
+    pid = None
+    try:
+        deadline = time.monotonic() + 30
+        while not started.exists():
+            assert login.poll() is None and time.monotonic() < deadline, "KWin never started"
+            time.sleep(0.1)
+        pid = int(started.read_text())
+        signalled = time.monotonic()
+        login.send_signal(signal.SIGTERM)
+        assert login.wait(timeout=20) == 0, "login.sh did not stop KWin and leave"
+        took = time.monotonic() - signalled
+        settle = time.monotonic() + 1
+        while alive(pid) and time.monotonic() < settle:     # the kernel finishing a kill
+            time.sleep(0.05)
+        assert not alive(pid), "login.sh went while KWin kept the screens"
+        assert (2.5 < took < 8) if hangs else took < 2.5, took
+    finally:
+        if login.poll() is None:
+            login.kill()
+        if pid and alive(pid):
+            os.kill(pid, signal.SIGKILL)

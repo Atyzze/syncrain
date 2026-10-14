@@ -9,8 +9,17 @@ Open questions, planned builds, the cadence and the constraints. What shipped: `
   then. Recommended: `syncrain --fps 20` for a day, then judge by eye.
 * **Pause behind maximized windows too, or only full-screen ones?** (2026-10-07) Both now; behind a
   see-through window the rain then stands still. Recommended: both.
+* **Build 19: the rest of the review, or the boot splash first?** (2026-10-14) Five middling
+  findings are open (M4 to M7, M9; build 18's notes). Recommended: the review first. M4 and M5
+  decide whether the login screen works on machines set up unlike theirs (a greetd config of
+  their own, a second factor); the splash after.
 
 ## Decisions answered
+
+* **2026-10-14 12:10**: a full review of build 17; "Yes, make build 18 please" with M1 to M3 and
+  the one-line fixes; on GitHub, "makes sure that the login screen replacement remains fully
+  optional, and that those who just want the wallpaper that their existing login method isn't
+  touched". Build 18.
 
 * **2026-10-13 15:29**: build 16 works; the box on all screens, always; no Plasma logo or old
   wallpaper between the login and the rain. Build 17.
@@ -43,8 +52,9 @@ Open questions, planned builds, the cadence and the constraints. What shipped: `
 
 ## Planned builds
 
-1. **The boot splash**: a still frame of the rain (Plymouth), until the login screen's live one.
-2. **A NixOS image** with syncrain as its wallpaper and login screen.
+1. **The rest of the review of build 17**: M4 to M7 and M9, then the small ones (build 18's notes).
+2. **The boot splash**: a still frame of the rain (Plymouth), until the login screen's live one.
+3. **A NixOS image** with syncrain as its wallpaper and login screen.
 
 ## Build cadence
 

@@ -1,4 +1,4 @@
-# Handoff: the state of syncrain at build 17
+# Handoff: the state of syncrain at build 18
 
 What is true now, for a context that has just opened this tree. Where this page and the code
 disagree, the code is right; fix the page in the same build.
@@ -29,6 +29,14 @@ This page, `docs/agent/NEXT_BUILD.md`, `docs/agent/WORKING_WITH_THE_OPERATOR.md`
   KWin, the rain, a GTK box on every screen (`syncrain/greeter.py`) speaking greetd's IPC; text login
   as fallback. Works on the operator's desktop (2026-10-13). After the login Plasma's splash and
   wallpaper are a still of the rain (`syncrain/handover.py`, build 17).
+* **The login screen is optional** (the operator, 2026-10-14): nothing but `--login-screen` touches
+  how the machine logs in, and `--login-screen-off` goes back to the record of what started at boot
+  (`/etc/greetd/display-manager.before-syncrain`); only the user who set it up changes it.
+  `tests/unit/test_the_login_screen_is_optional.py` holds every build to it. Root copies only what
+  the user could read.
+* **A review of build 17** (2026-10-14, the operator's Claude doc "Syncrain build 17 code review"):
+  9 middling findings (M), 21 small (L). Build 18 fixed M1 to M3, M8, L1 to L4; the rest are listed
+  in its notes.
 * **Memory**: 123 MiB at start on their card. Build 11 (explicit sync off) grew to 225 MiB in 18 h,
   slowing, then fell to 170 by itself: freed memory, not a leak. Build 12 hands it back every five
   minutes and writes `~/.local/state/syncrain/memory.log`; `--diagnose` shows it.
@@ -40,11 +48,12 @@ This page, `docs/agent/NEXT_BUILD.md`, `docs/agent/WORKING_WITH_THE_OPERATOR.md`
 * **Symbols**: sets with weights or shares (`syncrain/glyphs.py`); the themes' own, or the
   operator's `~/.config/syncrain/glyphs.json`. 489 shipped glyphs; others from the machine's fonts.
 * **Stream**: `def5684f` since build 15 (symbols by set); `c18f8be2` in 12 to 14; `48e6bf9c` 3 to 11.
-* **GitHub**: `main` holds builds 7 to 17, one commit each (`syncrain build <N>`).
+* **GitHub**: `main` holds builds 7 to 18, one commit each (`syncrain build <N>`).
 
 ## Waits on the operator
 
-* How build 17's hand-over looks there; how fast the login screen came up (`--diagnose`).
+* How build 17's hand-over looks there; how fast the login screen came up (`--diagnose`); that
+  build 18's `./install.sh` moved the record of Plasma Login beside greetd's config.
 * The memory record after a few hours of build 12.
 * The time of the next glow flare-up: two hours of frames show none (build 12's notes).
 * The three questions in `docs/ROADMAP.md`.
@@ -53,4 +62,4 @@ This page, `docs/agent/NEXT_BUILD.md`, `docs/agent/WORKING_WITH_THE_OPERATOR.md`
 
 Build numbers only; deliveries only from the release tool; short documents; no long dashes; "the
 operator" or "they"; consolidation at every number ending in 0; nothing that flashes; measure
-before claiming.
+before claiming; the login screen stays optional.

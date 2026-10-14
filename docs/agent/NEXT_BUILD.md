@@ -1,19 +1,24 @@
-# The next build is 18
+# The next build is 19
 
 The first line is parsed: `# The next build is <N>`, exactly one above `BUILD_NUMBER`.
 
-## Build 18: the hand-over as it looks there, then the boot splash
+## Build 19: what the operator finds in 18, then the review's rest or the boot splash
 
 * Read what the operator sent last, and answer it in one plain sentence first.
-* **Build 17 on their desktop**: the box on both screens, the still after the login. Fix what they
-  find first.
-* **The boot splash**: a still frame of the rain (Plymouth) until the login screen draws.
+* **Build 18 on their desktop**: `./install.sh` moved the record of Plasma Login beside greetd's
+  config (`syncrain --diagnose` names it); build 17's hand-over if they have not said. Fix what
+  they find first.
+* **Their pick** (`docs/ROADMAP.md`): the review's other middling findings (M4 to M7, M9, in
+  `docs/build_notes/BUILD18_NOTES.md`) or the boot splash, a still frame of the rain (Plymouth)
+  until the login screen draws. Recommended: the review.
 * **The glow flare-up**, with the time they saw it: draw that moment and look.
-* **The two questions** in `docs/ROADMAP.md` (default frame rate, what pauses).
+* **The other questions** in `docs/ROADMAP.md` (default frame rate, what pauses).
 
-**Known blockers**: watts, NVIDIA's driver and Plasma's shell exist only on the operator's machine.
+**Known blockers**: watts, NVIDIA's driver and Plasma's shell exist only on the operator's machine;
+a real greetd and PAM only there too (the lanes speak to a stand-in).
 
-**Acceptance**: the chosen defaults everywhere they live, each read by a test; every lane passes.
+**Acceptance**: each fix with a test that fails without it; the login screen stays optional
+(`tests/unit/test_the_login_screen_is_optional.py`); every lane passes.
 
 ## How to make a build
 
@@ -44,3 +49,4 @@ the build being made); they pass inside the gate.
 * Change the stream in a build about something else.
 * Hand over a patch or a hand-made tar.
 * Use long dashes.
+* Touch how the machine logs in without `--login-screen`.
