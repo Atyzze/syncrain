@@ -1,4 +1,4 @@
-# Handoff: the state of syncrain at build 21
+# Handoff: the state of syncrain at build 22
 
 What is true now, for a context that has just opened this tree. Where this page and the code
 disagree, the code is right; fix the page in the same build.
@@ -23,7 +23,7 @@ This page, `docs/agent/NEXT_BUILD.md`, `docs/agent/WORKING_WITH_THE_OPERATOR.md`
   2026-10-13).
 * **Hosts**: on Wayland the native wallpaper (C, `syncrain/native/`, the passes in `passes.c`); on
   X11, in windows and as fallback the GTK host (`syncrain/app.py`); in browsers the page
-  (`web/template.html`). Builds 13 and 14's Plasma wallpaper broke there; build 15 removed it
+  (`index.html` at the top, its data filled in by `tools/build_web.py`). Builds 13 and 14's Plasma wallpaper broke there; build 15 removed it
   (`install.sh` cleans it up).
 * **Login screen** (`install.sh --login-screen`): greetd runs `syncrain/login/login.sh`; KWin, the
   rain, a GTK box on every screen (`syncrain/greeter.py`) speaking greetd's IPC, PAM's further
@@ -46,13 +46,18 @@ This page, `docs/agent/NEXT_BUILD.md`, `docs/agent/WORKING_WITH_THE_OPERATOR.md`
 * **Timing**: every frame on the refresh; 97 to 100% even and steady on their screens.
 * **Symbols**: sets with weights or shares (`syncrain/glyphs.py`); the themes' own, or the
   operator's `~/.config/syncrain/glyphs.json`. 489 shipped glyphs; others from the machine's fonts.
+* **The look** (build 22): no themes; two presets (nixos, matrix) that the settings go over
+  (`engine.compose`, the page's `composeLook`): the rain's gradient and glow, the background and
+  vignette, flavours (each column one of N hues, by the channel or as a wave) and a colour cycle,
+  any picture as the logo (`syncrain/logo.py`; the page puts the texture in the settings file), its
+  size and rainbow, the hidden words. One flavour and no cycle is the picture as it was.
 * **The settings file** (build 21): the page's Settings panel tries every option and symbol set
   live and saves `config.json` (`syncrain-config-1`); `./install.sh --config config.json` keeps it
   as `~/.config/syncrain/config.json`, read under the command line (`syncrain/app.py`,
   `CONFIG_KEYS`); the login screen's rain reads a copy. The browser lane draws one file on the page
   and the desktop and compares the frames. `--theme` refuses an unknown theme with status 2.
-* **Stream**: `def5684f` since build 15; `c18f8be2` in 12 to 14; `48e6bf9c` 3 to 11.
-* **GitHub**: `main` holds builds 7 to 20, one commit each (`syncrain build <N>`).
+* **Stream**: `25b02556` since build 22 (the flavours, the presets; nixos draws as before); `def5684f` 15 to 21; `c18f8be2` in 12 to 14; `48e6bf9c` 3 to 11.
+* **GitHub**: `main` holds builds 7 to 21, one commit each (`syncrain build <N>`).
 
 ## Waits on the operator
 
@@ -61,7 +66,7 @@ This page, `docs/agent/NEXT_BUILD.md`, `docs/agent/WORKING_WITH_THE_OPERATOR.md`
 * The memory record after a few hours of build 12 or later.
 * The time of the next glow flare-up: two hours of frames show none (`docs/HISTORY.md`, build 12).
 * The two questions in `docs/ROADMAP.md`.
-* How the Settings panel feels to them, and whether a saved file looks the same on their desktop.
+* How the colours, flavours and a logo of their own look on their desktop.
 
 ## Their standing calls
 

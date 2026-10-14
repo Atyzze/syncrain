@@ -12,6 +12,12 @@ Open questions, planned builds, the cadence and the constraints. What shipped: `
 
 ## Decisions answered
 
+* **2026-10-14 18:25**: build 21 "working beautifully"; then a colour gradient for the rain so the
+  nixos and matrix themes can go and the look is general; any logo, the NixOS one the default; no
+  CachyOS remnants; colours that cycle and "how many color flavors at the same time ... every ray
+  for example having its own uniqe color, and then it pulses", with one static colour still there;
+  "1 html file in the root next to .install.sh", the `web` and `extras` folders gone. Build 22.
+
 * **2026-10-14 15:26**: "continue as recommended" (the review first, build 19); then the page "a
   live previewer that lets you directly see what it'll look like, and then lets you export/save
   the json config file, if then applied with that exported json, it should look exactly like it
@@ -37,10 +43,10 @@ What the documents and the review of build 17 leave to a build that changes code
 | Item | Where the fix goes |
 | --- | --- |
 | L8: KDE's wallet does not open after greetd's text login | not known yet; the wallet lines are `install.sh`'s, in greetd's PAM service |
-| L11: `--scale` below about 0.4 changes the picture (the page as a wallpaper does the same, so the two agree) | the cell size in `syncrain/renderer.py` (`geometry`), `syncrain/native/timing.c` (`geometry_compute`), `web/template.html` |
-| L20: the stream id does not cover `renderer.py`'s geometry, `native/timing.c` or `web/template.html` | `syncrain/build.py` (`STREAM_FILES`) |
+| L11: `--scale` below about 0.4 changes the picture (the page as a wallpaper does the same, so the two agree) | the cell size in `syncrain/renderer.py` (`geometry`), `syncrain/native/timing.c` (`geometry_compute`), `index.html` |
+| L20: the stream id does not cover `renderer.py`'s geometry, `native/timing.c` or `index.html` | `syncrain/build.py` (`STREAM_FILES`) |
 | L21: no `flake.lock`, so a Nix build takes whatever nixpkgs is current | `flake.lock` |
-| A font file name that is not UTF-8 makes a symbols file fall back to the theme's symbols | `syncrain/glyphs.py`, a stream file: waits for a build that changes the stream |
+| An SVG as the logo: the page takes one, the desktop's `--logo` does not (Pillow draws no SVG) | `syncrain/logo.py`, with GTK's loader (librsvg) |
 | The settings file holds no `background`, `mask`, `scale` or `layer` (the page cannot preview a picture file) | `syncrain/app.py` (`CONFIG_KEYS`) and the page, if wanted |
 
 ## Build cadence

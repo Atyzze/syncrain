@@ -1,12 +1,13 @@
 # syncrain
 
 A live code-rain wallpaper that never loops and stays in sync across machines: every frame is a
-function of the UTC clock and a channel name. Two themes, **nixos** (blue rain, snow, the NixOS
-snowflake) and **matrix** (green). A wallpaper on Linux (Wayland, X11) and a web page.
+function of the UTC clock and a channel name. Your colours (one, or many at once, cycling like an
+RGB keyboard), your logo and your symbols, starting from two presets: **nixos** (blue rain, snow,
+the NixOS snowflake) and **matrix** (green). A wallpaper on Linux (Wayland, X11) and a web page.
 
 <p align="center">
-  <img src="docs/images/nixos.jpg" width="49%" alt="The nixos theme: pale blue characters and Egyptian hieroglyphs falling in columns over dark blue, with snowflakes and the NixOS snowflake in rainbow colours in the middle">
-  <img src="docs/images/matrix.jpg" width="49%" alt="The matrix theme: green katakana, digits, letters and hieroglyphs falling in columns over black">
+  <img src="docs/images/nixos.jpg" width="49%" alt="The nixos preset: pale blue characters and Egyptian hieroglyphs falling in columns over dark blue, with snowflakes and the NixOS snowflake in rainbow colours in the middle">
+  <img src="docs/images/matrix.jpg" width="49%" alt="The matrix preset: green katakana, digits, letters and hieroglyphs falling in columns over black">
 </p>
 <p align="center"><sub>The channel <code>public</code> at 2026-10-07 00:00:07 UTC.
 <code>syncrain --window --time 1791331207</code> draws that moment on any machine.</sub></p>
@@ -24,14 +25,14 @@ syncrain                     # as your wallpaper (Ctrl+C stops it)
 ./install.sh --login-screen  # optional: also the login screen (greetd)
 ```
 
-**Try every setting first**: open `web/index.html`, press Settings, move anything and watch the rain
-change, then Save config.json and run `./install.sh --config config.json`. The desktop draws what the
-page showed.
+**Try every setting first**: open `index.html` (next to `install.sh`), press Settings, move anything
+and watch the rain change, then Save config.json and run `./install.sh --config config.json`. The
+desktop draws what the page showed.
 
 * **The login screen is optional**: without `--login-screen` the installer leaves yours as it is,
   and `./install.sh --login-screen-off` puts it back.
 * **NixOS**: `nix run github:Atyzze/syncrain -- --window`; the flake has NixOS and home-manager modules.
-* **Browser**: open `web/index.html`; as a web wallpaper, its URL takes the options (`hud=0` hides the controls).
+* **Browser**: open `index.html`; as a web wallpaper, its URL takes the options (`hud=0` hides the controls).
 
 Options, other systems, power and recipes: [`docs/OPERATIONS.md`](docs/OPERATIONS.md).
 
@@ -60,7 +61,7 @@ browser (Chromium), nix. What each needs: `docs/agent/ENVIRONMENT.md`.
 **What costs you if you get it wrong**
 
 * Only `tools/package_release.py` makes an archive and writes `BUILD_NUMBER`. No version strings.
-* The stream is frozen: a change to a shader, a theme, the atlas, a logo, `syncrain/engine.py` or
+* The stream is frozen: a change to a shader, a preset, the atlas, a logo, `syncrain/engine.py` or
   `syncrain/glyphs.py` changes every machine's picture; `tools/stream_freeze.py --write` re-takes
   it, on purpose only.
 * Three hosts draw the same frame: the page (JavaScript), the GTK host (Python) and the native
@@ -72,15 +73,15 @@ browser (Chromium), nix. What each needs: `docs/agent/ENVIRONMENT.md`.
 
     syncrain/          app.py (options, GTK host), native.py (starts the native wallpaper), renderer.py,
                        gl.py, pacing.py, hidden.py (KWin), engine.py, glyphs.py (symbols), build.py,
-                       diagnose.py, bench.py, power.py, cover.py, data/ (shaders, themes, atlas, logos)
+                       diagnose.py, bench.py, power.py, cover.py, logo.py, data/ (shaders, presets, atlas, logos)
     syncrain/          the login screen: greeter.py (the box), greetd.py, greetdconf.py, handover.py,
                        login/ (greetd's command)
     syncrain/native/   the native wallpaper in C
-    web/               template.html; index.html and artifact.html are generated from it
     nix/               package, web bundle, NixOS and home-manager modules and their options
     tools/             package_release.py, test_suite.py, stream_freeze.py, build_web.py, build_assets.py,
                        prepare_environment.sh
     tests/             one folder per lane; fixtures/stream_freeze.json
+    index.html         the web page: open it, try every setting, save them (its data filled in by tools/build_web.py)
     install.sh         the Arch-family installer
 
 ## Licence

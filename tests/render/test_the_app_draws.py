@@ -160,7 +160,7 @@ def test_a_symbols_file_changes_the_symbols_and_a_broken_one_is_said(app, tmp_pa
     bad = tmp_path / "bad.json"
     bad.write_text('{"sets": 3}', encoding="utf-8")
     done = app([*base, str(broken), "--glyphs", str(bad)])
-    assert done.returncode == 0 and "needs a list \"sets\"; the theme's own symbols instead" in done.stderr, done.stderr
+    assert done.returncode == 0 and "needs a list \"sets\"; the preset's own symbols instead" in done.stderr, done.stderr
     assert mean_abs_diff(theme, broken) == 0
 
 

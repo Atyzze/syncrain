@@ -1217,7 +1217,7 @@ int main(int argc, char **argv)
 		probe();
 	if (!W.compositor || !W.layer_shell)
 		hand_over("no layer-shell", 2, "this Wayland compositor has no wlr-layer-shell support (GNOME?). "
-		                               "Use --window, or the web version in web/index.html.");
+		                               "Use --window, or the web version, index.html at the top of the syncrain folder.");
 	if (!render_init(W.display, &W.scene, why, sizeof why))
 		hand_over(why, 69, NULL);
 	scene_unmap(&W.scene);                         /* the pixels are on the card now */

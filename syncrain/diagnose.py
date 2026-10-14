@@ -169,7 +169,7 @@ def symbol_lines(args) -> list[str]:
         lines.append(f"  {name}: {count} symbols, {share * 100:.1f}%")
     if r.missing:
         lines.append("no font here has: " + " ".join(r.missing) + " (they fall as blanks)")
-    if r.source == "the theme":
+    if r.source == "the preset":
         lines.append(f"your own: {glyphs.default_path()} (syncrain --write-glyphs writes a starter)")
     return lines
 
@@ -194,7 +194,7 @@ def library_lines(Gtk) -> tuple[list[str], bool | None]:
 
 
 def draw_one_frame(args, use_es, gl):
-    """Compile everything and draw the theme offscreen at a fixed moment; return (mean, lit share)."""
+    """Compile everything and draw the look offscreen at a fixed moment; return (mean, lit share)."""
     from .renderer import from_args
     w, h = 640, 360
     r = from_args(args, background=None, mask=None, bg_gamma=None, bg_gain=None)

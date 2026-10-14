@@ -26,6 +26,8 @@ from types import SimpleNamespace
 
 from . import engine, gl
 from . import glyphs as glyph_sets
+from .logo import normalize as logo_name
+from .logo import texture as logo_texture
 from .gl import (GL_BLEND, GL_CLAMP_TO_EDGE, GL_COLOR_ATTACHMENT0, GL_DEPTH_TEST, GL_FRAGMENT_SHADER,
                  GL_FRAMEBUFFER, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_NEAREST, GL_RGBA, GL_RGBA8,
                  GL_SCISSOR_TEST, GL_TEXTURE0, GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_TEXTURE_MIN_FILTER,
@@ -183,7 +185,7 @@ def texture_sources(r, bundled=rgba_pil):
     try:
         w, h, data = r.glyphs.atlas()          # only the glyphs the symbol sets use (syncrain/glyphs.py)
     except Exception as e:  # noqa: BLE001 - a file's characters or font that cannot be drawn
-        if r.glyphs.source == "the theme":
+        if r.glyphs.source == "the preset":
             raise
         r.theme_glyphs(e, r.data_dir)
         w, h, data = r.glyphs.atlas()
@@ -192,7 +194,7 @@ def texture_sources(r, bundled=rgba_pil):
     wb, n_words = r.glyphs.words_bytes()
     out["words"] = (16, n_words, "nearest", wb)
     if r.logo_choice != "none":
-        w, h, data = bundled(os.path.join(r.data_dir, f"logo-{r.logo_choice}.png"))
+        w, h, data = logo_texture(r.logo_choice, r.data_dir, bundled)
         out["logo"] = (w, h, "mip", data)
     else:
         out["logo"] = (1, 1, "linear", bytes(4))
@@ -247,6 +249,8 @@ def static_uniforms(r):
         for uniform, key in (("cDeep", "deep"), ("cMid", "mid"), ("cPale", "pale"), ("cHead", "head")):
             put(name, uniform, "f3", *c[key])
         put(name, "uContrast", "i", rain["contrast"])
+        put(name, "uFlavours", "i", max(1, min(64, int(rain.get("flavours", 1)))))
+        put(name, "uFlavourWave", "i", 1 if rain.get("flavourLayout") == "wave" else 0)
 
     put("blur", "uSrc", "i", UNIT["src"])
 
@@ -379,7 +383,7 @@ class Shared:
 
 #: The Renderer's keywords that come straight from the command line's options of the same names.
 OPTIONS = ("theme", "channel", "logo", "background", "mask", "bg_gamma", "bg_gain", "rainbow", "spin", "drift",
-           "speed", "density", "snow", "glow", "bloom", "hieroglyphs", "glyphs")
+           "speed", "density", "snow", "glow", "bloom", "hieroglyphs", "glyphs") + engine.LOOK_OPTIONS
 
 
 def from_args(args, **override):
@@ -392,23 +396,26 @@ def from_args(args, **override):
 class Renderer:
     def __init__(self, theme="nixos", channel="public", logo=None, background=None, mask=None,
                  bg_gamma=None, bg_gain=None, rainbow=None, spin=None, drift=None, speed=None, density=None,
-                 snow=None, glow=None, bloom=None, hieroglyphs=None, glyphs=None, data_dir=engine.DATA_DIR):
+                 snow=None, glow=None, bloom=None, hieroglyphs=None, glyphs=None, data_dir=engine.DATA_DIR,
+                 **look):
         self.meta = engine.load_meta(data_dir)
         if theme not in self.meta["themes"]:
-            raise SystemExit(f"unknown theme {theme!r}; available: {', '.join(self.meta['themes'])}")
-        self.theme_name, self.th = theme, self.meta["themes"][theme]
+            raise SystemExit(f"unknown preset {theme!r}; available: {', '.join(self.meta['themes'])}")
+        # the preset with the settings over it: colours, background, logo size and colour cycle, the
+        # rain's colour cycle and flavours, the hidden words (engine.compose)
+        self.theme_name, self.th = theme, engine.compose(self.meta, theme, rainbow=rainbow, **look)
         self.channel = channel
         self.seed = engine.channel_seed(channel)
-        self.logo_choice = logo or self.th["logo"]["default"]
+        self.logo_choice = logo_name(logo or self.th["logo"]["default"])
         self.background, self.mask = background, mask
         dark = background is not None
         self.bg_gamma = bg_gamma if bg_gamma is not None else (2.0 if dark else 1.0)
         self.bg_gain = bg_gain if bg_gain is not None else (0.42 if dark else 1.0)
-        self.motion = engine.motion(self.th, rainbow=rainbow, spin=spin, drift=drift)
+        self.motion = engine.motion(self.th, spin=spin, drift=drift)
         self.look = engine.look(self.th, speed=speed, density=density, snow=snow, glow=glow, bloom=bloom,
                                 hieroglyphs=hieroglyphs)
         # the symbols: a settings file's sets, or a symbols file (`glyphs`, else
-        # ~/.config/syncrain/glyphs.json if there is one), else the theme's own sets
+        # ~/.config/syncrain/glyphs.json if there is one), else the preset's own sets
         def warn(why):
             print(f"syncrain: {why}", file=sys.stderr, flush=True)
         try:
@@ -418,7 +425,7 @@ class Renderer:
             else:
                 self.glyphs = glyph_sets.for_theme(self.meta, self.th, data_dir, path=glyphs,
                                                    hieroglyphs=self.look["hieroglyphs"], warn=warn)
-        except Exception as e:  # noqa: BLE001 - a file's characters or font it cannot use: the theme's still work
+        except Exception as e:  # noqa: BLE001 - a file's characters or font it cannot use: the preset's still work
             self.theme_glyphs(e, data_dir)
         self.data_dir = data_dir
         self.epoch0, self.cols = self.meta["epoch0"], self.meta["cols"]
@@ -429,16 +436,17 @@ class Renderer:
         self.ready = False
 
     def theme_glyphs(self, why, data_dir):
-        """A symbols file whose characters or fonts cannot be used: said, and the theme's own symbols."""
+        """A symbols file whose characters or fonts cannot be used: said, and the preset's own symbols."""
         print(f"syncrain: the symbols file could not be used ({type(why).__name__}: {why}); "
-              "the theme's own symbols instead", file=sys.stderr, flush=True)
+              "the preset's own symbols instead", file=sys.stderr, flush=True)
         self.glyphs = glyph_sets.for_theme(self.meta, self.th, data_dir, path="theme",
                                            hieroglyphs=self.look["hieroglyphs"])
 
     def resource_key(self, use_es):
         """Everything the shared programs and textures depend on: two renderers with the same key
         draw with the same objects."""
-        return (use_es, self.data_dir, self.theme_name, self.seed, self.logo_choice, self.background, self.mask,
+        import json
+        return (use_es, self.data_dir, self.theme_name, json.dumps(self.th, sort_keys=True), self.seed, self.logo_choice, self.background, self.mask,
                 self.bg_gamma, self.bg_gain, tuple(sorted(self.motion.items())),
                 tuple(sorted((k, str(v)) for k, v in self.look.items())), self.glyphs.source,
                 tuple(self.glyphs.keys), tuple(self.glyphs.table), tuple(self.glyphs.uniform()))

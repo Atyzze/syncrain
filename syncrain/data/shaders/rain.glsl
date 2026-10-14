@@ -7,10 +7,21 @@ uniform sampler2D uAtlas;    // 16 slots a row, uAtlasRows rows, each covering 1
 uniform int uAtlasRows;
 uniform vec3 cDeep, cMid, cPale, cHead;
 uniform int uContrast;
+uniform int uFlavours;       // colours at once: each column one of this many hues round the wheel (1: as given)
+uniform int uFlavourWave;    // 1: the hues follow the columns in order, a rainbow across the stream; 0: by hash
 
 vec4 cellState(ivec2 c) {
     if (c.x < 0 || c.y < 0 || c.x >= uCols || c.y >= uRows) return vec4(0.0);
     return texelFetch(uState, c, 0);
+}
+
+// A column's turn of the hue wheel. By the channel's hash the columns are as the stream's, the same
+// on every machine; as a wave they go round the wheel once across the 64 columns.
+float flavourTurns(int col) {
+    if (uFlavours <= 1) return 0.0;
+    int k = uFlavourWave == 1 ? (((col % uCols) + uCols) % uCols) * uFlavours / uCols
+                              : int(H(uint(col), 0u, 0u, 90u) % uint(uFlavours));
+    return float(k) / float(uFlavours);
 }
 
 // px: pixel position in full-resolution screen pixels, origin top-left
@@ -34,5 +45,7 @@ vec3 rainGlyph(vec2 px, float cell) {
         ramp = wd * cDeep + max(0.0, 1.0 - wd - wp) * cMid + wp * cPale;
         whiteCut = 0.55;
     }
-    return g * (B * (1.0 - whiteCut * W) * ramp + W * cHead);
+    vec3 c = g * (B * (1.0 - whiteCut * W) * ramp + W * cHead);
+    float t = flavourTurns(ci.x);
+    return t > 0.0 ? max(hueRotate(c, t), 0.0) : c;
 }

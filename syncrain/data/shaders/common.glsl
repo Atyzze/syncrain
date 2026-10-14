@@ -24,3 +24,11 @@ float U(uint h) { return float(h >> 8) * (1.0 / 16777216.0); }   // uniform in [
 // seconds into the current hour; periodic effects use whole cycles per hour so they stay continuous
 float hourTime() { return float(uSec % 3600u) + uFrac; }
 float cyclesPerHour(float n) { return fract(n * (hourTime() / 3600.0)); }
+
+// rotate a colour's hue around the grey axis by a fraction of a turn (keeps its brightness)
+vec3 hueRotate(vec3 c, float turns) {
+    float a = 6.2831853 * turns;
+    const vec3 k = vec3(0.57735027);
+    float cs = cos(a), sn = sin(a);
+    return c * cs + cross(k, c) * sn + k * dot(k, c) * (1.0 - cs);
+}

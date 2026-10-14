@@ -26,7 +26,7 @@ class Shell:
     """Plasma's shell as far as the hand-over uses it: two desktops and their wallpapers."""
 
     def __init__(self):
-        self.desktops = [["org.kde.image", "file:///usr/share/wallpapers/cachyos.png", "1"],
+        self.desktops = [["org.kde.image", "file:///usr/share/wallpapers/mountains.png", "1"],
                          ["org.kde.color", "", "2"], ["org.kde.image", "", "3"]]
         self.scripts = []
 
@@ -74,7 +74,7 @@ def test_on_shows_the_still_after_login_and_off_puts_everything_back(tmp_path, m
     handover.on(["--theme", "matrix"], shell=shell)          # a newer build: what was there first is kept
     assert handover.off(shell=shell) == ["splash after login: as before", "Plasma's wallpaper: as before"]
     assert sorted(shell.desktops, key=lambda d: d[2]) == [
-        ["org.kde.image", "file:///usr/share/wallpapers/cachyos.png", "1"], ["org.kde.color", "", "2"],
+        ["org.kde.image", "file:///usr/share/wallpapers/mountains.png", "1"], ["org.kde.color", "", "2"],
         ["org.kde.image", "", "3"]]
     assert 'd.writeConfig("Image", w[1])' in shell.scripts[-1] and "&& w[1]" not in shell.scripts[-1]
     assert handover.read_ini(rc, "KSplash", "Theme") == "org.kde.breeze.desktop"
@@ -134,7 +134,7 @@ def test_a_newer_build_makes_the_still_again_and_changes_nothing_chosen_since(tm
     assert said == ["splash after login: the one chosen since stays",
                     "Plasma's wallpaper: as before where the still was; 1 chosen since stay"]
     assert shell.desktops[1][1] == "file:///home/op/beach.png", "the beach stays"
-    assert shell.desktops[0][1] == "file:///usr/share/wallpapers/cachyos.png"
+    assert shell.desktops[0][1] == "file:///usr/share/wallpapers/mountains.png"
     assert handover.read_ini(rc, "KSplash", "Theme") == "org.kde.breeze.desktop"
 
 

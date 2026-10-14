@@ -3,7 +3,7 @@
 #
 #   ./install.sh                     install this build for your user (asks for sudo once, for pacman packages)
 #   ./install.sh --autostart         ...and start it with every graphical login
-#   ./install.sh --theme matrix --channel friends --autostart
+#   ./install.sh --preset matrix --channel friends --autostart
 #   ./install.sh --config config.json  ...and draw what the web page showed (the settings it exported)
 #   ./install.sh --login-screen      ...and the rain as your login screen too (optional; greetd, yours stays installed)
 #   ./install.sh --login-screen-off  back to the login screen you had (undoes only what --login-screen did)
@@ -11,7 +11,7 @@
 #
 # Run from a newer build's folder, it upgrades in place and restarts a running wallpaper.
 # Everything goes into your home directory:
-#   ~/.local/share/syncrain/                 the app (plus web/index.html, the browser version)
+#   ~/.local/share/syncrain/                 the app (plus index.html, the browser version)
 #   ~/.local/bin/syncrain                    the launcher
 #   ~/.config/systemd/user/syncrain.service  only with --autostart
 set -euo pipefail
@@ -39,7 +39,7 @@ Options:
   --login-screen-off    back to the login screen from before (undoes only what --login-screen did)
   --config FILE         a settings file the web page exported: the wallpaper (and the login screen)
                         draw what the page showed; kept as ~/.config/syncrain/config.json
-  --theme NAME          nixos (default) or matrix
+  --preset NAME         where the look starts: nixos (default) or matrix (--theme: the same)
   --channel NAME        stream name (default: public)
   --rainbow MODE        logo (default), all or off
   --arg ARG             extra argument for syncrain, repeatable (e.g. --arg --fps --arg 24)
@@ -56,7 +56,7 @@ while [ $# -gt 0 ]; do
     --autostart) AUTOSTART=1 ;;
     --login-screen) LOGIN=1 ;;
     --login-screen-off) LOGIN_OFF=1 ;;
-    --theme) THEME="${2:?--theme needs a value}"; shift ;;
+    --preset|--theme) THEME="${2:?$1 needs a value}"; shift ;;
     --config) CONFIG="${2:?--config needs a file}"; shift ;;
     --channel) CHANNEL="${2:?--channel needs a value}"; shift ;;
     --rainbow) RAINBOW="${2:?--rainbow needs a value}"; shift ;;
@@ -524,7 +524,7 @@ mkdir -p "$APPDIR" "$BINDIR"
 cp -r "$SRC/syncrain" "$APPDIR/"
 find "$APPDIR" -name '__pycache__' -type d -prune -exec rm -rf {} +
 for f in BUILD_NUMBER README.md LICENSE; do [ -f "$SRC/$f" ] && cp "$SRC/$f" "$APPDIR/"; done
-if [ -f "$SRC/web/index.html" ]; then mkdir -p "$APPDIR/web" && cp "$SRC/web/index.html" "$APPDIR/web/"; fi
+if [ -f "$SRC/index.html" ]; then cp "$SRC/index.html" "$APPDIR/"; fi
 
 # The native wallpaper (syncrain/native/) draws on Wayland with neither Python nor GTK in memory.
 # Without it, the Python and GTK host draws the same frames, as before.
@@ -589,7 +589,7 @@ remove_plasma_wallpaper
 # ---- 4. autostart
 ARGS=()
 # --option=value: a channel that starts with "-" is then no option
-[ -n "$THEME" ] && ARGS+=("--theme=$THEME")
+[ -n "$THEME" ] && ARGS+=("--preset=$THEME")
 [ -n "$CHANNEL" ] && ARGS+=("--channel=$CHANNEL")
 [ -n "$RAINBOW" ] && ARGS+=("--rainbow=$RAINBOW")
 ARGS+=("${EXTRA[@]}")
@@ -649,14 +649,14 @@ echo
 bold "Done. Try it:"
 info "syncrain --window        preview in a normal window"
 info "syncrain                 run as your wallpaper (Ctrl+C stops it)"
-info "syncrain --theme matrix  the green theme; see --help for all options"
+info "index.html (in this folder): try every setting, then ./install.sh --config config.json; syncrain --help for all options"
 info "syncrain --diagnose      if it does not draw: what this machine offers, and why"
 case ":$PATH:" in *":$BINDIR:"*) ;; *) info "note: $BINDIR is not on your PATH; run $BINDIR/syncrain or add it to PATH" ;; esac
 case "$desktop" in
   *KDE*) info "KDE Plasma: syncrain sits just above Plasma's desktop, so desktop icons and widgets are hidden behind it (clicks still reach the desktop)."
-         info "To keep the icons, show $APPDIR/web/index.html?hud=0 with a Plasma wallpaper plugin for web pages instead." ;;
+         info "To keep the icons, show $APPDIR/index.html?hud=0 with a Plasma wallpaper plugin for web pages instead." ;;
   *Hyprland*) [ "$AUTOSTART" = 1 ] && info "Hyprland: if it doesn't start at login, add 'exec-once = $BINDIR/syncrain$(quote "${ARGS[@]}")' to hyprland.conf (or log in through UWSM)." ;;
   *sway*|*Sway*) [ "$AUTOSTART" = 1 ] && info "Sway: if it doesn't start at login, add 'exec $BINDIR/syncrain$(quote "${ARGS[@]}")' to your sway config." ;;
-  *GNOME*) info "GNOME has no wallpaper layer for apps; use 'syncrain --window' or open $APPDIR/web/index.html in a browser." ;;
+  *GNOME*) info "GNOME has no wallpaper layer for apps; use 'syncrain --window' or open $APPDIR/index.html in a browser." ;;
 esac
 info "uninstall: ./install.sh --uninstall"

@@ -168,7 +168,7 @@ def test_a_settings_file_from_the_page_is_kept_where_the_wallpaper_reads_it(root
     assert systemd_exec_words(value) == [str(tmp / ".local/bin/syncrain")]
     said = subprocess.run([str(tmp / ".local/bin/syncrain"), "--check-config"], env=env, capture_output=True,
                           text=True, timeout=60)
-    assert "theme nixos" in said.stdout, said.stdout + said.stderr
+    assert "preset nixos" in said.stdout, said.stdout + said.stderr
     again = install(root, env, "--config", str(tmp / "config/syncrain/config.json"))
     assert again.returncode == 0, "the kept file given again: " + again.stdout + again.stderr
     page.write_text(json.dumps({"contract": "syncrain-config-1", "speed": "fast"}))

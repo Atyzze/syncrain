@@ -152,7 +152,7 @@ def test_install_makes_the_rain_the_login_screen_and_puts_sddm_back_after(tmp_pa
     lib = tmp_path / "lib"
     assert json.loads((lib / "login.json").read_text()) == {
         "user": getpass.getuser(), "session": "plasma.desktop",
-        "rain": ["--theme=matrix", "--glyphs", f"{lib}/glyphs.json"]}
+        "rain": ["--preset=matrix", "--glyphs", f"{lib}/glyphs.json"]}
     assert (lib / "BUILD_NUMBER").read_text().strip() == str(build.BUILD_NUMBER)
     assert os.access(lib / "syncrain/login/login.sh", os.X_OK) and sorted(p.name for p in (lib / "kde").iterdir()) == [
         "kwinoutputconfig.json", "kxkbrc"]
@@ -174,7 +174,7 @@ def test_install_makes_the_rain_the_login_screen_and_puts_sddm_back_after(tmp_pa
 
     again = login_install(tmp_path)                   # a newer build: the login screen's copy follows
     assert again.returncode == 0 and "the login screen: build" in again.stdout, again.stdout + again.stderr
-    assert json.loads((lib / "login.json").read_text())["rain"][:1] == ["--theme=matrix"]
+    assert json.loads((lib / "login.json").read_text())["rain"][:1] == ["--preset=matrix"]
 
     off = login_install(tmp_path, "--login-screen-off")
     assert off.returncode == 0, off.stdout + off.stderr

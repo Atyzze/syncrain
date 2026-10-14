@@ -66,6 +66,20 @@ def rgb(hexstr, k=1.0):
     h = hexstr.lstrip('#')
     return [round(int(h[i:i + 2], 16) / 255 * k, 4) for i in (0, 2, 4)]
 
+# the snow every preset can show (on by default where the preset says so)
+# cell (power of two, in 1/1080ths of the screen height), speed (whole units per second),
+# density, brightness | radius min, max, sway, star | colour, front
+SNOW = [
+    {'cell': 32,  'speed': 17, 'density': 0.22, 'bright': 0.24, 'rmin': 0.7,  'rmax': 1.3,  'sway': 5,  'star': 0, 'color': rgb('#9fb4d4'), 'front': 0},
+    {'cell': 64,  'speed': 29, 'density': 0.30, 'bright': 0.42, 'rmin': 1.4,  'rmax': 2.4,  'sway': 10, 'star': 0, 'color': rgb('#c9d9ef'), 'front': 0},
+    {'cell': 128, 'speed': 50, 'density': 0.20, 'bright': 0.62, 'rmin': 6.0,  'rmax': 10.0, 'sway': 18, 'star': 1, 'color': rgb('#e4eefa'), 'front': 0},
+    {'cell': 256, 'speed': 88, 'density': 0.16, 'bright': 0.70, 'rmin': 14.0, 'rmax': 22.0, 'sway': 28, 'star': 1, 'color': rgb('#ffffff'), 'front': 1},
+]
+# A preset is where the settings start: every value here is one the settings (syncrain/app.py,
+# CONFIG_KEYS) can change, but for the rain's inner workings (word and glint rates, veil, contrast).
+RAIN = {'density': 0.43, 'wordRate': 0.085, 'glintRate': 0.23, 'veil': 0.35, 'contrast': 1,
+        'cycle': 0, 'flavours': 1, 'flavourLayout': 'random'}
+
 themes = {
     'nixos': {
         'label': 'NixOS snow',
@@ -86,16 +100,9 @@ themes = {
                        'center': rgb('#0a1a33'), 'vignette': 0.55},
         'logo': {'default': 'white', 'size': 0.40, 'glow': rgb('#7ebae4'), 'glowStrength': 0.22,
                  'spin': 180, 'hueCycle': 90, 'drift': 0.03},
-        'rain': {'density': 0.43, 'wordRate': 0.085, 'glintRate': 0.23, 'bloom': 1.0, 'veil': 0.35, 'contrast': 1,
-                 'rainbow': 'logo', 'allHueCycle': 600},
-        # cell (power of two, in 1/1080ths of the screen height), speed (whole units per second),
-        # density, brightness | radius min, max, sway, star | colour, front
-        'snow': [
-            {'cell': 32,  'speed': 17, 'density': 0.22, 'bright': 0.24, 'rmin': 0.7,  'rmax': 1.3,  'sway': 5,  'star': 0, 'color': rgb('#9fb4d4'), 'front': 0},
-            {'cell': 64,  'speed': 29, 'density': 0.30, 'bright': 0.42, 'rmin': 1.4,  'rmax': 2.4,  'sway': 10, 'star': 0, 'color': rgb('#c9d9ef'), 'front': 0},
-            {'cell': 128, 'speed': 50, 'density': 0.20, 'bright': 0.62, 'rmin': 6.0,  'rmax': 10.0, 'sway': 18, 'star': 1, 'color': rgb('#e4eefa'), 'front': 0},
-            {'cell': 256, 'speed': 88, 'density': 0.16, 'bright': 0.70, 'rmin': 14.0, 'rmax': 22.0, 'sway': 28, 'star': 1, 'color': rgb('#ffffff'), 'front': 1},
-        ],
+        'rain': dict(RAIN, bloom=1.0),
+        'snow': SNOW,
+        'snowDefault': True,
     },
     'matrix': {
         'label': 'Matrix green',
@@ -105,21 +112,21 @@ themes = {
             {'name': 'digits', 'chars': G.DIGITS, 'weight': 16},
             {'name': 'symbols', 'chars': G.MATRIX_SYMS, 'weight': 7.2},
             {'name': 'hieroglyphs', 'chars': G.HIEROGLYPHS + G.HIEROGLYPHS_MORE, 'share': 0.15}]},
-        'wordText': ['AI', 'NEURAL', 'CACHYOS', 'TENSOR', 'AGENT', 'LINUX', 'ONLINE', 'MATRIX'],
+        'wordText': ['AI', 'NEURAL', 'TENSOR', 'AGENT', 'LINUX', 'ONLINE', 'MATRIX'],
         'colors': {'deep': [0.0, 0.62, 0.22], 'mid': [0.12, 1.0, 0.36], 'pale': [0.6, 1.0, 0.68],
                    'head': [0.85, 1.0, 0.9], 'glow': [0.04, 0.6, 0.22]},
         'background': {'mode': 'gradient', 'top': rgb('#020604'), 'bottom': rgb('#03090a'),
                        'center': rgb('#06180f'), 'vignette': 0.4},
         'logo': {'default': 'none', 'size': 0.40, 'glow': [0.3, 0.9, 0.6], 'glowStrength': 0.0,
                  'spin': 180, 'hueCycle': 90, 'drift': 0.03},
-        'rain': {'density': 0.43, 'wordRate': 0.085, 'glintRate': 0.23, 'bloom': 1.25, 'veil': 0.35, 'contrast': 1,
-                 'rainbow': 'logo', 'allHueCycle': 600},
-        'snow': [],
+        'rain': dict(RAIN, bloom=1.25),
+        'snow': SNOW,
+        'snowDefault': False,
     },
 }
 
 meta = {
-    'contract': 'syncrain-themes-2',   # the file's format; a reader checks it, a build number is not it
+    'contract': 'syncrain-themes-3',   # the file's format; a reader checks it, a build number is not it
     'epoch0': 1704067200,          # 2024-01-01T00:00:00Z; time is passed as whole seconds since this + fraction
     'cols': 64,
     'library': {'file': 'glyphs.png', 'grid': G.GRID, 'slot': G.SLOT, 'cell': G.CELL,

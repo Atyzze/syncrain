@@ -24,14 +24,14 @@ Machines with synced clocks and the same stream id draw the same frame.
 5. **blur**, vertical.
 6. **composite**: background, snow, glyphs, bloom, logo, front snow.
 
-Data: `syncrain/data/themes.json`, `syncrain/data/glyphs.png` (489 shipped glyphs: code,
+Data: `syncrain/data/themes.json` (the presets), `syncrain/data/glyphs.png` (489 shipped glyphs: code,
 katakana, hiragana, kanji, Cyrillic, Greek, Arabic, French, 125 Egyptian hieroglyphs), the NixOS
 logos (CC BY 4.0), all made by `tools/build_assets.py`. The logo turns, drifts and cycles colour,
 against burn-in; nothing flashes.
 
 ## Symbols (`syncrain/glyphs.py`)
 
-* Sets of characters, each with a weight or a share: the theme's, or a symbols file's
+* Sets of characters, each with a weight or a share: the preset's, or a symbols file's
   (`~/.config/syncrain/glyphs.json`). A drop's symbol: a set by its share, then one of its
   characters, all alike (`pickGlyph` in `state.frag`).
 * A wallpaper's atlas holds only the glyphs its sets use: shipped ones copied from `glyphs.png`,
@@ -50,25 +50,39 @@ against burn-in; nothing flashes.
 * **GTK host** (`syncrain/app.py`, `syncrain/renderer.py`): X11, windows, `--screenshot`,
   `--record`, and the fallback. A GLArea per viewport, OpenGL through libepoxy (`syncrain/gl.py`),
   `GSK_RENDERER=gl` and `GDK_DISABLE=dmabuf`.
-* **Web page** (`web/template.html`): WebGL2; `tools/build_web.py` generates `web/index.html` and
-  `web/artifact.html`. Its settings panel edits one settings object, drawn live, and saves it as
+* **Web page** (`index.html`, at the top): WebGL2, one self-contained file; `tools/build_web.py`
+  fills its data blocks (shaders, presets, images, the build) in place, and writes the live page's
+  copy (`--artifact`). Its settings panel edits one settings object, drawn live, and saves it as
   the settings file the desktop reads (below). It builds the atlas as `glyphs.resolve` does (only
   the glyphs used, the words' first), copying shipped glyphs from `glyphs.png` and drawing others
   with the browser's fonts.
 
+The lanes compare them: native and GTK host to the pixel (at whole-number scales; at 125% or 150%
+GTK draws more pixels and scales them down), the page within texture filtering.
+
+## The look (`syncrain/engine.py`, `compose`)
+
+* A look is a preset (themes.json's `themes`: nixos, matrix) with the settings over it: the rain's
+  gradient (dark, middle, bright, leading) and glow, the background gradient and vignette, the logo
+  and its size and colour cycle, the rain's colour cycle and flavours, the hidden words. Every host
+  draws from the composed look (the page's `composeLook` does the same).
+* **Flavours** (`rain.glsl`, `flavourTurns`): each of the 64 columns turns the gradient round the
+  hue wheel by k/N of a turn, k by the channel's hash or, as a wave, in order across the stream; the
+  glow beside a column follows it. **Cycle** turns every flavour together (`uRainHueCph`). One
+  flavour skips the turn, so the default picture is the one it always was.
+* **The logo** (`syncrain/logo.py`): the shipped snowflakes, or a picture made into the same kind
+  of texture (a square, the picture in its middle two thirds, its own average colour under its
+  see-through pixels). The page makes it and keeps it in the settings file as a PNG, used as it is.
+
 ## The settings file (`syncrain/app.py`, `CONFIG_KEYS`)
 
 * `syncrain-config-1`: the picture options by name (`bg_gain` for `--bg-gain`), `null` for the
-  theme's, and `glyphs`, a symbols file's sets. Read before the command line, as if its options were
+  preset's, and `glyphs`, a symbols file's sets; build 21's `theme` and `rainbow` still read. Read before the command line, as if its options were
   typed first, so they are checked the same way and the command line goes over them.
 * `--config FILE`, else `~/.config/syncrain/config.json` when it is there. The page checks what it
   loads and saves the same way (`readSettings`, `checkGlyphs`), so a file it saves is one the
   desktop takes; the browser lane draws one on both and compares.
 * The login screen's rain reads a copy in `/usr/local/lib/syncrain/config.json`.
-
-The lanes compare them: native and GTK host to the pixel (at whole-number scales; at 125% or 150%
-GTK draws more pixels and scales them down), the page within texture filtering on screens
-wider than about 900 px (open item L12).
 
 ## The login screen (`syncrain/login/`, `syncrain/greeter.py`, `syncrain/greetd.py`)
 

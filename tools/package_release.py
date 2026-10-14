@@ -4,7 +4,7 @@
     setsid nohup python3 tools/package_release.py --output <dir> > ../release.log 2>&1 < /dev/null &
 
 In order: undo a previous run that was killed (from `var/release_journal.json`); write
-`current + 1` into BUILD_NUMBER; rebuild the generated web pages for it; run every test lane with
+`current + 1` into BUILD_NUMBER; fill the page (index.html) for it; run every test lane with
 every environment required (`tools/test_suite.py --lane all --require-all`) and write its summary
 into the build's notes in place of the token GATE_RESULT; compile the Python; build a wheel,
 install it somewhere clean and ask it which build and stream it is; then write
@@ -38,11 +38,11 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 #: What a release carries: these files at the root, and these directories whole.
-ROOT_FILES = {".gitignore", "BUILD_NUMBER", "LICENSE", "README.md", "flake.nix", "flake.lock", "install.sh",
-              "pyproject.toml"}
+ROOT_FILES = {".gitignore", "BUILD_NUMBER", "LICENSE", "README.md", "flake.nix", "flake.lock", "index.html",
+              "install.sh", "pyproject.toml"}
 #: Root files whose absence is a fact about the tree, not a broken promise.
 OPTIONAL_ROOT_FILES = {"flake.lock"}
-ROOT_DIRS = {"docs", "extras", "nix", "syncrain", "tests", "tools", "web"}
+ROOT_DIRS = {"docs", "nix", "syncrain", "tests", "tools"}
 #: Never in a release: host state, caches and build products.
 EXCLUDED_PARTS = {".git", ".pytest_cache", "__pycache__", "build", "dist", "var", ".venv", "venv",
                   "syncrain-wallpaper"}
@@ -51,10 +51,10 @@ EXCLUDED_SUFFIXES = {".pyc", ".pyo"}
 REQUIRED_RELEASE_PATHS = {
     "BUILD_NUMBER", "README.md", "LICENSE", "install.sh", "flake.nix", "pyproject.toml",
     "syncrain/__main__.py", "syncrain/app.py", "syncrain/build.py", "syncrain/diagnose.py", "syncrain/engine.py",
-    "syncrain/renderer.py", "syncrain/gl.py", "syncrain/native.py", "syncrain/native/build.sh",
+    "syncrain/renderer.py", "syncrain/logo.py", "syncrain/gl.py", "syncrain/native.py", "syncrain/native/build.sh",
     "syncrain/native/wallpaper.c", "syncrain/native/render.c", "syncrain/native/syncrain.h",
     "syncrain/data/themes.json", "syncrain/data/glyphs.png",
-    "web/index.html", "web/artifact.html", "web/template.html",
+    "index.html",
     "nix/package.nix", "nix/nixos-module.nix", "nix/hm-module.nix",
     "tests/fixtures/stream_freeze.json", "tools/package_release.py", "tools/test_suite.py",
     "tools/stream_freeze.py", "tools/build_web.py",
@@ -66,7 +66,7 @@ GATE_RESULT_TOKEN = "GATE_RESULT"
 JOURNAL = ROOT / "var" / "release_journal.json"
 JOURNAL_CONTRACT = "syncrain-release-journal-1"
 #: The files a release changes before it knows whether it will succeed.
-TRACKED = ("BUILD_NUMBER", "web/index.html", "web/artifact.html")
+TRACKED = ("BUILD_NUMBER", "index.html")
 
 
 def archive_name(number: int) -> str:

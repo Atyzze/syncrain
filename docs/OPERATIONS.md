@@ -21,7 +21,7 @@ git clone https://github.com/Atyzze/syncrain && cd syncrain   # or unpack SYNCRA
 * Packages: `python python-gobject python-cairo python-pillow gtk4 gtk4-layer-shell`, plus
   `gcc pkgconf wayland dbus` to build the native wallpaper. If that build fails, the installer says
   why and Python and GTK draw instead.
-* `--theme`, `--channel`, `--rainbow` and `--arg ...` (repeatable) go into the autostart service and
+* `--preset`, `--channel`, `--rainbow` and `--arg ...` (repeatable) go into the autostart service and
   the login screen's rain. Also `--prefix DIR`, `--no-deps`, `--yes`; `./install.sh --help`.
 * `--config FILE`: a settings file from the web page, checked, then kept as
   `~/.config/syncrain/config.json` (one there before is kept as `config.json.before`). The service
@@ -47,18 +47,21 @@ git clone https://github.com/Atyzze/syncrain && cd syncrain   # or unpack SYNCRA
 
 **NixOS** (flake): `services.syncrain = { enable = true; theme = "nixos"; channel = "public"; };`
 with `syncrain.nixosModules.default` (or `homeManagerModules.default`). Options: `enable`,
-`package`, `theme`, `channel`, `fps`, `logo`, `background`, `mask`, `rainbow`, `spin`, `drift`,
-`speed`, `density`, `glow`, `bloom`, `bgGain`, `snow`, `hieroglyphs`, `scale`, `pauseUnder`, `layer`,
-`extraArgs` (`nix/options.nix`). Without installing:
+`package`, `settings` (a `config.json` from the page), `theme` (the preset), `channel`, `fps`,
+`rainColors`, `glowColor`, `backgroundColors`, `vignette`, `flavours`, `flavourLayout`, `cycle`,
+`logo` (a name or a picture), `logoSize`, `logoCycle`, `words`, `background`, `mask`, `rainbow`,
+`spin`, `drift`, `speed`, `density`, `glow`, `bloom`, `bgGain`, `snow`, `hieroglyphs`, `scale`,
+`pauseUnder`, `layer`, `extraArgs` (`nix/options.nix`). Without installing:
 `nix run github:Atyzze/syncrain -- --window`.
 
 **Other systems**: GTK 4, gtk4-layer-shell, PyGObject, pycairo and Pillow, then `pip install .`.
 For the native wallpaper: `sh syncrain/native/build.sh <path>` and `SYNCRAIN_WALLPAPER=<path>` in
 the session's environment.
 
-**Browser**: `web/index.html`, one self-contained file; Settings tries every option live and saves
-them for the desktop (below). As a wallpaper page, URL parameters: `theme`, `channel`, `fps`,
-`logo`, `rainbow`, `spin`, `drift`, `speed`, `density`, `glow`, `bloom`, `bg-gain`, `snow=off`,
+**Browser**: `index.html` at the top of the folder, one self-contained file; Settings tries every
+option live and saves them for the desktop (below). As a wallpaper page, URL parameters: `preset`,
+`channel`, `fps`, `logo`, `logo-size`, `logo-cycle`, `cycle`, `flavours`, `flavour-layout`,
+`vignette`, `spin`, `drift`, `speed`, `density`, `glow`, `bloom`, `bg-gain`, `snow=off`,
 `hieroglyphs`, `scale`, `hud=0` (no control strip or settings), `t=<unix seconds>` (frozen clock).
 A Plasma web-wallpaper plugin can host it, behind the desktop icons.
 
@@ -66,15 +69,25 @@ A Plasma web-wallpaper plugin can host it, behind the desktop icons.
 
 | Flag | Default | Meaning |
 | --- | --- | --- |
-| `--theme` | `nixos` | `nixos` or `matrix`; `--list-themes` prints them |
+| `--preset` | `nixos` | Where the look starts: `nixos` or `matrix` (`--theme` is the earlier name); `--list-themes` prints them |
 | `--channel` | `public` | Stream name: same name, synced clock, same frame |
 | `--fps` | `30` | Cap; frames land on whole refreshes (every 2nd at 60 Hz) |
 | `--host` | `auto` | Wayland: `auto` (native when built, else GTK), `native` (only), `gtk` |
 | `--pause-under` | `maximized` | KDE: stop a screen under a maximized or full-screen window; `fullscreen`, `never` |
-| `--logo` | theme | `white`, `colours` or `none` |
+| `--rain-colors C,C,C,C` | preset's | The rain's gradient, dark, middle, bright, then the leading symbol: `#rrggbb` (or `r/g/b`, 0 to 1) |
+| `--glow-color C` | preset's | The glow round the rain |
+| `--flavours N` | `1` | Colours at once, 1 to 64: each column one of N hues round the colour wheel |
+| `--flavour-layout` | `random` | `random`: the columns' hues by the channel; `wave`: in order across the screen |
+| `--cycle S` | `0` | Seconds a turn of the colour wheel, every flavour together (an RGB keyboard's rainbow); 0 = the colours stay |
+| `--background-colors C,C,C` | preset's | The background gradient: top, bottom, centre glow |
+| `--vignette F` | preset's | How much darker the corners are, 0 to 1 |
+| `--logo` | preset's | `nixos`, `nixos-colours`, `none`, or a picture file (PNG or JPEG) |
+| `--logo-size F` | `0.4` | The logo's height in screen heights, 0.05 to 0.9 |
+| `--logo-cycle S` | `90` | Seconds a turn of the logo's rainbow; 0 = its own colours |
+| `--words W,W` | preset's | The hidden words that fall now and then (`--words=` for none) |
 | `--background IMAGE` | - | An image instead of the gradient, darkened by `--bg-gamma` (2.0) and `--bg-gain` (0.42) |
 | `--mask IMAGE` | - | Greyscale mask for the background: white stays bright, rain passes behind |
-| `--rainbow` | `logo` | `logo`, `all` (the rain too) or `off` |
+| `--rainbow` | `logo` | The earlier spelling: `all` is `--cycle 600`, `off` is `--logo-cycle 0` |
 | `--spin S` | `180` | Seconds per logo turn; 0 = still |
 | `--drift F` | `0.03` | Logo orbit (or image pan) in screen heights; 0 = fixed |
 | `--bg-gain F` | `1` | Background brightness; lower is darker (0.42 with `--background`) |
@@ -82,11 +95,11 @@ A Plasma web-wallpaper plugin can host it, behind the desktop icons.
 | `--bloom F` | `1` | Glow around the falling symbols, 0 (none) to 2 |
 | `--speed F` | `1` | Fall speed, 0.25 to 4 |
 | `--density F` | `1` | How often a column starts a stream, 0 to 2.3 |
-| `--snow` | `on` | `off`: no falling snowflakes |
-| `--hieroglyphs F` | sets' | Share of the changing symbols that are Egyptian hieroglyphs (the themes: 0.15) |
+| `--snow` | preset's | `on` or `off`: the falling snowflakes (on for nixos, off for matrix) |
+| `--hieroglyphs F` | sets' | Share of the changing symbols that are Egyptian hieroglyphs (the presets: 0.15) |
 | `--config FILE` | see below | A settings file (the web page saves one); `none` for none. Options given go over it |
 | `--check-config` | - | Read the settings file and the options, say what they come to, exit (2 if wrong) |
-| `--glyphs FILE` | see below | A symbols file; `theme` for the theme's own symbols |
+| `--glyphs FILE` | see below | A symbols file; `theme` for the preset's own symbols |
 | `--write-glyphs` | - | Write a starter symbols file (a bit of everything) and exit |
 | `--scale` | `1.0` | Render resolution scale, up to 4 (0.75 on a weak GPU) |
 | `--layer` | auto | `background` or `bottom`; auto is `bottom` on KDE |
@@ -110,17 +123,26 @@ syncrain sets `__NV_DISABLE_EXPLICIT_SYNC=1` and `__GL_YIELD=USLEEP` for itself 
 
 ## Settings from the web page
 
-Open `web/index.html` (or the live page), press **Settings** and move anything: theme, channel,
-colours, motion, light, the symbol sets (add, remove, weigh, type your own), frame rate. The rain
-changes as you go; **Screen shape** previews a 16:9, 21:9 or other desktop. Then **Save
-config.json** (or **Copy**) and, in the syncrain folder, `./install.sh --config config.json`.
+Open `index.html` (or the live page), press **Settings** and move anything: a preset to start from,
+the channel, the rain's colours and how many at once, the colour cycle, the background, the logo
+(or a picture of your own), motion, light, the symbol sets (add, remove, weigh, type your own), the
+hidden words, the frame rate. The rain changes as you go; **Screen shape** previews a 16:9, 21:9 or
+other desktop. Then **Save config.json** (or **Copy**) and, in the syncrain folder,
+`./install.sh --config config.json`.
 
 * The desktop draws what the page showed: the same frame at the same moment on the same channel.
   Symbols that are not among the 489 shipped ones are drawn by each side's fonts and can differ a
   little; the page names them.
 * The file is `~/.config/syncrain/config.json`, read at every start; `syncrain --config FILE
-  --window` tries one without installing it. It holds every setting (`null`: as the theme has it)
-  and the symbol sets, written out, so a symbols file cannot draw others.
+  --window` tries one without installing it. It holds every setting written out, the symbol sets
+  too, so a symbols file cannot draw others. Colours are `"#rrggbb"`, or three numbers 0 to 1.
+* A picture as the logo is made into the logo's texture by the page (a square, the picture in its
+  middle two thirds) and kept in the file as a PNG (`data:image/png;base64,...`): the desktop draws
+  those very pixels. `--logo FILE` makes one the same way from a file.
+* **Colours at once**: each column of rain takes one of that many hues, the gradient turned round
+  the colour wheel; by the channel (the same columns on every machine) or as a wave across the
+  screen. **Colour cycle** turns them all round the wheel together, like an RGB keyboard's rainbow.
+  One colour and no cycle is the picture as it always was.
 * Options on the command line go over the file. **Open a settings file** (or drop one on the page)
   shows one again; a symbols file (`glyphs.json`) loads as the sets.
 
@@ -185,11 +207,14 @@ picture or font it cannot use).
   `ffmpeg -framerate 30 -i /tmp/frames/frame_%05d.png -c:v libx264 -crf 17 -pix_fmt yuv420p rain.mp4`.
 * **The README's pictures** (`docs/images/`; redo when the stream changes): under Xvfb with
   `GDK_BACKEND=x11`, `syncrain --window --size 1600x900 --time 1791331207 --screenshot nixos.png`
-  (and `--theme matrix`); save as JPEG with Pillow, `quality=90, subsampling=0, progressive=True`.
-* **The CachyOS look**: `syncrain --theme matrix --background <nebula.png> --mask extras/cachyos-logo-mask.png`.
+  (and `--preset matrix`); save as JPEG with Pillow, `quality=90, subsampling=0, progressive=True`.
+* **An RGB keyboard's rainbow**: `syncrain --flavours 64 --flavour-layout wave --cycle 20` (a rainbow
+  across the screen, turning every 20 s); `--flavours 6 --cycle 60` for six colours by the channel.
+* **A picture behind the rain**: `syncrain --background <picture.png>`, with `--mask <mask.png>` to
+  keep part of it bright and the rain behind it.
 * **New assets**: `python3 tools/build_assets.py --hieroglyph-font <NotoSansEgyptianHieroglyphs.ttf>`
   (add `--nixos-artwork <checkout>` to redraw the logos), then `python3 tools/build_web.py`; a new
-  atlas or theme changes the stream.
+  atlas or preset changes the stream.
 
 ## Credits and licences
 

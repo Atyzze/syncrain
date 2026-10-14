@@ -154,7 +154,7 @@ def test_symbols_the_shipped_atlas_does_not_have_are_drawn_by_the_browser(page, 
 @pytest.mark.parametrize("wrong, says", [
     ({"speed": "fast"}, "speed is a number"),
     ({"density": -1}, "density is 0 or more"),
-    ({"theme": "nope"}, "theme is"),
+    ({"theme": "nope"}, "no preset"),
     ({"colour": "red"}, "no setting"),
     ({"glyphs": {"sets": [{"name": "a", "chars": "ab", "share": 0.7}, {"name": "b", "chars": "cd", "share": 0.6}]}},
      "the shares add up to more than 1"),
@@ -178,7 +178,93 @@ def test_a_settings_file_with_only_sets_leaves_nothing_of_the_last_one(page, tmp
     sets.write_text(json.dumps({"contract": "syncrain-config-1", "glyphs": {"sets": [{"name": "d", "chars": "0123"}]}}))
     symbols.write_text(json.dumps({"sets": [{"name": "e", "chars": "4567"}]}))
     said = page("symbols", first, sets)
-    assert said["loaded"] == "" and (said["exported"]["speed"], said["exported"]["theme"]) == (1, "nixos")
+    assert said["loaded"] == "" and (said["exported"]["speed"], said["exported"]["preset"]) == (1, "nixos")
     said = page("symbols", first, symbols)
     assert said["loaded"] == "" and said["exported"]["speed"] == 2
     assert [s["name"] for s in said["exported"]["glyphs"]["sets"]] == ["e"]
+
+
+def a_logo_png(path):
+    """A small picture with a see-through background, made into the logo texture as the page does."""
+    from PIL import Image, ImageDraw
+    im = Image.new("RGBA", (300, 200), (0, 0, 0, 0))
+    d = ImageDraw.Draw(im)
+    d.ellipse((20, 20, 180, 180), fill=(230, 60, 40, 255))
+    d.rectangle((150, 60, 280, 140), fill=(40, 120, 230, 255))
+    im.save(path)
+    return path
+
+
+def test_the_new_look_settings_draw_the_same_frame_on_the_page_and_the_desktop(page, app, tmp_path):
+    """Colours of one's own, seven flavours by the channel cycling every 45 s, another background,
+    a picture as the logo (as the desktop gets it from the page: the texture itself), hidden words."""
+    import base64
+    from syncrain import logo
+    from PIL import Image
+    texture = tmp_path / "logo.png"
+    logo.prepare(Image.open(a_logo_png(tmp_path / "picture.png"))).save(texture)
+    settings = {"contract": "syncrain-config-1", "preset": "matrix", "channel": "flavours",
+                "rain_colors": ["#202040", "#8040c0", [0.9, 0.7, 1.0], "#ffffff"], "glow_color": "#6030a0",
+                "background_colors": ["#050008", "#0a0010", "#200838"], "vignette": 0.3, "cycle": 45, "flavours": 7,
+                "flavour_layout": "random", "logo": "data:image/png;base64," + base64.b64encode(texture.read_bytes()).decode(),
+                "logo_size": 0.3, "logo_cycle": 0, "snow": True, "words": ["HELLO", "SYNC"]}
+    path, web, native = tmp_path / "config.json", tmp_path / "web.png", tmp_path / "native.png"
+    for layout in ("random", "wave"):
+        path.write_text(json.dumps(dict(settings, flavour_layout=layout)), encoding="utf-8")
+        said = page("configshot", web, 1280, 720, f"t={MOMENT}&hud=0", path)
+        assert said["loaded"] == "", said
+        done = app(["--window", "--size", "1280x720", "--time", str(MOMENT), "--screenshot", str(native),
+                    "--config", str(path)])
+        assert done.returncode == 0, done.stderr
+        assert mean_abs_diff(web, native) < 1.0, layout
+
+
+def test_one_flavour_and_no_cycle_is_the_picture_as_it_was(page, tmp_path):
+    """The default stays: flavours 1 draws what a page without flavours drew."""
+    plain, one = tmp_path / "plain.png", tmp_path / "one.png"
+    page("shot", plain, 640, 360, f"t={MOMENT}&hud=0")
+    page("shot", one, 640, 360, f"t={MOMENT}&hud=0&flavours=1&cycle=0")
+    assert mean_abs_diff(plain, one) == 0
+    many = tmp_path / "many.png"
+    page("shot", many, 640, 360, f"t={MOMENT}&hud=0&flavours=12")
+    assert mean_abs_diff(plain, many) > 1.0, "twelve flavours are another picture"
+
+
+def test_a_picture_picked_as_the_logo_goes_into_the_settings_file(page, tmp_path):
+    import base64
+    import io
+    from PIL import Image
+    from syncrain.app import parse_args
+    said = page("logo", a_logo_png(tmp_path / "picture.png"))["exported"]
+    uri = said["logo"]
+    assert uri.startswith("data:image/png;base64,") and said["logo_cycle"] == 0, "a picture keeps its colours"
+    im = Image.open(io.BytesIO(base64.b64decode(uri.split(",", 1)[1])))
+    assert im.size == (1024, 1024) and im.mode == "RGBA"
+    box = im.getchannel("A").getbbox()
+    middle = (1024 - round(1024 * 2 / 3)) // 2
+    assert middle <= box[0] and box[2] <= 1024 - middle and box[2] - box[0] > 0.8 * round(1024 * 2 / 3), \
+        "the picture fills the middle two thirds across"
+    path = tmp_path / "config.json"
+    path.write_text(json.dumps(said), encoding="utf-8")
+    assert parse_args(["--config", str(path)]).logo == uri
+
+
+@pytest.mark.parametrize("given, then", [
+    ({"theme": "matrix", "snow": True, "rainbow": "off"}, {"preset": "matrix", "snow": False, "logo_cycle": 0}),
+    ({"theme": "matrix", "preset": None}, {"preset": "matrix"}),
+    ({"rainbow": "off", "logo_cycle": None}, {"logo_cycle": 0}),
+    ({"logo_cycle": 30, "rainbow": "off"}, {"logo_cycle": 0}),
+    ({"words": [" HI", "THERE "]}, {"words": ["HI", "THERE"]}),
+], ids=["build-21-matrix", "a-null-is-no-value", "rainbow-off", "rainbow-where-it-stands", "words-as-the-desktop-reads"])
+def test_the_page_reads_a_file_as_the_desktop_does(page, tmp_path, given, then):
+    from syncrain import engine
+    from syncrain.app import parse_args
+    from syncrain.renderer import from_args
+    path = tmp_path / "config.json"
+    path.write_text(json.dumps(dict({"contract": "syncrain-config-1"}, **given)), encoding="utf-8")
+    said = page("symbols", path)
+    assert said["loaded"] == "" and {k: said["exported"][k] for k in then} == then
+    r = from_args(parse_args(["--config", str(path)]), glyphs="theme")
+    desktop = {"preset": r.theme_name, "snow": r.look["snow"], "logo_cycle": r.th["logo"]["hueCycle"],
+               "words": r.th["wordText"]}
+    assert {k: desktop[k] for k in then} == then

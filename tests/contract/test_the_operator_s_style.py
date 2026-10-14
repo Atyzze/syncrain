@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import re
 
-from tests.support import our_text_files
+from tests.support import our_text_files, readable_text
 
 LONG_DASHES = ("\u2014", "\u2013")   # em dash, en dash
 PRONOUN = re.compile(r"\b(he|He|him|Him|his|His|himself|she|She|her|Her|herself)\b")
@@ -21,7 +21,7 @@ LABEL = re.compile(r"^\s*(?:#+|//+|/\*+|\*+)\s*:?\s*(?:Builds?\s+)?\d+[a-z]?(?:\
 def test_no_long_dashes(root):
     found = []
     for path in our_text_files():
-        for n, line in enumerate(path.read_text(encoding="utf-8", errors="replace").splitlines(), 1):
+        for n, line in enumerate(readable_text(path).splitlines(), 1):
             if any(d in line for d in LONG_DASHES):
                 found.append(f"{path.relative_to(root)}:{n}: {line.strip()[:90]}")
     assert not found, "use - , ; or . instead:\n" + "\n".join(found)
@@ -32,7 +32,7 @@ def test_the_operator_is_they(root):
     for path in our_text_files():
         if path.name == "test_the_operator_s_style.py":
             continue
-        for n, line in enumerate(path.read_text(encoding="utf-8", errors="replace").splitlines(), 1):
+        for n, line in enumerate(readable_text(path).splitlines(), 1):
             if PRONOUN.search(line):
                 found.append(f"{path.relative_to(root)}:{n}: {line.strip()[:90]}")
     assert not found, 'say "the operator" or "they":\n' + "\n".join(found)
@@ -42,9 +42,9 @@ def test_comments_say_why_not_when(root):
     found = []
     for path in our_text_files():
         if path.suffix not in {".py", ".sh", ".nix", ".glsl", ".frag", ".vert", ".js", ".c", ".h"} \
-                and path.name != "template.html":
+                and path.name != "index.html":
             continue
-        for n, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        for n, line in enumerate(readable_text(path).splitlines(), 1):
             if LABEL.match(line):
                 found.append(f"{path.relative_to(root)}:{n}: {line.strip()[:90]}")
     assert not found, "comments that open with a build label:\n" + "\n".join(found)

@@ -10,7 +10,7 @@ from __future__ import annotations
 import re
 import tomllib
 
-from tests.support import our_text_files
+from tests.support import our_text_files, readable_text
 
 NOTES = "docs/build_notes"
 
@@ -47,7 +47,7 @@ def test_nothing_in_the_tree_carries_a_version(root):
         rel = path.relative_to(root).as_posix()
         if rel in exempt or rel.startswith(NOTES + "/"):
             continue
-        for n, line in enumerate(path.read_text(encoding="utf-8", errors="replace").splitlines(), 1):
+        for n, line in enumerate(readable_text(path).splitlines(), 1):
             if VERSIONISH.search(line):
                 found.append(f"{rel}:{n}: {line.strip()[:100]}")
     assert not found, "build numbers only:\n" + "\n".join(found)

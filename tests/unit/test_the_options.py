@@ -65,7 +65,7 @@ def test_the_settings_file_is_read_from_its_place_unless_told_none(tmp_path, mon
 
 @pytest.mark.parametrize("values, says", [({"spin": "fast"}, "--spin"), ({"colour": "red"}, "no setting 'colour'"),
                                           ({"glyphs": {"sets": []}}, "needs a list"), ({"speed": [1]}, "list"),
-                                          ({"theme": "nope"}, "no theme 'nope'")])
+                                          ({"theme": "nope"}, "no preset 'nope'")])
 def test_a_settings_file_it_cannot_use_ends_with_status_2_and_says_where(tmp_path, capsys, values, says):
     path = settings(tmp_path, **values)
     with pytest.raises(SystemExit) as stop:
@@ -133,3 +133,101 @@ def test_check_config_refuses_sets_the_wallpaper_would_not_draw(tmp_path, capsys
     assert main(["--config", settings(tmp_path, glyphs={"sets": [{"name": "kanji", "chars": many}]}),
                  "--check-config"]) == 2
     assert "at most 640" in capsys.readouterr().err
+
+
+def test_the_look_s_options_and_their_settings(tmp_path):
+    from syncrain import engine
+    from syncrain.renderer import from_args
+    args = parse_args(["--config", "none", "--preset", "matrix", "--rain-colors", "#000000,#ff0000,0.5/0.25/1,#ffffff",
+                       "--glow-color", "#102030", "--flavours", "3.0", "--flavour-layout", "wave", "--cycle", "45",
+                       "--words", "HI,THERE", "--logo-size", "0.3", "--logo-cycle", "0", "--vignette", "0.2"])
+    assert (args.theme, args.flavours, args.flavour_layout, args.cycle, args.words) == ("matrix", 3, "wave", 45.0,
+                                                                                         ["HI", "THERE"])
+    th = from_args(args, glyphs="theme").th
+    assert th["colors"]["mid"] == [1.0, 0.0, 0.0] and th["colors"]["pale"] == [0.5, 0.25, 1.0]
+    assert (th["rain"]["flavours"], th["logo"]["hueCycle"], th["wordText"]) == (3, 0.0, ["HI", "THERE"])
+    assert engine.motion(th)["uRainHueCph"] == 80
+    path = settings(tmp_path, preset="matrix", rain_colors=["#000000", "#ff0000", [0.5, 0.25, 1], "#ffffff"],
+                    glow_color=[0.1, 0.2, 0.3], background_colors=["#010203", "#040506", "#070809"], flavours=3,
+                    words=[], snow=None)
+    from_file = parse_args(["--config", path])
+    assert from_file.rain_colors == args.rain_colors and from_file.glow_color == [0.1, 0.2, 0.3]
+    assert from_file.words == [] and from_file.flavours == 3 and from_file.snow is None
+
+
+@pytest.mark.parametrize("argv", [["--rain-colors", "#000000,#ffffff"], ["--rain-colors", "red,green,blue,white"],
+                                  ["--glow-color", "1/2/3"], ["--flavours", "65"], ["--flavours", "2.5"],
+                                  ["--words", "TOO LONG A WORD"], ["--words", "A" * 17], ["--logo", "/no/such.png"],
+                                  ["--logo-size", "1"], ["--vignette", "2"], ["--flavour-layout", "spiral"]])
+def test_a_look_it_cannot_draw_ends_with_status_2(argv, capsys):
+    with pytest.raises(SystemExit) as stop:
+        parse_args(["--config", "none", *argv])
+    assert stop.value.code == 2 and argv[0] in capsys.readouterr().err
+
+
+def test_a_logo_of_one_s_own_from_a_file_or_from_the_page(tmp_path):
+    import base64
+    from PIL import Image
+    from syncrain import logo
+    picture = tmp_path / "p.png"
+    Image.new("RGBA", (40, 20), (200, 30, 30, 255)).save(picture)
+    made = logo.prepare(Image.open(picture))
+    assert made.size == (logo.SIDE, logo.SIDE)
+    assert made.getchannel("A").getbbox() == (170, 341, 853, 683), "the middle two thirds across"
+    assert made.getpixel((0, 0)) == (200, 30, 30, 0), "the picture's colour under its see-through pixels"
+    made.save(tmp_path / "t.png")
+    uri = "data:image/png;base64," + base64.b64encode((tmp_path / "t.png").read_bytes()).decode()
+    w, h, data = logo.texture(uri, "", None)
+    assert (w, h) == made.size and data == made.tobytes(), "the page's texture is used as it is"
+    assert parse_args(["--config", "none", "--logo", str(picture)]).logo == str(picture)
+    assert parse_args(["--config", "none", "--logo", "nixos"]).logo == "nixos"
+    with pytest.raises(SystemExit):
+        parse_args(["--config", "none", "--logo", "data:image/png;base64,bm90IGEgcG5n"])
+
+
+def test_a_font_whose_file_name_is_not_utf8_is_still_a_font(tmp_path, monkeypatch):
+    from syncrain import glyphs
+    fake = tmp_path / "bin"
+    fake.mkdir()
+    (fake / "fc-list").write_bytes(b"#!/bin/sh\nprintf '/fonts/caf\\351.ttf\\t0\\tCafe\\tBold\\t41-5a\\n'\n")
+    (fake / "fc-list").chmod(0o755)
+    monkeypatch.setenv("PATH", f"{fake}:/usr/bin:/bin")
+    fonts = glyphs.font_list()
+    assert len(fonts) == 1 and fonts[0]["family"] == "Cafe" and fonts[0]["ranges"] == [(0x41, 0x5A)]
+
+
+def test_the_words_hold_at_most_254_different_characters(capsys):
+    many = ",".join("".join(chr(0x4E00 + w * 10 + i) for i in range(10)) for w in range(26))
+    with pytest.raises(SystemExit):
+        parse_args(["--config", "none", "--words", many])
+    assert "254 different characters" in capsys.readouterr().err
+    assert len(parse_args(["--config", "none", "--words", many[:274]]).words) == 25
+
+
+def test_rainbow_goes_over_a_settings_file_as_any_option_does(tmp_path):
+    from syncrain import engine
+    from syncrain.renderer import from_args
+    path = settings(tmp_path, logo_cycle=90, cycle=0)
+    def cycles(argv):
+        motion = engine.motion(from_args(parse_args(argv), glyphs="theme").th)
+        return motion["uLogoHueCph"], motion["uRainHueCph"]
+    assert cycles(["--config", path, "--rainbow", "off"]) == (0, 0)
+    assert cycles(["--config", path, "--rainbow", "all"]) == (40, 6)
+    assert cycles(["--config", path, "--rainbow", "off", "--logo-cycle", "60"]) == (60, 0), "what comes after goes over"
+    assert cycles(["--config", settings(tmp_path, rainbow="all")]) == (40, 6), "build 21's files as they were"
+
+
+def test_build_21_s_matrix_files_still_have_no_snow(tmp_path):
+    from syncrain.renderer import from_args
+    old = parse_args(["--config", settings(tmp_path, theme="matrix", snow=True, rainbow=None)])
+    assert from_args(old, glyphs="theme").look["snow"] is False
+    new = parse_args(["--config", settings(tmp_path, preset="matrix", snow=True)])
+    assert from_args(new, glyphs="theme").look["snow"] is True
+
+
+def test_a_logo_file_that_is_no_picture_is_refused_at_once(tmp_path, capsys):
+    svg = tmp_path / "logo.svg"
+    svg.write_text('<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>')
+    with pytest.raises(SystemExit) as stop:
+        parse_args(["--config", "none", "--logo", str(svg)])
+    assert stop.value.code == 2 and "not a picture syncrain reads" in capsys.readouterr().err

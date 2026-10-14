@@ -20,7 +20,7 @@ uniform vec4 uSnowC[4];              // colour, front (1: drawn over everything)
 // anti burn-in motion, all derived from the shared clock so every screen stays in sync
 uniform float uSpinCph;              // logo revolutions per hour (0: still)
 uniform float uLogoHueCph;           // logo rainbow cycles per hour (0: original colours)
-uniform float uRainHueCph;           // whole-rain rainbow cycles per hour (0: theme colours)
+uniform float uRainHueCph;           // whole-rain colour cycles per hour (0: the colours stay)
 uniform float uDrift;                // slow orbit of the logo, or pan of an image, in screen heights
 in vec2 vUV;
 out vec4 oColor;
@@ -93,14 +93,6 @@ vec3 snowLayer(int i, vec2 px) {
 vec3 hsv2rgb(vec3 c) {
     vec3 p = abs(fract(c.xxx + vec3(0.0, 2.0 / 3.0, 1.0 / 3.0)) * 6.0 - 3.0);
     return c.z * mix(vec3(1.0), clamp(p - 1.0, 0.0, 1.0), c.y);
-}
-
-// rotate a colour's hue around the grey axis by a fraction of a turn (keeps its brightness)
-vec3 hueRotate(vec3 c, float turns) {
-    float a = 6.2831853 * turns;
-    const vec3 k = vec3(0.57735027);
-    float cs = cos(a), sn = sin(a);
-    return c * cs + cross(k, c) * sn + k * dot(k, c) * (1.0 - cs);
 }
 
 // slow Lissajous orbit (7 and 5 cycles per hour), in screen heights
@@ -178,7 +170,9 @@ void main() {
 
     vec3 glyph = rainGlyph(px, cell);
     vec3 bloom = texture(uBloom, vUV).rgb * 2.0;
-    vec3 glow = bloom * 0.95 + cGlow * fl.b * 0.09;
+    float ft = flavourTurns(int(floor(px.x / cell + uColOffset)));
+    vec3 glowColour = ft > 0.0 ? max(hueRotate(cGlow, ft), 0.0) : cGlow;
+    vec3 glow = bloom * 0.95 + glowColour * fl.b * 0.09;
     vec3 rain = glyph + glow * uBloomK;
     if (uRainHueCph > 0.0) rain = max(hueRotate(rain, cyclesPerHour(uRainHueCph)), 0.0);
     col += rainK * rain;

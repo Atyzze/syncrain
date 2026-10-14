@@ -75,8 +75,75 @@ def _theme(text):
     from .engine import load_meta
     themes = load_meta()["themes"]
     if text not in themes:
-        raise argparse.ArgumentTypeError(f"no theme {text!r} (the themes: {', '.join(themes)})")
+        raise argparse.ArgumentTypeError(f"no preset {text!r} (the presets: {', '.join(themes)})")
     return text
+
+
+def _colours(count):
+    """A list of colours, comma-separated: "#rrggbb" or three numbers 0 to 1 split by "/"."""
+    def parse(text):
+        from .engine import colour
+        words = [w.strip() for w in text.split(",")]
+        if len(words) != count:
+            raise argparse.ArgumentTypeError(f"{count} colours, comma-separated, not {len(words)}")
+        out = []
+        for w in words:
+            try:
+                out.append(colour([float(x) for x in w.split("/")] if "/" in w else w))
+            except ValueError as e:
+                raise argparse.ArgumentTypeError(str(e)) from None
+        return out if count > 1 else out[0]
+    return parse
+
+
+def _flavours(text):
+    """How many colours at once, 1 to 64 (a whole number; 3.0 is 3)."""
+    try:
+        value = float(text)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"not a number: {text!r}") from None
+    if not value.is_integer() or not 1 <= value <= 64:
+        raise argparse.ArgumentTypeError(f"{text} is not a whole number 1 to 64")
+    return int(value)
+
+
+#: Hidden words: at most this many, each this long at most (the words texture is 16 slots wide), and
+#: at most this many different characters among them (a word's slot is a byte, 255 ends a word).
+MAX_WORDS, MAX_WORD, MAX_WORD_CHARS = 32, 16, 254
+
+
+def _words(text):
+    """The hidden words, comma-separated; none for none."""
+    words = [w.strip() for w in text.split(",")] if text.strip() else []
+    for w in words:
+        if not w or any(ch.isspace() for ch in w) or len(w) > MAX_WORD:
+            raise argparse.ArgumentTypeError(f"a word is 1 to {MAX_WORD} characters with no space: {w!r}")
+    if len(words) > MAX_WORDS:
+        raise argparse.ArgumentTypeError(f"at most {MAX_WORDS} words")
+    if len(set("".join(words))) > MAX_WORD_CHARS:
+        raise argparse.ArgumentTypeError(f"at most {MAX_WORD_CHARS} different characters in all the words")
+    return words
+
+
+class _Rainbow(argparse.Action):
+    """--rainbow is the colour cycles it stood for, set where it stands among the options, so what
+    comes after it (a settings file's cycles come before the command line) goes over it."""
+
+    def __call__(self, parser, namespace, value, option_string=None):
+        from .engine import ALL_CYCLE
+        namespace.rainbow = value
+        if value == "off":
+            namespace.logo_cycle = 0.0
+        elif value == "all":
+            namespace.cycle = float(ALL_CYCLE)
+
+
+def _logo(text):
+    from .logo import LogoError, check
+    try:
+        return check(text)
+    except LogoError as e:
+        raise argparse.ArgumentTypeError(str(e)) from None
 
 
 def _image(text):
@@ -88,10 +155,15 @@ def _image(text):
 
 #: What a settings file is (the web page writes it): the options it may hold, as their command-line names.
 CONFIG_CONTRACT = "syncrain-config-1"
-CONFIG_KEYS = {"theme": "--theme", "channel": "--channel", "rainbow": "--rainbow", "logo": "--logo",
-               "spin": "--spin", "drift": "--drift", "speed": "--speed", "density": "--density",
-               "glow": "--glow", "bloom": "--bloom", "bg_gain": "--bg-gain", "snow": "--snow",
-               "hieroglyphs": "--hieroglyphs", "fps": "--fps", "pause_under": "--pause-under"}
+CONFIG_KEYS = {"preset": "--preset", "theme": "--preset", "channel": "--channel", "rainbow": "--rainbow",
+               "rain_colors": "--rain-colors", "glow_color": "--glow-color", "background_colors": "--background-colors",
+               "vignette": "--vignette", "cycle": "--cycle", "flavours": "--flavours",
+               "flavour_layout": "--flavour-layout", "logo": "--logo", "logo_size": "--logo-size",
+               "logo_cycle": "--logo-cycle", "spin": "--spin", "drift": "--drift", "speed": "--speed",
+               "density": "--density", "glow": "--glow", "bloom": "--bloom", "bg_gain": "--bg-gain", "snow": "--snow",
+               "hieroglyphs": "--hieroglyphs", "words": "--words", "fps": "--fps", "pause_under": "--pause-under"}
+#: The settings whose values are colours: (how many, as a list).
+COLOUR_KEYS = {"rain_colors": 4, "background_colors": 3, "glow_color": 1}
 
 
 def default_config_path() -> str:
@@ -113,6 +185,22 @@ def _config_path(argv):
     return path if os.path.isfile(path) else None
 
 
+def _colour_words(value, count, wrong, key):
+    """A settings file's colours as the option takes them: "#rrggbb", or r/g/b exactly."""
+    def word(c):
+        if isinstance(c, str):
+            return c
+        if isinstance(c, list) and len(c) == 3 and all(isinstance(x, (int, float)) and not isinstance(x, bool)
+                                                       for x in c):
+            return "/".join(repr(float(x)) for x in c)
+        wrong(f"{key}: {c!r} is no colour (\"#rrggbb\", or three numbers 0 to 1)")
+    if count == 1:
+        return word(value)
+    if not isinstance(value, list) or len(value) != count:
+        wrong(f"{key} is a list of {count} colours")
+    return ",".join(word(c) for c in value)
+
+
 def _read_settings(ap, path):
     """The settings file as options (checked as the command line's are) and its symbol sets."""
     import json
@@ -129,14 +217,25 @@ def _read_settings(ap, path):
     if not isinstance(cfg, dict) or cfg.get("contract") != CONFIG_CONTRACT:
         wrong(f'not a syncrain settings file (it says "contract": "{CONFIG_CONTRACT}")')
     out = []
+    # A file that names a "theme" was written by the page of build 21, which wrote "snow": true for
+    # every theme, where matrix had none to show: there it means as the preset has it.
+    legacy = "theme" in cfg and "preset" not in cfg
     for key, value in cfg.items():
         if key in ("contract", "about", "glyphs"):
             continue
+        if legacy and key == "snow" and value in (True, "on"):
+            continue
         if key not in CONFIG_KEYS:
             wrong(f"no setting {key!r} (the settings: {', '.join(CONFIG_KEYS)}, glyphs)")
-        if value is None:                         # as the theme or the sets have it
+        if value is None:                         # as the preset or the sets have it
             continue
-        if isinstance(value, bool):
+        if key in COLOUR_KEYS:
+            value = _colour_words(value, COLOUR_KEYS[key], wrong, key)
+        elif key == "words":
+            if not isinstance(value, list) or not all(isinstance(w, str) and "," not in w for w in value):
+                wrong("words is a list of words in quotes, none with a comma")
+            value = ",".join(value)
+        elif isinstance(value, bool):
             value = "on" if value else "off"
         elif isinstance(value, (int, float)):
             try:
@@ -170,7 +269,8 @@ def parse_args(argv=None):
     # no shortened options: --conf would be --config to argparse and not to _config_path
     ap = argparse.ArgumentParser(prog="syncrain", description="Never-repeating, clock-synchronised code rain wallpaper.",
                                  allow_abbrev=False)
-    ap.add_argument("--theme", type=_theme, default="nixos", help="nixos (default) or matrix")
+    ap.add_argument("--preset", "--theme", dest="theme", type=_theme, default="nixos",
+                    help="where the look starts: nixos (default) or matrix; every option below goes over it")
     ap.add_argument("--channel", default="public",
                     help="stream name; everyone on the same channel with a synced clock sees the same frame")
     ap.add_argument("--fps", type=_number(above=0, high=1000), default=30.0,
@@ -184,30 +284,51 @@ def parse_args(argv=None):
                     help="what draws the wallpaper on Wayland: auto (the native program when it is built, "
                          "else Python and GTK), native (the native program only) or gtk (Python and GTK, as on "
                          "X11 and in a window)")
-    ap.add_argument("--logo", choices=("white", "colours", "none"), help="NixOS logo variant (theme default otherwise)")
-    ap.add_argument("--background", type=_image, metavar="IMAGE", help="use an image as the background instead of the theme gradient")
+    ap.add_argument("--logo", type=_logo, metavar="LOGO",
+                    help="nixos (the default), nixos-colours, none, or a picture file (PNG or JPEG)")
+    ap.add_argument("--logo-size", type=_number(low=0.05, high=0.9), metavar="F",
+                    help="the logo's height, in screen heights (default 0.4)")
+    ap.add_argument("--logo-cycle", type=_number(low=0), metavar="SECONDS",
+                    help="seconds a turn of the logo's rainbow (default 90; 0 = the logo's own colours)")
+    ap.add_argument("--rain-colors", type=_colours(4), metavar="C,C,C,C",
+                    help="the rain's gradient, dark to bright, then the leading symbol: #rrggbb each")
+    ap.add_argument("--glow-color", type=_colours(1), metavar="C", help="the glow round the rain: #rrggbb")
+    ap.add_argument("--background-colors", type=_colours(3), metavar="C,C,C",
+                    help="the background gradient: top, bottom, centre glow (#rrggbb each)")
+    ap.add_argument("--vignette", type=_number(low=0, high=1), metavar="F",
+                    help="how much darker the corners are, 0 to 1 (the preset's otherwise)")
+    ap.add_argument("--flavours", type=_flavours, metavar="N",
+                    help="colours at once, 1 (default) to 64: each column of rain one of N hues round the wheel")
+    ap.add_argument("--flavour-layout", choices=("random", "wave"),
+                    help="random (default): the columns' hues by the channel; wave: in order across the screen")
+    ap.add_argument("--cycle", type=_number(low=0), metavar="SECONDS",
+                    help="seconds a turn of the rain's hue wheel, every flavour together (default 0: the colours stay)")
+    ap.add_argument("--words", type=_words, metavar="W,W,...",
+                    help="the hidden words that fall now and then, comma-separated ('' for none)")
+    ap.add_argument("--background", type=_image, metavar="IMAGE", help="use an image as the background instead of the background gradient")
     ap.add_argument("--mask", type=_image, metavar="IMAGE", help="greyscale mask (same framing as --background): white = keep bright, no rain")
     ap.add_argument("--bg-gamma", type=_number(above=0), help="darkening curve for --background (default 2.0; 1 = unchanged)")
     ap.add_argument("--bg-gain", type=_number(low=0),
                     help="background brightness: the gradient's (default 1; lower is darker) or --background's "
                          "(default 0.42; 1 = unchanged)")
-    ap.add_argument("--rainbow", choices=("logo", "all", "off"),
-                    help="colour cycling: logo (default), all (the rain too) or off")
+    ap.add_argument("--rainbow", choices=("logo", "all", "off"), action=_Rainbow,
+                    help="the earlier spelling of --logo-cycle and --cycle: logo (as is), all (--cycle 600) or "
+                         "off (--logo-cycle 0)")
     ap.add_argument("--spin", type=_number(), metavar="SECONDS", help="seconds per logo revolution (default 180, 0 = still)")
     ap.add_argument("--drift", type=_number(), metavar="FRACTION",
                     help="slow orbit of the logo / pan of the image, in screen heights (default 0.03, 0 = fixed)")
     ap.add_argument("--speed", type=_number(above=0), metavar="F",
-                    help="how fast the symbols fall, times the theme's (default 1; 0.25 to 4)")
+                    help="how fast the symbols fall, times the preset's (default 1; 0.25 to 4)")
     ap.add_argument("--density", type=_number(low=0), metavar="F",
-                    help="how often a column starts a new stream, times the theme's (default 1; 0 to 2.3)")
+                    help="how often a column starts a new stream, times the preset's (default 1; 0 to 2.3)")
     ap.add_argument("--glow", type=_number(low=0), metavar="F",
-                    help="the glow around the centre and the logo, times the theme's (default 1; 0 = none)")
+                    help="the glow around the centre and the logo, times the preset's (default 1; 0 = none)")
     ap.add_argument("--bloom", type=_number(low=0), metavar="F",
-                    help="the glow around the falling symbols, times the theme's (default 1; 0 = none)")
-    ap.add_argument("--snow", choices=("on", "off"), help="the falling snowflakes (default on, where the theme has them)")
+                    help="the glow around the falling symbols, times the preset's (default 1; 0 = none)")
+    ap.add_argument("--snow", choices=("on", "off"), help="the falling snowflakes (default: on for nixos, off for matrix)")
     ap.add_argument("--hieroglyphs", type=_number(low=0, high=1), metavar="SHARE",
                     help="share of the changing symbols that are Egyptian hieroglyphs (default: as the symbol sets "
-                         "say, 0.15 in the themes; 0 = none, 1 = only)")
+                         "say, 0.15 in the presets; 0 = none, 1 = only)")
     ap.add_argument("--config", metavar="FILE",
                     help="a settings file, as the web page exports it (default: ~/.config/syncrain/config.json "
                          "if there is one; 'none' for none); options given here go over it")
@@ -215,7 +336,7 @@ def parse_args(argv=None):
                     help="read the settings file and the options, say what they come to, exit (status 2 if wrong)")
     ap.add_argument("--glyphs", metavar="FILE",
                     help="a symbols file: sets of characters and how often each falls (default: "
-                         "~/.config/syncrain/glyphs.json if there is one, else the theme's; 'theme' for the theme's)")
+                         "~/.config/syncrain/glyphs.json if there is one, else the preset's; 'theme' for the preset's)")
     ap.add_argument("--write-glyphs", action="store_true",
                     help="write a starter symbols file (to --glyphs, or ~/.config/syncrain/glyphs.json) and exit")
     ap.add_argument("--scale", type=_number(above=0, high=4), default=1.0, help="render resolution scale, e.g. 0.75 on weak GPUs")
@@ -472,7 +593,7 @@ def main(argv=None):
         from . import glyphs
         from .engine import DATA_DIR, load_meta
         from .renderer import from_args
-        if isinstance(args.glyphs, dict):         # the wallpaper would fall back to the theme's: say it
+        if isinstance(args.glyphs, dict):         # the wallpaper would fall back to the preset's: say it
             meta = load_meta()
             try:
                 glyphs.resolve(meta, meta["themes"][args.theme], DATA_DIR, args.glyphs, str(args.config_file),
@@ -481,7 +602,16 @@ def main(argv=None):
                 print(f"syncrain: {e}", file=sys.stderr)
                 return 2
         r = from_args(args)
-        print(f"syncrain: {args.config_file or 'no settings file'}: theme {r.theme_name}, channel "
+        try:                                      # what the wallpaper makes before its first frame
+            r.glyphs.words_bytes()
+            if r.logo_choice != "none":
+                from .logo import texture
+                from .renderer import rgba_pil
+                texture(r.logo_choice, r.data_dir, rgba_pil)
+        except Exception as e:  # noqa: BLE001 - a picture or a word it cannot use, said as such
+            print(f"syncrain: {type(e).__name__}: {e}", file=sys.stderr)
+            return 2
+        print(f"syncrain: {args.config_file or 'no settings file'}: preset {r.theme_name}, channel "
               f"{r.channel!r}, {len(r.glyphs.sets)} symbol sets from {r.glyphs.source}")
         return 0
     # Before GTK is imported: PyGObject initialises GTK on import, and GDK reads GDK_DISABLE then.
@@ -538,7 +668,7 @@ def main(argv=None):
             LayerShell = None
         if LayerShell is None:
             print("syncrain: this Wayland compositor has no wlr-layer-shell support (GNOME?). "
-                  "Use --window, or the web version in web/index.html.", file=sys.stderr)
+                  "Use --window, or the web version, index.html at the top of the syncrain folder.", file=sys.stderr)
             return EXIT_NO_LAYER
 
     # Until the first frame, and if OpenGL never comes, a window shows its theme background:

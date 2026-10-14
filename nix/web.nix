@@ -10,5 +10,5 @@ runCommand "syncrain-web-${lib.fileContents ../BUILD_NUMBER}"
     };
   }
   ''
-    install -Dm644 ${../web/index.html} $out/share/syncrain/index.html
+    install -Dm644 ${../index.html} $out/share/syncrain/index.html
   ''

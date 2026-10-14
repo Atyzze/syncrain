@@ -1,4 +1,4 @@
-// Drive web/index.html in Chromium for the browser lane; prints one JSON line.
+// Drive index.html in Chromium for the browser lane; prints one JSON line.
 //   node page.js shot <png> <width> <height> <query>   a screenshot of the page
 //   node page.js state <width> <height> <query>        a hash of the raw rain-cell grid
 //   node page.js identity                              the build and stream the page says it is
@@ -6,13 +6,14 @@
 //   node page.js controls                              the control strip at desk and phone sizes
 //   node page.js configshot <png> <w> <h> <query> <json> a screenshot with that settings file loaded
 //   node page.js symbols <json>...                     what the page drew its symbols from, with those files
+//   node page.js logo <picture>                       a picture given as the logo: the settings it saves
 //   node page.js studio                                the settings panel used as a person would, and saved
 'use strict';
 const { chromium } = require('playwright');
 const crypto = require('crypto');
 const path = require('path');
 
-const PAGE = 'file://' + path.resolve(__dirname, '..', '..', 'web', 'index.html');
+const PAGE = 'file://' + path.resolve(__dirname, '..', '..', 'index.html');
 
 (async () => {
   const [mode, ...rest] = process.argv.slice(2);
@@ -65,11 +66,22 @@ const PAGE = 'file://' + path.resolve(__dirname, '..', '..', 'web', 'index.html'
     const [png, w, h, query, json] = rest;
     const page = await open(Number(w), Number(h), query + '&capture=1&scale=1&fps=1');
     out.loaded = await page.evaluate(text => window.__syncrainLoad(text), require('fs').readFileSync(json, 'utf8'));
+    await page.evaluate(() => window.__syncrainSettled());
     const data = await page.evaluate(() => {
       window.__syncrainDraw(Number(new URLSearchParams(location.search).get('t')) * 1000);
       return document.getElementById('c').toDataURL('image/png');
     });
     require('fs').writeFileSync(png, Buffer.from(data.split(',')[1], 'base64'));
+  } else if (mode === 'logo') {
+    // a picture given as the logo, as a person picks one: what the settings file then holds
+    const [picture] = rest;
+    const page = await open(1280, 720, 'fps=1');
+    await page.click('#open');
+    await page.click('#logo button[data-v="picture"]').catch(() => {});
+    await page.setInputFiles('#logo-file', picture);
+    await page.waitForFunction(() => JSON.parse(window.__syncrainExport()).logo.startsWith('data:'), null, { timeout: 60000 });
+    await page.evaluate(() => window.__syncrainSettled());
+    out.exported = JSON.parse(await page.evaluate(() => window.__syncrainExport()));
   } else if (mode === 'symbols') {
     const page = await open(800, 450, 'hud=0&fps=1');
     for (const json of rest)                     // one after another, as a person opens them
@@ -86,7 +98,7 @@ const PAGE = 'file://' + path.resolve(__dirname, '..', '..', 'web', 'index.html'
       await page.waitForFunction(() => window.__syncrainReady === true, null, { timeout: 120000 });
       await page.mouse.move(w / 2, h / 2);
       await page.click('#open');
-      await page.click('#themes button[data-v="matrix"]');
+      await page.click('#presets-look button[data-v="matrix"]');
       await page.fill('#motion input[type="number"] >> nth=0', '1.5');
       await page.press('#motion input[type="number"] >> nth=0', 'Enter');
       await page.selectOption('#add-set', 'greek');

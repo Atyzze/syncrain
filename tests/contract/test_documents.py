@@ -13,7 +13,7 @@ from syncrain.app import parse_args
 CANONICAL = {"ARCHITECTURE.md", "HISTORY.md", "LESSONS.md", "OPERATIONS.md", "ROADMAP.md", "WHERE_WE_ARE.md"}
 AGENT = {"ENVIRONMENT.md", "HANDOFF.md", "NEXT_BUILD.md", "TARGET_ENVIRONMENT.md", "WORKING_WITH_THE_OPERATOR.md"}
 #: A path in backticks that starts in one of these is a pointer and must resolve.
-POINTER = re.compile(r"`((?:docs|tools|tests|syncrain|nix|web|extras)/[A-Za-z0-9_./-]*[A-Za-z0-9_/])`")
+POINTER = re.compile(r"`((?:docs|tools|tests|syncrain|nix)/[A-Za-z0-9_./-]*[A-Za-z0-9_/])`")
 
 
 def documents(root):

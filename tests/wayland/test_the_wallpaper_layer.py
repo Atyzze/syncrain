@@ -107,14 +107,24 @@ SYMBOLS = '{"balance": "glyphs", "sets": [{"name": "a", "chars": "Ж★ΩअД�
 
 
 @pytest.mark.parametrize("look", [[], ["--speed", "2", "--density", "0.5", "--glow", "0", "--bloom", "1.5",
-                                        "--bg-gain", "0.5", "--snow", "off", "--hieroglyphs", "1"], ["--glyphs"]],
-                         ids=["defaults", "every-option", "a-symbols-file"])
+                                        "--bg-gain", "0.5", "--snow", "off", "--hieroglyphs", "1"], ["--glyphs"],
+                                  ["--logo"]],
+                         ids=["defaults", "every-option", "a-symbols-file", "a-look-of-one-s-own"])
 def test_the_native_wallpaper_draws_the_gtk_host_s_frame(root, sway, tmp_path, look):
     """The same moment, drawn by each host on the same screen, is the same picture to the pixel."""
     session, _ = sway
     if look == ["--glyphs"]:
         (tmp_path / "glyphs.json").write_text(SYMBOLS, encoding="utf-8")
         look = ["--glyphs", str(tmp_path / "glyphs.json")]
+    if look == ["--logo"]:                    # colours, flavours, a picture as the logo, words of one's own
+        from PIL import Image, ImageDraw
+        picture = Image.new("RGBA", (300, 200), (0, 0, 0, 0))
+        ImageDraw.Draw(picture).ellipse((20, 20, 180, 180), fill=(230, 60, 40, 255))
+        picture.save(tmp_path / "picture.png")
+        look = ["--preset", "matrix", "--rain-colors", "#202040,#8040c0,0.9/0.7/1,#ffffff", "--flavours", "9",
+                "--flavour-layout", "wave", "--cycle", "30", "--logo", str(tmp_path / "picture.png"),
+                "--logo-size", "0.3", "--background-colors", "#050008,#0a0010,#200838", "--vignette", "0.2",
+                "--words", "HELLO,SYNC", "--glow-color", "#6030a0"]
     shots = {}
     for host in ("native", "gtk"):
         proc, line = start(root, wallpaper_env(root, session), "--time", str(MOMENT), "--host",

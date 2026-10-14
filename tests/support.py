@@ -188,15 +188,23 @@ class AnotherUser:
             shutil.rmtree(self.base, ignore_errors=True)
 
 
+def readable_text(path: Path) -> str:
+    """A file's text as written: the page without the data its blocks are filled with."""
+    import re
+    text = path.read_text(encoding="utf-8", errors="replace")
+    if path == ROOT / "index.html":
+        text = re.sub(r"/\*@([A-Z]+)\*/.*?/\*@/\1\*/", "null", text, flags=re.S)
+    return text
+
+
 def our_text_files() -> list[Path]:
     """Every text file this project wrote (not generated pages, not binary assets, not caches)."""
     skip_dirs = {".git", "__pycache__", "var", "result", "build", "dist", ".pytest_cache"}
     suffixes = {".py", ".md", ".sh", ".nix", ".toml", ".glsl", ".frag", ".vert", ".js", ".json", ".txt", ".c",
                 ".h"}
-    generated = {ROOT / "web" / "index.html", ROOT / "web" / "artifact.html"}
     files = [p for p in ROOT.rglob("*") if p.is_file() and not (set(p.relative_to(ROOT).parts) & skip_dirs)
-             and (p.suffix in suffixes or p.name in {"template.html", "LICENSE", ".gitignore"})
-             and p not in generated and "fixtures" not in p.parts]
+             and (p.suffix in suffixes or p.name in {"index.html", "LICENSE", ".gitignore"})
+             and "fixtures" not in p.parts]
     return sorted(files)
 
 

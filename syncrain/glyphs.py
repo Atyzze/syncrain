@@ -294,8 +294,8 @@ class Resolved:
         return self._render()
 
 
-def resolve(meta, theme, data_dir, config=None, source="the theme", hieroglyphs=None) -> Resolved:
-    """The symbols for `theme`, from `config` (a checked symbols file) or the theme's own sets."""
+def resolve(meta, theme, data_dir, config=None, source="the preset", hieroglyphs=None) -> Resolved:
+    """The symbols for `theme`, from `config` (a checked symbols file) or the preset's own sets."""
     library = Library(meta, data_dir)
     cfg = config or check_config(theme["glyphs"], "themes.json")
     keys, slots = [], {}
@@ -340,8 +340,8 @@ def resolve(meta, theme, data_dir, config=None, source="the theme", hieroglyphs=
 
 
 def for_theme(meta, theme, data_dir, path=None, hieroglyphs=None, warn=None) -> Resolved:
-    """The symbols a wallpaper uses: `path` ("" or "theme": the theme's own), else the default symbols
-    file if there is one. A broken file is said (`warn`) and the theme's symbols are used."""
+    """The symbols a wallpaper uses: `path` ("" or "theme": the preset's own), else the default symbols
+    file if there is one. A broken file is said (`warn`) and the preset's symbols are used."""
     if path in ("", "theme"):
         return resolve(meta, theme, data_dir, hieroglyphs=hieroglyphs)
     path = path or default_path()
@@ -351,7 +351,7 @@ def for_theme(meta, theme, data_dir, path=None, hieroglyphs=None, warn=None) -> 
         return resolve(meta, theme, data_dir, read_config(path), path, hieroglyphs)
     except GlyphsError as e:
         if warn:
-            warn(f"{e}; the theme's own symbols instead")
+            warn(f"{e}; the preset's own symbols instead")
         return resolve(meta, theme, data_dir, hieroglyphs=hieroglyphs)
 
 
@@ -360,8 +360,9 @@ def for_theme(meta, theme, data_dir, path=None, hieroglyphs=None, warn=None) -> 
 def font_list() -> list[dict]:
     """Every font fontconfig knows: file, face index, family, style, and the characters it has."""
     try:
+        # a font file whose name is not UTF-8 is still a font: its name goes through as it is
         done = subprocess.run(["fc-list", "--format", "%{file}\t%{index}\t%{family[0]}\t%{style[0]}\t%{charset}\n"],
-                              capture_output=True, text=True, timeout=60)
+                              capture_output=True, text=True, errors="surrogateescape", timeout=60)
     except (OSError, subprocess.SubprocessError):
         return []
     fonts = []

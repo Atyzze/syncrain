@@ -1,6 +1,6 @@
 """The symbol sets (syncrain/glyphs.py): how often each symbol falls, what goes into a wallpaper's
 atlas, and what a symbols file may say. Pinned to answers worked out by hand, because the web page
-(web/template.html, setShares) must compute the same."""
+(index.html, setShares) must compute the same."""
 from __future__ import annotations
 
 import json
@@ -66,8 +66,8 @@ def test_a_wallpaper_s_atlas_holds_only_what_its_sets_use():
 
 
 def test_the_web_page_resolves_the_shares_the_same_way():
-    """setShares in web/template.html is this function in JavaScript: the same steps in the same order."""
-    page = open(engine.DATA_DIR.replace("syncrain/data", "web/template.html"), encoding="utf-8").read()
+    """setShares in index.html is this function in JavaScript: the same steps in the same order."""
+    page = open(engine.DATA_DIR.replace("syncrain/data", "index.html"), encoding="utf-8").read()
     assert "function setShares(g, hieroglyphs)" in page and "rest * weights[i] / total" in page
 
 
@@ -91,7 +91,7 @@ def test_a_broken_file_falls_back_to_the_theme_and_says_so(tmp_path):
     said = []
     meta = engine.load_meta()
     r = glyphs.for_theme(meta, meta["themes"]["nixos"], engine.DATA_DIR, path=str(path), warn=said.append)
-    assert r.source == "the theme" and "not JSON" in said[0]
+    assert r.source == "the preset" and "not JSON" in said[0]
 
 
 def test_the_starter_file_is_a_bit_of_everything(tmp_path):
@@ -135,11 +135,11 @@ def test_shares_of_sets_with_nothing_to_draw_go_to_the_rest():
 
 def test_any_problem_with_a_file_s_symbols_falls_back_to_the_theme(tmp_path, capsys):
     """Not only a file that is not right: characters or a font that cannot be drawn (here half of a
-    character, which JSON can spell). The wallpaper draws the theme's symbols and says why."""
+    character, which JSON can spell). The wallpaper draws the preset's symbols and says why."""
     from syncrain import renderer
     path = tmp_path / "glyphs.json"
     path.write_text('{"sets": [{"name": "mine", "chars": "\\u4e00\\ud83d"}]}', encoding="utf-8")
     r = renderer.from_args(__import__("syncrain.app", fromlist=["parse_args"]).parse_args(["--glyphs", str(path)]))
     sources, _bg, _mask = renderer.texture_sources(r, renderer.rgba_pil)
-    assert r.glyphs.source == "the theme" and sources["atlas"][0] > 0
+    assert r.glyphs.source == "the preset" and sources["atlas"][0] > 0
     assert "could not be used (UnicodeEncodeError" in capsys.readouterr().err

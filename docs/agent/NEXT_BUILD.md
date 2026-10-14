@@ -1,12 +1,12 @@
-# The next build is 22
+# The next build is 23
 
 The first line is parsed: `# The next build is <N>`, exactly one above `BUILD_NUMBER`.
 
-## Build 22: what the operator asks next
+## Build 23: what the operator asks next
 
 * Read what the operator sent last, and answer it in one plain sentence first.
-* Build 21 made the page a live previewer that saves a settings file; ask how it felt and whether
-  a saved file looks the same on their desktop, and fix what they find first.
+* Build 22 made the look general (colours, flavours, a colour cycle, any logo, presets instead of
+  themes) and put the page at the top as `index.html`; fix first what they find on their desktop.
 * With nothing asked: the boot splash (`docs/ROADMAP.md`, "Planned builds"), or an open item.
 
 **Known blockers**: watts, NVIDIA's driver and Plasma's shell exist only on the operator's machine;
@@ -17,7 +17,8 @@ claude.ai viewer needs the `downloads` capability on the artifact (publish with 
 
 ## How to make a build
 
-1. Make the change. Comments say why, not when; tests assert behaviour.
+1. Make the change. Comments say why, not when; tests assert behaviour. To edit `index.html`,
+   `python3 tools/build_web.py --strip` first (its data out of the way), then fill it again.
 2. A stream file changes (shader, theme, atlas, logo, `syncrain/engine.py`, `syncrain/glyphs.py`)
    only on purpose: `python3 tools/stream_freeze.py --write`, and the notes say machines stop
    matching.
@@ -31,7 +32,8 @@ claude.ai viewer needs the `downloads` capability on the artifact (publish with 
 6. A failing gate puts `BUILD_NUMBER` back: fix the cause, run it again. Never edit the number.
 7. Have an agent that did not write it review any change that runs on the operator's desktop;
    an everyday fault it finds goes first, anything rarer into the message and the next build.
-8. Deliver only the archive; republish the live page from `web/artifact.html`.
+8. Deliver only the archive; republish the live page from `python3 tools/build_web.py --artifact <file>`
+   (the page without its document), with the `downloads` capability.
 9. Commit the tree as `syncrain build <N>` on `main` and push. A change as big as build 8 waits for
    the operator's trial first.
 

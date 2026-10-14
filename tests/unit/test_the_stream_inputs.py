@@ -50,15 +50,34 @@ def test_a_period_of_zero_or_less_switches_the_motion_off(period):
     assert engine.cycles_per_hour(period) == 0.0
 
 
-def test_the_rainbow_modes():
-    theme = engine.load_meta()["themes"]["nixos"]
-    off, logo, everything = (engine.motion(theme, rainbow=m) for m in ("off", "logo", "all"))
+def test_the_rainbow_modes_are_the_colour_cycles_they_were():
+    meta = engine.load_meta()
+    off, logo, everything = (engine.motion(engine.compose(meta, rainbow=m)) for m in ("off", "logo", "all"))
     assert off["uLogoHueCph"] == 0 and off["uRainHueCph"] == 0
     assert logo["uLogoHueCph"] > 0 and logo["uRainHueCph"] == 0
-    assert everything["uLogoHueCph"] > 0 and everything["uRainHueCph"] > 0
+    assert everything["uLogoHueCph"] > 0 and everything["uRainHueCph"] == engine.cycles_per_hour(600)
     assert off["uSpinCph"] > 0, "the logo keeps turning with the colours off"
-    still = engine.motion(theme, spin=0, drift=0)
+    still = engine.motion(engine.compose(meta), spin=0, drift=0)
     assert still["uSpinCph"] == 0 and still["uDrift"] == 0
+    assert engine.motion(engine.compose(meta, rainbow="all", cycle=0))["uRainHueCph"] == 0, "the new option wins"
+
+
+def test_a_preset_with_the_settings_over_it():
+    meta = engine.load_meta()
+    th = engine.compose(meta, "matrix", rain_colors=["#000000", "#ff0000", [0.5, 0.25, 1], "#ffffff"],
+                        glow_color="#102030", background_colors=["#010203", "#040506", "#070809"], vignette=0.1,
+                        logo_size=0.2, logo_cycle=0, cycle=30, flavours=8, flavour_layout="wave", words=["HI"])
+    assert th["colors"]["mid"] == [1.0, 0.0, 0.0] and th["colors"]["pale"] == [0.5, 0.25, 1.0]
+    assert th["colors"]["glow"] == [round(16 / 255, 4), round(32 / 255, 4), round(48 / 255, 4)]
+    assert th["background"]["vignette"] == 0.1 and th["logo"]["size"] == 0.2 and th["wordText"] == ["HI"]
+    assert (th["rain"]["cycle"], th["rain"]["flavours"], th["rain"]["flavourLayout"]) == (30, 8, "wave")
+    assert meta["themes"]["matrix"]["colors"]["mid"] == [0.12, 1.0, 0.36], "the preset itself stays"
+    nixos = meta["themes"]["nixos"]["colors"]
+    assert engine.compose(meta, rain_colors=["#132a52", "#3d6ed2", "#8cc0ee", "#eef7ff"])["colors"] == nixos, \
+        "the preset's own colours, as the page writes them, are the preset's to the last digit"
+    for wrong in ("#12345", "blue", [1, 2, 3], [0.1, 0.2]):
+        with pytest.raises(ValueError):
+            engine.colour(wrong)
 
 
 def test_the_themes_file_is_read_by_its_contract(tmp_path):
@@ -66,7 +85,7 @@ def test_the_themes_file_is_read_by_its_contract(tmp_path):
     assert set(meta["themes"]) == {"nixos", "matrix"}
     meta["contract"] = "syncrain-themes-1"
     (tmp_path / "themes.json").write_text(json.dumps(meta), encoding="utf-8")
-    with pytest.raises(RuntimeError, match="syncrain-themes-2"):
+    with pytest.raises(RuntimeError, match="syncrain-themes-3"):
         engine.load_meta(str(tmp_path))
 
 

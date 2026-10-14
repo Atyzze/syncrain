@@ -3,6 +3,7 @@ self:
 { lib, pkgs, ... }:
 let
   inherit (lib) mkEnableOption mkOption types;
+  colour = types.strMatching "#[0-9a-fA-F]{6}";
 in
 {
   enable = mkEnableOption "syncrain, the clock-synchronised code-rain live wallpaper";
@@ -14,37 +15,108 @@ in
     description = "The syncrain package to run.";
   };
 
+  settings = mkOption {
+    type = types.nullOr types.path;
+    default = null;
+    description = ''
+      A settings file the web page saved (`config.json`): every look and symbol set in it. The
+      options below go over it.
+    '';
+  };
+
   theme = mkOption {
-    type = types.enum [ "nixos" "matrix" ];
-    default = "nixos";
-    description = "Colour theme: `nixos` (ice blue, snow, NixOS logo) or `matrix` (green).";
+    type = types.nullOr (types.enum [ "nixos" "matrix" ]);
+    default = null;
+    description = "The preset the look starts from: `nixos` (ice blue, snow, NixOS logo; null: the settings file's, else this) or `matrix` (green).";
+  };
+
+  rainColors = mkOption {
+    type = types.nullOr (types.addCheck (types.listOf colour) (l: builtins.length l == 4));
+    default = null;
+    example = [ "#132a52" "#3d6ed2" "#8cc0ee" "#eef7ff" ];
+    description = "The rain's gradient, dark to bright, then the leading symbol: four `#rrggbb` (null: the preset's).";
+  };
+
+  glowColor = mkOption {
+    type = types.nullOr colour;
+    default = null;
+    description = "The glow round the rain, `#rrggbb` (null: the preset's).";
+  };
+
+  backgroundColors = mkOption {
+    type = types.nullOr (types.addCheck (types.listOf colour) (l: builtins.length l == 3));
+    default = null;
+    description = "The background gradient: top, bottom and centre glow, three `#rrggbb` (null: the preset's).";
+  };
+
+  vignette = mkOption {
+    type = types.nullOr (types.numbers.between 0.0 1.0);
+    default = null;
+    description = "How much darker the corners are (null: the preset's).";
+  };
+
+  flavours = mkOption {
+    type = types.nullOr (types.ints.between 1 64);
+    default = null;
+    description = "Colours at once: each column of rain one of this many hues round the colour wheel (null: 1).";
+  };
+
+  flavourLayout = mkOption {
+    type = types.nullOr (types.enum [ "random" "wave" ]);
+    default = null;
+    description = "How the flavours fall to the columns: `random` (by the channel) or `wave` (in order across the screen).";
+  };
+
+  cycle = mkOption {
+    type = types.nullOr types.ints.unsigned;
+    default = null;
+    description = "Seconds a turn of the rain's colour wheel, every flavour together (null and 0: the colours stay).";
+  };
+
+  words = mkOption {
+    type = types.nullOr (types.listOf (types.strMatching "[^,[:space:]]{1,16}"));
+    default = null;
+    description = "The hidden words that fall now and then (null: the preset's; [ ]: none).";
   };
 
   channel = mkOption {
-    type = types.str;
-    default = "public";
+    type = types.nullOr types.str;
+    default = null;
     description = ''
       Stream name. Every machine on the same channel with a synchronised clock renders the
-      exact same frame at the same moment; a different name gives a different, equally endless stream.
+      exact same frame at the same moment; a different name gives a different, equally endless stream
+      (null: the settings file's, else `public`).
     '';
   };
 
   fps = mkOption {
-    type = types.ints.between 1 240;
-    default = 30;
-    description = "Frame-rate cap.";
+    type = types.nullOr (types.ints.between 1 240);
+    default = null;
+    description = "Frame-rate cap (null: the settings file's, else 30).";
   };
 
   logo = mkOption {
-    type = types.nullOr (types.enum [ "white" "colours" "none" ]);
+    type = types.nullOr (types.either (types.enum [ "nixos" "nixos-colours" "white" "colours" "none" ]) types.path);
     default = null;
-    description = "NixOS logo variant (null: theme default, which is `white` for the nixos theme).";
+    description = "The logo: `nixos`, `nixos-colours`, `none` or a picture (null: the preset's, `nixos` for nixos).";
+  };
+
+  logoSize = mkOption {
+    type = types.nullOr (types.numbers.between 0.05 0.9);
+    default = null;
+    description = "The logo's height in screen heights (null: 0.4).";
+  };
+
+  logoCycle = mkOption {
+    type = types.nullOr types.ints.unsigned;
+    default = null;
+    description = "Seconds a turn of the logo's rainbow (null: 90; 0: the logo's own colours).";
   };
 
   background = mkOption {
     type = types.nullOr types.path;
     default = null;
-    description = "Optional background image (darkened with bgGamma/bgGain) instead of the theme gradient.";
+    description = "Optional background image (darkened with bgGamma/bgGain) instead of the background gradient.";
   };
 
   mask = mkOption {
@@ -57,8 +129,8 @@ in
     type = types.nullOr (types.enum [ "logo" "all" "off" ]);
     default = null;
     description = ''
-      Colour cycling against burn-in: `logo` (the logo cycles through the rainbow; the default),
-      `all` (the rain cycles too) or `off` (theme colours). The logo keeps turning either way unless spin = 0.
+      The earlier spelling of `logoCycle` and `cycle`: `logo` (as is), `all` (the rain cycles every
+      600 s) or `off` (the logo's own colours). The logo keeps turning either way unless spin = 0.
     '';
   };
 
@@ -77,25 +149,25 @@ in
   speed = mkOption {
     type = types.nullOr (types.numbers.between 0.25 4.0);
     default = null;
-    description = "How fast the symbols fall, times the theme's (null: 1).";
+    description = "How fast the symbols fall, times the preset's (null: 1).";
   };
 
   density = mkOption {
     type = types.nullOr (types.numbers.between 0.0 2.3);
     default = null;
-    description = "How often a column starts a new stream, times the theme's (null: 1).";
+    description = "How often a column starts a new stream, times the preset's (null: 1).";
   };
 
   glow = mkOption {
     type = types.nullOr (types.numbers.between 0.0 2.0);
     default = null;
-    description = "The glow around the centre and the logo, times the theme's (null: 1; 0: none).";
+    description = "The glow around the centre and the logo, times the preset's (null: 1; 0: none).";
   };
 
   bloom = mkOption {
     type = types.nullOr (types.numbers.between 0.0 2.0);
     default = null;
-    description = "The glow around the falling symbols, times the theme's (null: 1; 0: none).";
+    description = "The glow around the falling symbols, times the preset's (null: 1; 0: none).";
   };
 
   bgGain = mkOption {
@@ -105,9 +177,9 @@ in
   };
 
   snow = mkOption {
-    type = types.bool;
-    default = true;
-    description = "The falling snowflakes, where the theme has them.";
+    type = types.nullOr types.bool;
+    default = null;
+    description = "The falling snowflakes (null: the preset's, on for nixos, off for matrix).";
   };
 
   hieroglyphs = mkOption {
