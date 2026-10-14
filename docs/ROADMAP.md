@@ -9,12 +9,14 @@ Open questions, planned builds, the cadence and the constraints. What shipped: `
   then. Recommended: `syncrain --fps 20` for a day, then judge by eye.
 * **Pause behind maximized windows too, or only full-screen ones?** (2026-10-07) Both now; behind a
   see-through window the rain then stands still. Recommended: both.
-* **Build 19: the rest of the review, or the boot splash first?** (2026-10-14) Five middling
-  findings are open (M4 to M7, M9; build 18's notes). Recommended: the review first. M4 and M5
-  decide whether the login screen works on machines set up unlike theirs (a greetd config of
-  their own, a second factor); the splash after.
 
 ## Decisions answered
+
+* **2026-10-14 15:26**: "continue as recommended" (the review first, build 19); then the page "a
+  live previewer that lets you directly see what it'll look like, and then lets you export/save
+  the json config file, if then applied with that exported json, it should look exactly like it
+  did in the html previewer"; "fix the bugs first of course". Builds 19 and 21 (20 is the
+  consolidation).
 
 * **2026-10-14 12:10**: a full review of build 17; "Yes, make build 18 please" with M1 to M3 and
   the one-line fixes; on GitHub, "makes sure that the login screen replacement remains fully
@@ -52,7 +54,11 @@ Open questions, planned builds, the cadence and the constraints. What shipped: `
 
 ## Planned builds
 
-1. **The rest of the review of build 17**: M4 to M7 and M9, then the small ones (build 18's notes).
+1. **The previewer page (build 21)**: every option and symbol set on the page, drawn live;
+   "Export config" saves `config.json`; the desktop reads it (`install.sh --config`, or the file
+   in `~/.config/syncrain/`) and draws the same frame. Needs the page and the desktop to agree at
+   every size and scale first (review L11, L12) and the stream id to cover all that decides the
+   picture (L20).
 2. **The boot splash**: a still frame of the rain (Plymouth), until the login screen's live one.
 3. **A NixOS image** with syncrain as its wallpaper and login screen.
 

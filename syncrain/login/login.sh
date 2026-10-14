@@ -18,12 +18,14 @@ fi
 LOG="$STATE/login.log"
 [ -f "$LOG" ] && mv -f "$LOG" "$LOG.1"
 # The greeter user's home is / (not writable): KWin's and syncrain's files live in the state folder.
+# Its settings, data and state start afresh at every start, from what is installed: anything left
+# there since (by build 17's root copies, or by whoever got to run as greeter: a KWin input method
+# would see every password typed) goes. The cache stays: compiled shaders, kept, save seconds.
 export XDG_CONFIG_HOME="$STATE/config" XDG_CACHE_HOME="$STATE/cache" XDG_STATE_HOME="$STATE/state" \
        XDG_DATA_HOME="$STATE/data"
+rm -rf "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" "$XDG_STATE_HOME"
 mkdir -p "$XDG_CONFIG_HOME" "$XDG_CACHE_HOME" "$XDG_STATE_HOME" "$XDG_DATA_HOME"
-# The operator's screen and keyboard settings as installed now (a copy of one no longer installed
-# goes), and the symbols drawn at install (drawing takes seconds).
-for f in kwinoutputconfig.json kxkbrc kcminputrc; do rm -f "$XDG_CONFIG_HOME/$f"; done
+# The operator's screen and keyboard settings, and the symbols drawn at install (drawing takes seconds).
 [ -d "$LIB/kde" ] && cp -f "$LIB/kde/"* "$XDG_CONFIG_HOME/" 2>/dev/null
 # Without the operator's keyboard layout, the system's (localectl) is the next best.
 LOCALE1=--locale1

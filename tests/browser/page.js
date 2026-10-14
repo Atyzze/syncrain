@@ -2,6 +2,7 @@
 //   node page.js shot <png> <width> <height> <query>   a screenshot of the page
 //   node page.js state <width> <height> <query>        a hash of the raw rain-cell grid
 //   node page.js identity                              the build and stream the page says it is
+//   node page.js cph                                   cycles per hour for 0.5 to 7200 s, in halves
 //   node page.js controls                              the control strip at desk and phone sizes
 'use strict';
 const { chromium } = require('playwright');
@@ -39,6 +40,9 @@ const PAGE = 'file://' + path.resolve(__dirname, '..', '..', 'web', 'index.html'
     const page = await open(Number(w), Number(h), query);
     const s = await page.evaluate(() => window.__syncrainState());
     out = { cols: s.cols, rows: s.rows, hash: crypto.createHash('sha256').update(Buffer.from(s.data)).digest('hex') };
+  } else if (mode === 'cph') {
+    const page = await open(320, 180, 'hud=0&fps=1');
+    out.cph = await page.evaluate(n => Array.from({ length: n }, (_, i) => window.__syncrainCph((i + 1) / 2)), 14400);
   } else if (mode === 'identity') {
     const page = await open(800, 450, 'hud=0');
     out = await page.evaluate(() => Object.assign({}, window.__syncrainIdentity,

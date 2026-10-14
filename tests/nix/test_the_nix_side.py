@@ -124,3 +124,12 @@ def test_the_built_package_draws_the_wallpaper_natively_on_wayland(root, built, 
                 proc.communicate(timeout=30)
             assert proc.returncode == 0, name
     assert mean_abs_diff(shots["nix"], shots["tree"]) < 1.0
+
+
+def test_the_package_finds_fc_list_without_a_path_of_its_own(built):
+    """A service starts with almost no PATH; symbols that are not shipped come from the machine's
+    fonts through fc-list, so the wrapper brings fontconfig's."""
+    import re
+    wrapper = (built / "bin" / "syncrain").read_text(errors="replace")
+    found = re.findall(r"(/nix/store/[^:'\"\s\x00]*fontconfig[^:'\"\s\x00/]*/bin)", wrapper)
+    assert found and any(os.access(os.path.join(d, "fc-list"), os.X_OK) for d in found), wrapper[-2000:]

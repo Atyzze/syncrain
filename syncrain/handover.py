@@ -6,7 +6,8 @@ a splash) and the image wallpaper of every desktop. What they were before is kep
 back. Runs as the operator, inside their Plasma session (the wallpaper is set through plasmashell).
 
     python -m syncrain.handover on [rain options]    # make the still, set splash and wallpaper
-    python -m syncrain.handover off                   # put the splash and wallpapers back
+    python -m syncrain.handover still [rain options] # make the still again (a newer build), nothing else
+    python -m syncrain.handover off                   # put back the splash and wallpapers still on it
 """
 from __future__ import annotations
 
@@ -192,7 +193,11 @@ def on(rain: list[str], shell=plasma_script) -> list[str]:
         before = {}
     rc = config_home() / "ksplashrc"
     if "splash" not in before:
-        before["splash"] = {k: read_ini(rc, "KSplash", k) for k in ("Engine", "Theme")}
+        # syncrain's own splash, left by a run that broke off, is not what to go back to: Plasma's is
+        ours = read_ini(rc, "KSplash", "Theme") == SPLASH
+        before["splash"] = {k: None if ours else read_ini(rc, "KSplash", k) for k in ("Engine", "Theme")}
+        state.parent.mkdir(parents=True, exist_ok=True)
+        state.write_text(json.dumps(before, indent=1), encoding="utf-8")     # kept before anything changes
     write_ini(rc, "KSplash", "Engine", "KSplashQML")
     write_ini(rc, "KSplash", "Theme", SPLASH)
     said.append("splash after login: the still frame")
@@ -210,6 +215,16 @@ def on(rain: list[str], shell=plasma_script) -> list[str]:
     return said
 
 
+def still(rain: list[str]) -> list[str]:
+    """A newer build's still frame, into the same file and the splash: the splash and the
+    wallpapers stay as the operator has them now (they may have chosen others since)."""
+    if not make_still(rain, still_path()):
+        return ["the still frame could not be made again; the one from before stays"]
+    if (data_home() / "plasma" / "look-and-feel" / SPLASH).is_dir():
+        write_splash(still_path())
+    return ["the still frame: made again"]
+
+
 def off(shell=plasma_script) -> list[str]:
     said = []
     state = state_path()
@@ -225,14 +240,22 @@ def off(shell=plasma_script) -> list[str]:
             said.append("splash after login: Plasma's own")
         shutil.rmtree(package, ignore_errors=True)
         return said
-    splash = before.get("splash") or {}
-    for key in ("Engine", "Theme"):
-        write_ini(rc, "KSplash", key, splash.get(key))
-    said.append("splash after login: as before")
+    # Only what still shows syncrain's: a splash or wallpaper chosen since stays.
+    if read_ini(rc, "KSplash", "Theme") == SPLASH:
+        splash = before.get("splash") or {}
+        for key in ("Engine", "Theme"):
+            write_ini(rc, "KSplash", key, splash.get(key))
+        said.append("splash after login: as before")
+    else:
+        said.append("splash after login: the one chosen since stays")
     if before.get("wallpapers"):
         try:
-            shell(set_wallpapers_script(before["wallpapers"]))
-            said.append("Plasma's wallpaper: as before")
+            now = json.loads(shell(READ_WALLPAPERS) or "[]")
+            uri = still_path().as_uri()
+            shell(set_wallpapers_script(back_to(before["wallpapers"], now, uri)))
+            chosen = sum(1 for e in now if not (e[0] == "org.kde.image" and e[1] == uri))
+            said.append("Plasma's wallpaper: as before" if not chosen else
+                        f"Plasma's wallpaper: as before where the still was; {chosen} chosen since stay")
         except Exception as e:  # noqa: BLE001
             # The still and the record stay, so a run from inside Plasma can still put them back.
             said.append(f"Plasma's wallpaper not put back (its shell did not answer: {getattr(e, 'message', e)});"
@@ -245,10 +268,24 @@ def off(shell=plasma_script) -> list[str]:
     return said
 
 
+def back_to(before: list, now: list, still_uri: str) -> list:
+    """The wallpaper for each desktop now: the one from before where the still is, else as it is."""
+    out = []
+    for i, entry in enumerate(now):
+        if entry[0] == "org.kde.image" and entry[1] == still_uri:
+            same = [e for e in before if len(e) > 2 and len(entry) > 2 and e[2] == entry[2]]
+            out.append(list(same[0] if same else before[min(i, len(before) - 1)] if before else ["org.kde.image", ""]))
+        else:
+            out.append(list(entry))
+    return out
+
+
 def main(argv: list[str] | None = None) -> int:
     argv = sys.argv[1:] if argv is None else argv
     if argv[:1] == ["on"]:
         lines = on(argv[1:])
+    elif argv[:1] == ["still"]:
+        lines = still(argv[1:])
     elif argv[:1] == ["off"]:
         lines = off()
     else:

@@ -10,6 +10,7 @@
   wayland-scanner,
   dbus,
   libglvnd,
+  fontconfig,
 }:
 
 python3Packages.buildPythonApplication {
@@ -54,13 +55,15 @@ python3Packages.buildPythonApplication {
   '';
 
   # one wrapper: GTK/GI paths from wrapGAppsHook4, gtk4-layer-shell loaded before libwayland-client,
-  # and where the native wallpaper is
+  # where the native wallpaper is, and fc-list (a service's PATH has none; symbols not shipped come
+  # from the machine's fonts through it)
   dontWrapGApps = true;
   preFixup = ''
     makeWrapperArgs+=(
       "''${gappsWrapperArgs[@]}"
       --prefix LD_PRELOAD : ${gtk4-layer-shell}/lib/libgtk4-layer-shell.so
       --set-default SYNCRAIN_WALLPAPER $out/libexec/syncrain/syncrain-wallpaper
+      --suffix PATH : ${lib.makeBinPath [ fontconfig ]}
     )
   '';
 

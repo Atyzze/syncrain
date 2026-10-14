@@ -162,3 +162,21 @@ def test_a_symbols_file_changes_the_symbols_and_a_broken_one_is_said(app, tmp_pa
     done = app([*base, str(broken), "--glyphs", str(bad)])
     assert done.returncode == 0 and "needs a list \"sets\"; the theme's own symbols instead" in done.stderr, done.stderr
     assert mean_abs_diff(theme, broken) == 0
+
+
+def test_a_picture_it_cannot_use_ends_it_with_a_status_the_service_keeps(app, tmp_path):
+    """Not a black window that runs on: said, and a status no service restarts on."""
+    from syncrain.app import EXIT_CONFIG, NO_RESTART
+    broken = tmp_path / "broken.png"
+    broken.write_bytes(b"not a picture at all")
+    started = time.monotonic()
+    done = app(["--window", "--background", str(broken)], timeout=90)
+    assert done.returncode == EXIT_CONFIG and EXIT_CONFIG in NO_RESTART, done.stdout + done.stderr
+    assert "the picture could not be made ready" in done.stderr
+    assert time.monotonic() - started < 60
+
+
+def test_a_screenshot_that_cannot_be_saved_ends_it(app, tmp_path):
+    done = app(["--window", "--size", "320x180", "--time", str(MOMENT), "--screenshot", str(tmp_path / "no-such/a.png")],
+               timeout=90)
+    assert done.returncode == 1 and "not saved" in done.stderr, done.stdout + done.stderr

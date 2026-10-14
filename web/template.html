@@ -101,7 +101,9 @@ const store = {
   set(k, v) { try { localStorage.setItem('syncrain.' + k, v); } catch (e) { /* storage unavailable */ } },
 };
 const hashTheme = location.hash.replace('#', '');
-const initialTheme = [P.get('theme'), hashTheme, store.get('theme')].find(t => t && META.themes[t]) || 'nixos';
+// a theme by its own name only: Object.prototype's (constructor, toString) are no theme
+const isTheme = t => !!t && Object.prototype.hasOwnProperty.call(META.themes, t);
+const initialTheme = [P.get('theme'), hashTheme, store.get('theme')].find(isTheme) || 'nixos';
 const initialChannel = P.get('channel') || store.get('channel') || 'public';
 const logoParam = ['white', 'colours', 'none'].includes(P.get('logo')) ? P.get('logo') : null;
 const fpsCap = Math.max(1, Math.min(240, Number(P.get('fps')) || 30));
@@ -109,8 +111,10 @@ const spinParam = P.has('spin') ? Number(P.get('spin')) : null;        // second
 const driftParam = P.has('drift') ? Number(P.get('drift')) : null;     // screen heights, 0 = fixed
 let rainbowMode = ['logo', 'all', 'off'].includes(P.get('rainbow')) ? P.get('rainbow')
   : (['logo', 'all', 'off'].includes(store.get('rainbow')) ? store.get('rainbow') : null);
-// whole cycles per hour, so every periodic motion is seamless at the hour boundary
-const cph = s => (!s || s <= 0) ? 0 : Math.max(1, Math.round(3600 / s));
+// whole cycles per hour, so every periodic motion is seamless at the hour boundary; a half goes to
+// the even neighbour, as Python's round() does in engine.cycles_per_hour, or the two would turn apart
+const roundHalfEven = x => { const f = Math.floor(x), d = x - f; return (d > 0.5 || (d === 0.5 && f % 2 !== 0)) ? f + 1 : f; };
+const cph = s => (!s || s <= 0) ? 0 : Math.max(1, roundHalfEven(3600 / s));
 function motion() {                          // same as engine.motion() in the native app
   const mode = rainbowMode || TH.rain.rainbow || 'logo';
   return {
@@ -156,6 +160,9 @@ function fail(text) {
   throw new Error(text);
 }
 if (!gl) fail('This page needs WebGL2, which this browser or device does not provide.');
+// A lost context (a GPU reset, a resume) comes back empty: the page starts again rather than stay black.
+canvas.addEventListener('webglcontextlost', e => e.preventDefault());
+canvas.addEventListener('webglcontextrestored', () => location.reload());
 
 const HEADER = '#version 300 es\nprecision highp float;\nprecision highp int;\nprecision highp sampler2D;\n';
 const assemble = name => HEADER + SRC[name].replace(/^\/\/#include (\w+)\s*$/mg, (_, n) => SRC[n]);
@@ -251,7 +258,7 @@ function glyphSets() {
 }
 
 function setTheme(name) {
-  themeName = META.themes[name] ? name : 'nixos';
+  themeName = isTheme(name) ? name : 'nixos';
   TH = META.themes[themeName];
   words = TH.wordText.map(w => Array.from(w).map(c => LIB.get(c)));
   logoChoice = logoParam || TH.logo.default;
@@ -430,7 +437,8 @@ function tickClock(ms) {
   clockEl.firstChild.nodeValue = new Date(ms).toISOString().slice(11, 21) + ' ';
 }
 
-let paused = reduceMotion && fixedT === null;
+// still for whoever asked for less motion, where the Play button is there to start it (not with hud=0)
+let paused = reduceMotion && fixedT === null && showHud;
 function redrawIfPaused() { if (paused) draw(Date.now()); }
 if (paused && showHud) {
   playBtn.hidden = false;
@@ -453,6 +461,7 @@ if (paused && showHud) {
     return { cols: COLS, rows, data: Array.from(px) };
   };
   window.__syncrainIdentity = { build: BUILD, stream: STREAM };   // test hook: what this page says it is
+  window.__syncrainCph = cph;                  // test hook: cycles per hour, as the shaders get them
   window.__syncrainReady = true;
   draw(fixedT !== null ? fixedT * 1000 : Date.now());
   let last = -1e9;

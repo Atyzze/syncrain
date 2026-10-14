@@ -29,8 +29,9 @@ in
         Restart = "on-failure";
         RestartSec = 3;
         # statuses a restart cannot change: 69 no OpenGL here, 2 no wallpaper layer (GNOME) or an
-        # unknown option, 70 a native wallpaper from another build (`syncrain --diagnose`)
-        RestartPreventExitStatus = "2 69 70";
+        # option it cannot use, 70 a native wallpaper from another build, 78 a picture or font it
+        # cannot use (`syncrain --diagnose`)
+        RestartPreventExitStatus = "2 69 70 78";
       };
     };
   };

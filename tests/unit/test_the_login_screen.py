@@ -201,6 +201,7 @@ def test_a_link_among_the_operator_s_files_brings_nothing_of_root_s_into_the_log
     assert f"not copied, this user cannot read it: {config}/kxkbrc" in done.stdout
     assert not [p for p in lib.rglob("*") if p.is_file() and "root's own" in p.read_text(errors="replace")]
     assert not [c for c in user.calls("sudo") if str(config) in c], "root opened none of the operator's settings"
+    assert not [c for c in user.calls("sudo") if str(user.base / "home") in c], "nor the app in their folder"
     (lib / "kde/kxkbrc").write_text("root's own\n")    # what build 17 made of that link, as root,
     (user.base / "state/config").mkdir()                # and what login.sh copied of it at a start
     (user.base / "state/config/kxkbrc").write_text("root's own\n")
@@ -236,18 +237,22 @@ def test_a_link_in_place_of_the_app_is_copied_as_a_link_and_nothing_it_points_at
 
 
 def test_each_start_takes_the_settings_as_installed_now(tmp_path):
-    """A copy of a setting no longer installed (build 17 copied a link's target as root) goes."""
+    """Nothing left in the greeter's settings from an earlier start counts: not a copy of a setting no
+    longer installed (build 17 copied a link's target as root), not a KWin setting someone put there."""
     write_sessions(tmp_path / "share")
     (tmp_path / "state/config").mkdir(parents=True)
     (tmp_path / "state/config/kxkbrc").write_text("root's own\n")
-    (tmp_path / "state/config/kwinrc").write_text("[Wayland]\n")
+    (tmp_path / "state/config/kwinrc").write_text("[Wayland]\nInputMethod=/tmp/sees-every-key\n")
+    (tmp_path / "state/data").mkdir()
+    (tmp_path / "state/data/left.txt").write_text("from before\n")
     env = dict(os.environ, XDG_DATA_DIRS=str(tmp_path / "share"), SYNCRAIN_LOGIN_STATE=str(tmp_path / "state"),
                SYNCRAIN_LOGIN_KWIN="false", SYNCRAIN_LOGIN_TEXT=str(stub(tmp_path / "bin", "agreety", "exit 0")),
                SYNCRAIN_PYTHON=sys.executable, SYNCRAIN_LOGIN_CONFIG=str(tmp_path / "none.json"))
     done = subprocess.run(["sh", str(ROOT / "syncrain/login/login.sh")], env=env, capture_output=True, text=True,
                           timeout=60)
     assert done.returncode == 0, done.stdout + done.stderr
-    assert sorted(p.name for p in (tmp_path / "state/config").iterdir()) == ["kwinrc"]
+    assert not [p for p in (tmp_path / "state/config").rglob("*") if p.name in ("kxkbrc", "kwinrc")]
+    assert not (tmp_path / "state/data/left.txt").exists()
 
 
 def test_the_diagnosis_says_which_login_screen_starts_and_what_it_said(tmp_path, monkeypatch):
@@ -347,3 +352,33 @@ def test_when_greetd_stops_the_login_screen_its_kwin_goes_too(tmp_path, hangs):
             login.kill()
         if pid and alive(pid):
             os.kill(pid, signal.SIGKILL)
+
+
+def test_what_pam_asks_after_the_password_goes_to_whoever_answers_it(tmp_path):
+    """A second factor: the password answers only the first secret prompt; the code is asked for,
+    and what PAM says comes as it comes."""
+    fake = FakeGreetd(tmp_path / "sock", more=[("info", "Open the app on your phone", None),
+                                               ("secret", "Verification code:", "123456")])
+    asked, told = [], []
+    ok, said = Greetd(fake.path).login("op", "right", ["x"], [], ask=lambda p, s: asked.append((p, s)) or "123456",
+                                       tell=told.append)
+    assert ok, said
+    assert asked == [("Verification code:", True)] and told == ["Welcome", "Open the app on your phone"]
+    assert [r.get("response") for r in fake.requests if r["type"] == "post_auth_message_response"] == [
+        None, "right", None, "123456"], "the password went to the password prompt alone"
+    fake.close()
+
+
+def test_a_wrong_second_factor_is_not_called_a_wrong_password(tmp_path):
+    fake = FakeGreetd(tmp_path / "sock", more=[("secret", "Verification code:", "123456")])
+    ok, said = Greetd(fake.path).login("op", "right", ["x"], [], ask=lambda p, s: "000000")
+    assert not ok and said.endswith("Not accepted") and {"type": "cancel_session"} in fake.requests
+    fake.close()
+
+
+def test_without_anyone_to_ask_the_login_stops_and_says_to_use_the_text_login(tmp_path):
+    fake = FakeGreetd(tmp_path / "sock", more=[("visible", "Token:", "x")])
+    ok, said = Greetd(fake.path).login("op", "right", ["x"], [])
+    assert not ok and "Token: (more than a password: use Text login)" in said
+    assert fake.requests[-1] == {"type": "cancel_session"} and not fake.started()
+    fake.close()

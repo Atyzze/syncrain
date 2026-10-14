@@ -74,3 +74,17 @@ def test_the_page_says_which_build_and_stream_it_is(page):
 def test_the_controls_fit_a_desk_and_a_phone(page):
     for size, seen in page("controls").items():
         assert seen == {"overflow": False, "shown": True}, size
+
+
+def test_the_page_turns_the_logo_as_the_desktop_does(page):
+    """Cycles per hour for every period from 0.5 s to 2 h in halves: a half is rounded to the even
+    neighbour in both, so a logo never turns once more an hour on one of them."""
+    from syncrain.engine import cycles_per_hour
+    assert page("cph")["cph"] == [cycles_per_hour((i + 1) / 2) for i in range(14400)]
+
+
+def test_a_theme_that_is_no_theme_gives_the_default_one(page):
+    """Names every object has (constructor, toString) are not themes; the page draws NixOS snow."""
+    nixos = page("state", 1280, 720, f"t={MOMENT}&hud=0&theme=nixos")
+    for name in ("constructor", "toString", "__proto__"):
+        assert page("state", 1280, 720, f"t={MOMENT}&hud=0&theme={name}") == nixos, name

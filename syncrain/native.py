@@ -164,6 +164,8 @@ def run(args, user_args, path: str) -> str:
         os.execve(path, argv, environment())
     except OSError as e:
         return f"the native wallpaper did not start ({e})"
+    except Exception as e:  # noqa: BLE001 - a picture or font the scene cannot use: the GTK host says why
+        return f"the native wallpaper's scene could not be made ({type(e).__name__}: {e})"
     finally:
         if fd is not None:                      # still here: the scene must not stay with the GTK host
             os.close(fd)

@@ -172,6 +172,7 @@ struct screen {
 	struct wl_callback *frame_callback;
 	int64_t callback_counter;
 	int64_t counter;                         /* frames committed */
+	bool settled;                            /* memory handed back after its first frames */
 	struct frame history[HISTORY];
 	struct pacer pacer;
 	int64_t due;                             /* monotonic microseconds when the next frame is asked for */
@@ -198,12 +199,12 @@ static struct {
 	struct scene scene;
 	bool ready;                              /* OpenGL is up: outputs get screens */
 	bool announced;
+	bool watch_tried;                        /* the KWin watch was started, or could not be */
 	bool drawn;                              /* a frame was committed: no more handing over */
 	const char *lost;                        /* why the wallpaper must stop with status 1 */
-	bool settled;                            /* memory handed back since the screens last changed */
 	int64_t started;                         /* monotonic microseconds at the start */
 	int64_t frames;                          /* frames shown, every screen */
-	int64_t next_trim;                       /* when freed memory is next handed back */
+	int64_t next_trim;                       /* when freed memory is next handed back (0: not yet) */
 	int64_t trim_us;
 	int trims;
 	bool running;
@@ -549,34 +550,27 @@ static void trim_memory(int64_t now)
 		record_memory(before, resident_mib());
 }
 
-/* Once every screen shown has drawn its first frames (after startup, and after the screens changed):
- * hand back to the system what starting left free in the C heap, as the GTK host does (app.py,
+/* Once a screen has drawn its first frames (at startup, and each screen that comes later): hand back
+ * to the system what starting left free in the C heap, as the GTK host does (app.py,
  * settle_memory). The driver's shader compiler works there the first time it meets the shaders, and
  * with a cold shader cache (the first start after an install or a driver update) that held tens of
  * MiB until the process ended: on the operator's NVIDIA card the first native run of a sweep kept
- * 182 MiB, the later ones 123. After that, trim_memory does it every five minutes. */
-static void settle_memory(void)
+ * 182 MiB, the later ones 123. Each screen on its own, so one that never draws (off, or covered
+ * where the compositor stops asking) holds nothing back; from the first, trim_memory runs every
+ * five minutes, whatever the screens do. */
+static void settle_memory(struct screen *s)
 {
-	if (W.settled)
+	if (s->settled || s->counter < 2)
 		return;
-	struct screen *s;
-	int drawn = 0;
-	wl_list_for_each(s, &W.screens, link) {
-		if (s->hidden || (s->configured && !s->render))   /* covered, or a screen that cannot be drawn */
-			continue;
-		if (s->counter < 2)                       /* a new screen not yet configured counts too */
-			return;
-		drawn++;
-	}
-	if (!drawn)
-		return;
-	W.settled = true;
+	s->settled = true;
 	double before = resident_mib();
 	malloc_trim(0);
 	double after = resident_mib();
 	record_memory(before, after);
-	W.next_trim = monotonic_us() + W.trim_us;
-	W.trims = 0;
+	if (!W.next_trim) {
+		W.next_trim = monotonic_us() + W.trim_us;
+		W.trims = 0;
+	}
 	if (opt.debug_fps > 0)
 		printf("syncrain: memory handed back after the first frames (%.0f MiB resident)\n", after);
 }
@@ -641,8 +635,8 @@ static void draw(struct screen *s)
 			fprintf(stderr, "syncrain: frames are shown again\n");
 		s->failing_since = 0;
 		W.frames++;
-		settle_memory();
-		if (W.settled && now >= W.next_trim)
+		settle_memory(s);
+		if (W.next_trim && now >= W.next_trim)
 			trim_memory(now);
 	} else {
 		swap_failed(s, f, error);
@@ -708,6 +702,13 @@ static void announce(void)
 	int n = wl_list_length(&W.screens);
 	printf("%s: %s %d.%d on %s, native wallpaper, %d screen%s\n", W.scene.describe, info.es ? "OpenGL ES" : "OpenGL",
 	       info.major, info.minor, info.renderer, n, n == 1 ? "" : "s");
+}
+
+/* The watch on KWin's windows (kwin.c), once the first frame is up: it speaks to the session bus,
+ * which can be slow to answer, or never, and the wallpaper is on the screens meanwhile. */
+static void start_watch(void)
+{
+	W.watch_tried = true;
 	if (opt.pause_under == PAUSE_NEVER)
 		return;
 	W.watch = watch_new(update_hidden);
@@ -845,7 +846,6 @@ static void create_screen(struct output *o)
 	struct screen *s = calloc(1, sizeof *s);
 	if (!s)
 		return;
-	W.settled = false;                             /* settle again once the new screen has drawn */
 	s->output = o;
 	o->screen = s;
 	pacer_init(&s->pacer, opt.fps);
@@ -879,7 +879,6 @@ static void destroy_screen(struct screen *s)
 {
 	if (!s)
 		return;
-	W.settled = false;
 	wl_list_remove(&s->link);
 	if (s->output)
 		s->output->screen = NULL;
@@ -1146,6 +1145,8 @@ static void loop(void)
 		}
 		if (n > 0 && fds[2].fd >= 0 && (fds[2].revents & (POLLIN | POLLHUP | POLLERR)))
 			watch_dispatch(W.watch);
+		if (W.drawn && !W.watch_tried)
+			start_watch();
 	}
 }
 

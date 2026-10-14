@@ -60,6 +60,12 @@ Rules learned by shipping their opposite, one line each. When and how: `docs/HIS
 * **greetd signals the greeter alone**: a greeter that starts a compositor in its own session
   stops it on SIGTERM.
 * **A shared folder such as /tmp is no fallback for state**: any user can leave a file there.
+* **Change only your part of someone else's config** (greetd's `[default_session]`), and write to
+  the PAM service it names, not the one you expect.
+* **PAM may ask more than once**: answer the first password prompt with the password and show
+  the rest, in its own words.
+* **One screen that never draws must not hold up what all screens share** (the memory trim).
+* **Python rounds halves to even, JavaScript up**: say which, in both, when the two must agree.
 
 ## Launching, services, releases
 

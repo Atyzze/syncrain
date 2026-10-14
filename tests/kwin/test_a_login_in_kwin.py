@@ -26,16 +26,16 @@ def sessions(share):
     (folder / "gone.desktop").write_text("[Desktop Entry]\nExec=gone\nTryExec=/nonexistent/gone\nName=Gone\n")
 
 
-def run_login(tmp_path, typed, delay=0.0):
+def run_login(tmp_path, typed, delay=0.0, more=None):
     """login.sh as greetd runs it, KWin headless with two screens; (log, greetd stand-in). `delay` is
-    how long greetd takes to check a password."""
+    how long greetd takes to check a password, `more` what PAM asks after it (tests/fake_greetd.py)."""
     needs()
     kwin = os.environ.get("SYNCRAIN_KWIN") or shutil.which("kwin_wayland")
     run = tmp_path / "run"
     run.mkdir(mode=0o700)
     sessions(tmp_path / "share")
     (tmp_path / "login.json").write_text(json.dumps({"user": "op", "rain": ["--theme", "matrix", "--fps", "10"]}))
-    greetd = FakeGreetd(tmp_path / "greetd.sock", delay=delay)
+    greetd = FakeGreetd(tmp_path / "greetd.sock", delay=delay, more=more)
     text = tmp_path / "text-login"
     text.write_text(f"#!/bin/sh\necho \"$@\" > {tmp_path}/text-login.ran\n")
     text.chmod(0o755)
@@ -88,3 +88,20 @@ def test_text_login_waits_while_greetd_checks_a_login(tmp_path, native_wallpaper
     assert re.search(r"syncrain-login: [0-9:.]+ text login: not while a login is under way", log), log[-4000:]
     assert len(greetd.started()) == 1 and not (tmp_path / "text-login.ran").exists(), log[-4000:]
     assert (tmp_path / "state" / "logged-in").read_text() == "plasma.desktop\n"
+
+
+def test_a_second_factor_is_asked_for_in_the_box(tmp_path, native_wallpaper):
+    log, greetd = run_login(tmp_path, [{"password": "right"}, {"answer": "123456", "wait": 1}],
+                            more=[("secret", "Verification code:", "123456")])
+    assert re.search(r"syncrain-login: [0-9:.]+ asked: Verification code:", log), log[-4000:]
+    assert len(greetd.started()) == 1 and not (tmp_path / "text-login.ran").exists(), log[-4000:]
+    answers = [r.get("response") for r in greetd.requests if r["type"] == "post_auth_message_response"]
+    assert answers == [None, "right", "123456"]
+
+
+def test_text_login_while_pam_asks_gives_the_login_up_first(tmp_path, native_wallpaper):
+    log, greetd = run_login(tmp_path, [{"password": "right"}, {"text": True, "wait": 1}],
+                            more=[("secret", "Verification code:", "123456")])
+    assert re.search(r"text login: giving up the login under way first", log), log[-4000:]
+    assert {"type": "cancel_session"} in greetd.requests and not greetd.started()
+    assert (tmp_path / "text-login.ran").exists(), log[-4000:]

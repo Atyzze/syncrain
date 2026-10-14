@@ -1,6 +1,7 @@
 """A stand-in for greetd's socket, as a greeter sees it (greetd-ipc(7)): one user and password,
 a PAM conversation of an info line and the password prompt, and a record of every request.
-`delay` is how long checking a password takes (a slow PAM module)."""
+`delay` is how long checking a password takes (a slow PAM module); `more` adds prompts after the
+password, each (type, prompt, the answer it takes), as a second factor would."""
 from __future__ import annotations
 
 import json
@@ -13,9 +14,10 @@ from pathlib import Path
 
 class FakeGreetd:
     def __init__(self, path: Path, user: str = "op", password: str = "right", info: str = "Welcome",
-                 delay: float = 0.0):
+                 delay: float = 0.0, more: list[tuple[str, str, str | None]] | None = None):
         self.path, self.user, self.password, self.info = str(path), user, password, info
         self.delay = delay
+        self.steps = [("info", info, None), ("secret", "Password:", password), *(more or [])]
         self.requests: list[dict] = []
         self.server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         self.server.bind(self.path)
@@ -47,7 +49,7 @@ class FakeGreetd:
             threading.Thread(target=self._talk, args=(conn,), daemon=True).start()
 
     def _talk(self, conn):
-        user, step = None, 0
+        user, step, ok = None, None, False
         with conn:
             while True:
                 try:
@@ -58,21 +60,31 @@ class FakeGreetd:
                 self.requests.append(req)
                 kind = req.get("type")
                 if kind == "create_session":
-                    user, step = req.get("username"), 1
-                    reply = {"type": "auth_message", "auth_message_type": "info", "auth_message": self.info}
-                elif kind == "post_auth_message_response" and step == 1:
-                    step = 2
-                    reply = {"type": "auth_message", "auth_message_type": "secret", "auth_message": "Password:"}
-                elif kind == "post_auth_message_response" and step == 2:
-                    time.sleep(self.delay)
-                    step = 3 if (user == self.user and req.get("response") == self.password) else 0
-                    reply = {"type": "success"} if step == 3 else \
-                        {"type": "error", "error_type": "auth_error", "description": "pam_authenticate: AUTH_ERR"}
-                elif kind == "start_session" and step == 3:
+                    user, step, ok = req.get("username"), 0, req.get("username") == self.user
+                    reply = self._prompt(0)
+                elif kind == "post_auth_message_response" and step is not None and step < len(self.steps):
+                    t, _text, expected = self.steps[step]
+                    if t == "secret" and expected == self.password:
+                        time.sleep(self.delay)
+                    if t != "info" and req.get("response") != expected:
+                        ok = False
+                    step += 1
+                    if step < len(self.steps):
+                        reply = self._prompt(step)
+                    elif ok:
+                        step, reply = len(self.steps) + 1, {"type": "success"}
+                    else:
+                        step, reply = None, {"type": "error", "error_type": "auth_error",
+                                             "description": "pam_authenticate: AUTH_ERR"}
+                elif kind == "start_session" and step == len(self.steps) + 1:
                     reply = {"type": "success"}
                 elif kind == "cancel_session":
-                    step, reply = 0, {"type": "success"}
+                    step, reply = None, {"type": "success"}
                 else:
                     reply = {"type": "error", "error_type": "error", "description": f"unexpected {kind}"}
                 data = json.dumps(reply).encode()
                 conn.sendall(struct.pack("=I", len(data)) + data)
+
+    def _prompt(self, i):
+        t, text, _ = self.steps[i]
+        return {"type": "auth_message", "auth_message_type": t, "auth_message": text}

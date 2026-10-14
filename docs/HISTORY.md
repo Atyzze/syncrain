@@ -55,6 +55,8 @@ showed within seconds, which is why syncrain draws every frame from the clock.
 * **18** (2026-10-14): the first fixes from a review of 17. The login screen stays optional: only
   `--login-screen` changes how the machine logs in, `--login-screen-off` puts back exactly what was
   there, and root copies only what the operator could read.
+* **19** (2026-10-14): the rest of the review: greetd's own settings kept, a second factor asked in
+  the box, a wallpaper chosen since kept, options checked as they are read.
 
 ## The operator's words
 
@@ -96,4 +98,7 @@ showed within seconds, which is why syncrain draws every frame from the clock.
 * **After 17**: "Full in depth code review please"; "makes sure that the login screen replacement
   remains fully optional, and that those who just want the wallpaper that their existing login
   method isn't touched".
+* **After 18**: "continue as recommended"; "our html page should be designed to let you
+  change/try out all the config settings, and select which char sets etc, basically, its a live
+  previewer ... and then lets you export/save the json config file"; "fix the bugs first of course".
 * **Standing**: no long dashes in anything written to them.

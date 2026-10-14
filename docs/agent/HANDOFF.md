@@ -1,4 +1,4 @@
-# Handoff: the state of syncrain at build 18
+# Handoff: the state of syncrain at build 19
 
 What is true now, for a context that has just opened this tree. Where this page and the code
 disagree, the code is right; fix the page in the same build.
@@ -35,8 +35,12 @@ This page, `docs/agent/NEXT_BUILD.md`, `docs/agent/WORKING_WITH_THE_OPERATOR.md`
   `tests/unit/test_the_login_screen_is_optional.py` holds every build to it. Root copies only what
   the user could read.
 * **A review of build 17** (2026-10-14, the operator's Claude doc "Syncrain build 17 code review"):
-  9 middling findings (M), 21 small (L). Build 18 fixed M1 to M3, M8, L1 to L4; the rest are listed
-  in its notes.
+  9 middling findings (M), 21 small (L). Builds 18 and 19 fixed every M and most L; open: L8, L11,
+  L12, L20, L21, and a font name that is not UTF-8 (`syncrain/glyphs.py`, a stream file); build 19's
+  notes.
+* **The box speaks PAM's whole conversation** (build 19): the password to the first prompt, further
+  prompts asked in the box. **greetd's config** is changed only in `[default_session]`
+  (`syncrain/greetdconf.py`).
 * **Memory**: 123 MiB at start on their card. Build 11 (explicit sync off) grew to 225 MiB in 18 h,
   slowing, then fell to 170 by itself: freed memory, not a leak. Build 12 hands it back every five
   minutes and writes `~/.local/state/syncrain/memory.log`; `--diagnose` shows it.
@@ -48,7 +52,7 @@ This page, `docs/agent/NEXT_BUILD.md`, `docs/agent/WORKING_WITH_THE_OPERATOR.md`
 * **Symbols**: sets with weights or shares (`syncrain/glyphs.py`); the themes' own, or the
   operator's `~/.config/syncrain/glyphs.json`. 489 shipped glyphs; others from the machine's fonts.
 * **Stream**: `def5684f` since build 15 (symbols by set); `c18f8be2` in 12 to 14; `48e6bf9c` 3 to 11.
-* **GitHub**: `main` holds builds 7 to 18, one commit each (`syncrain build <N>`).
+* **GitHub**: `main` holds builds 7 to 19, one commit each (`syncrain build <N>`).
 
 ## Waits on the operator
 

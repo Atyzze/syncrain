@@ -107,7 +107,7 @@ remove_plasma_wallpaper() {
 LOGIN_LIB="${SYNCRAIN_LOGIN_LIB:-/usr/local/lib/syncrain}"
 LOGIN_STATE="${SYNCRAIN_LOGIN_STATE:-/var/lib/syncrain-login}"
 GREETD_CONFIG="${SYNCRAIN_GREETD_CONFIG:-/etc/greetd/config.toml}"
-GREETD_PAM="${SYNCRAIN_GREETD_PAM:-/etc/pam.d/greetd}"
+PAM_DIR="${SYNCRAIN_PAM_DIR:-/etc/pam.d}"
 DM_LINK="${SYNCRAIN_DM_LINK:-/etc/systemd/system/display-manager.service}"
 # What started at boot before --login-screen: a unit (sddm.service, plasmalogin.service,
 # greetd.service), "none" or "unknown". Written by --login-screen before anything else changes,
@@ -121,6 +121,14 @@ as_root() { if [ "$(id -u)" = 0 ]; then "$@"; else sudo "$@"; fi; }
 copy_to_root() {
   if [ -f "$1" ] && [ -r "$1" ]; then cat -- "$1" | as_root tee "$2" >/dev/null
   else info "not copied, this user cannot read it: $1"; fi
+}
+# The app, into the folder root made, $1: this user reads it into a stream and root unpacks that, so
+# root never walks this user's folder, where a folder swapped for a link mid-copy would lead it
+# elsewhere. GNU tar does not follow a link from the stream out of the folder, and the files are root's.
+copy_app_to_root() {
+  tar -C "$APPDIR" -cf - syncrain | as_root tar -C "$1" -xf - --no-same-owner --no-same-permissions
+  # the app is files, folders and links; a stream could make devices and pipes, which go
+  as_root find "$1" ! -type f ! -type d ! -type l -delete
 }
 # KWin on the login screen reads this user's screen layout, keyboard layout and Num Lock (kcminputrc)
 # from copies, made into the folder root made, $1.
@@ -156,6 +164,28 @@ login_user() {
 }
 mine() { [ -f "$LOGIN_LIB/login.json" ] && [ "$(login_user)" = "$(id -un)" ]; }
 
+# A file of the system's, read as this user where it can be (greetd's config and PAM files are).
+read_system_file() { if [ -r "$1" ]; then cat -- "$1"; elif [ -e "$1" ]; then as_root cat -- "$1"; fi; }
+greetdconf() {
+  local lib="$SRC"
+  [ -f "$lib/syncrain/greetdconf.py" ] || lib="$APPDIR"
+  PYTHONPATH="$lib" PYTHONSAFEPATH=1 python3 -m syncrain.greetdconf "$@"
+}
+# The PAM file of the service greetd logs users in with ([general] service in its config), and of
+# the one it runs its greeter under ([default_session] service).
+pam_file() {
+  local s
+  s="$(read_system_file "$GREETD_CONFIG" | greetdconf service 2>/dev/null)" || s=greetd
+  printf '%s/%s\n' "$PAM_DIR" "${s:-greetd}"
+}
+greeter_pam_file() {
+  local s
+  s="$(read_system_file "$GREETD_CONFIG" | greetdconf greeter-service 2>/dev/null)" || s=greetd-greeter
+  printf '%s/%s\n' "$PAM_DIR" "${s:-greetd-greeter}"
+}
+PAM_MARK="written by syncrain's install.sh --login-screen"
+CONFIG_MARK="set by syncrain's install.sh --login-screen"
+
 unit_name() { case "$1" in *[!A-Za-z0-9@._-]*|"") return 1 ;; *.service) return 0 ;; *) return 1 ;; esac; }
 # What starts at boot now: the display manager's unit, "none" without one, "unknown" for anything else.
 display_manager() {
@@ -180,6 +210,48 @@ record_before() {
   as_root chmod 644 "$LOGIN_BEFORE"             # read back as this user, whatever root's umask
 }
 keep_record() { if [ ! -f "$LOGIN_BEFORE" ] && [ -n "$1" ]; then record_before "$1"; fi; }
+
+# greetd's side of the login screen, at --login-screen and again at each upgrade (an earlier build
+# wrote greetd's whole config and missed the greeter's PAM file).
+apply_greetd() {
+  if [ -f "$GREETD_CONFIG" ] && ! grep -q syncrain "$GREETD_CONFIG" && [ ! -f "$GREETD_CONFIG.before-syncrain" ]; then
+    as_root cp "$GREETD_CONFIG" "$GREETD_CONFIG.before-syncrain"
+  fi
+  as_root mkdir -p "$(dirname "$GREETD_CONFIG")"
+  # Only [default_session] changes; the rest of greetd's config stays as the operator has it: a PAM
+  # service, an automatic login, the terminal. A whole config written by builds 16 to 18 starts again
+  # from greetd's own. If the login screen's files ever go missing, greetd's text login asks
+  # instead of a black screen.
+  local login="$LOGIN_LIB/syncrain/login/login.sh" base="$GREETD_CONFIG" edited pam greeter_pam
+  if grep -qs syncrain "$GREETD_CONFIG" && ! grep -qsF "$CONFIG_MARK" "$GREETD_CONFIG"; then
+    base="$GREETD_CONFIG.before-syncrain"
+  fi
+  edited="$(mktemp)"
+  if ! read_system_file "$base" | greetdconf config \
+      "sh -c 'test -x $login && exec $login; exec agreety --cmd startplasma-wayland'" greeter > "$edited"; then
+    rm -f "$edited"
+    die "greetd's config ($base) could not be changed, so it stays as it is"
+  fi
+  copy_to_root "$edited" "$GREETD_CONFIG"
+  rm -f "$edited"
+  pam="$(pam_file)"
+  greeter_pam="$(greeter_pam_file)"
+  # SDDM's PAM opens KDE's wallet (and GNOME's keyring) with the password typed at login; greetd's
+  # does not, so without these the wallet would ask again. "-" skips a module that is not installed.
+  if [ -f "$pam" ] && ! grep -q pam_kwallet5 "$pam"; then
+    [ -f "$pam.before-syncrain" ] || as_root cp "$pam" "$pam.before-syncrain"
+    printf '%s\n' "" "# added by syncrain's install.sh --login-screen: the wallet opens with the login, as under SDDM" \
+      "-auth       optional    pam_gnome_keyring.so" "-auth       optional    pam_kwallet5.so" \
+      "-session    optional    pam_gnome_keyring.so    auto_start" "-session    optional    pam_kwallet5.so         auto_start" \
+      | as_root tee -a "$pam" >/dev/null
+  fi
+  # greetd runs its greeter under its own PAM service where that file exists, else under the users'
+  # one: a file without the wallet lines keeps a wallet starting for the user greeter at every boot.
+  if [ -f "$pam.before-syncrain" ] && [ ! -e "$greeter_pam" ] && [ "$greeter_pam" != "$pam" ]; then
+    { printf '# %s: greetd'"'"'s greeter, without the wallet lines\n' "$PAM_MARK"; read_system_file "$pam.before-syncrain"; } \
+      | as_root tee "$greeter_pam" >/dev/null
+  fi
+}
 
 login_screen_on() {
   bold "Making the rain your login screen (greetd)"
@@ -217,12 +289,12 @@ login_screen_on() {
     XDG_CACHE_HOME="$tmp/cache" SYNCRAIN_LOGIN_CONFIG="$tmp/draw.json" PYTHONPATH="$APPDIR" PYTHONSAFEPATH=1 \
       python3 -m syncrain.greeter --draw-symbols || info "the symbols were not drawn now; the login screen draws them"
   fi
-  # Made beside the old copy and swapped in whole, so greetd never finds half of one. The app goes
-  # over without following links (-P); every other file of this user's goes through copy_to_root.
-  # chmod -R is given only the folder root made: a link it meets inside, it leaves alone.
+  # Made beside the old copy and swapped in whole, so greetd never finds half of one. Root reads
+  # nothing of this user's: the app comes as a stream (copy_app_to_root), every other file through
+  # copy_to_root. chmod -R is given only the folder root made: a link it meets inside, it leaves alone.
   as_root rm -rf "$new"
   as_root mkdir -p "$new/cache" "$new/kde"
-  as_root cp -RP "$APPDIR/syncrain" "$new/"
+  copy_app_to_root "$new"
   copy_to_root "$APPDIR/BUILD_NUMBER" "$new/BUILD_NUMBER"
   copy_to_root "$tmp/login.json" "$new/login.json"
   if [ -f "$tmp/glyphs.json" ]; then copy_to_root "$tmp/glyphs.json" "$new/glyphs.json"; fi
@@ -230,7 +302,7 @@ login_screen_on() {
     if [ -f "$f" ]; then copy_to_root "$f" "$new/cache/${f##*/}"; fi
   done
   copy_kde_settings "$new/kde"
-  as_root chmod -R a+rX "$new"
+  as_root chmod -R a+rX,go-w,ug-s "$new"
   as_root rm -rf "$LOGIN_LIB"
   as_root mv "$new" "$LOGIN_LIB"
   local owner="${SYNCRAIN_LOGIN_OWNER:-greeter}"
@@ -239,25 +311,7 @@ login_screen_on() {
   rm -rf "$tmp"
   info "the app: $LOGIN_LIB (user $(id -un), Plasma, the rain's options given to this installer)"
 
-  if [ -f "$GREETD_CONFIG" ] && ! grep -q syncrain "$GREETD_CONFIG" && [ ! -f "$GREETD_CONFIG.before-syncrain" ]; then
-    as_root cp "$GREETD_CONFIG" "$GREETD_CONFIG.before-syncrain"
-  fi
-  as_root mkdir -p "$(dirname "$GREETD_CONFIG")"
-  # If the login screen's files ever go missing, greetd's text login asks instead of a black screen.
-  local login="$LOGIN_LIB/syncrain/login/login.sh"
-  printf '%s\n' "# written by syncrain's install.sh --login-screen; greetd's own: $GREETD_CONFIG.before-syncrain" \
-    "[terminal]" "vt = 1" "" "[default_session]" \
-    "command = \"sh -c 'test -x $login && exec $login; exec agreety --cmd startplasma-wayland'\"" \
-    "user = \"greeter\"" | as_root tee "$GREETD_CONFIG" >/dev/null
-  # SDDM's PAM opens KDE's wallet (and GNOME's keyring) with the password typed at login; greetd's
-  # does not, so without these the wallet would ask again. "-" skips a module that is not installed.
-  if [ -f "$GREETD_PAM" ] && ! grep -q pam_kwallet5 "$GREETD_PAM"; then
-    [ -f "$GREETD_PAM.before-syncrain" ] || as_root cp "$GREETD_PAM" "$GREETD_PAM.before-syncrain"
-    printf '%s\n' "" "# added by syncrain's install.sh --login-screen: the wallet opens with the login, as under SDDM" \
-      "-auth       optional    pam_gnome_keyring.so" "-auth       optional    pam_kwallet5.so" \
-      "-session    optional    pam_gnome_keyring.so    auto_start" "-session    optional    pam_kwallet5.so         auto_start" \
-      | as_root tee -a "$GREETD_PAM" >/dev/null
-  fi
+  apply_greetd
   as_root systemctl enable --force greetd.service >/dev/null || die "systemctl could not enable greetd"
   if in_plasma; then
     info "after a login, Plasma's splash and wallpaper show a still frame of the rain (a window opens for a moment):"
@@ -279,7 +333,7 @@ login_screen_on() {
 # and one that is gone leaves greetd with its own config rather than no way to log in. Run again
 # (for the hand-over, from Plasma), it finds nothing more of the login screen to put back.
 login_screen_off() {
-  local before now keep="" again=""
+  local before now keep="" again="" pam greeter_pam
   before="$(recorded_before)"
   now="$(display_manager)"
   if [ -z "$before" ] && [ ! -d "$LOGIN_LIB" ] && ! grep -qs syncrain "$GREETD_CONFIG"; then
@@ -301,12 +355,15 @@ login_screen_off() {
            fi ;;
       esac
     fi
+    pam="$(pam_file)"                           # the config before syncrain names the same services
+    greeter_pam="$(greeter_pam_file)"
     if [ -f "$GREETD_CONFIG.before-syncrain" ] && grep -qs syncrain "$GREETD_CONFIG"; then
       as_root mv -f "$GREETD_CONFIG.before-syncrain" "$GREETD_CONFIG"
     fi
-    if [ -f "$GREETD_PAM.before-syncrain" ] && grep -qs "added by syncrain" "$GREETD_PAM"; then
-      as_root mv -f "$GREETD_PAM.before-syncrain" "$GREETD_PAM"
+    if [ -f "$pam.before-syncrain" ] && grep -qs "added by syncrain" "$pam"; then
+      as_root mv -f "$pam.before-syncrain" "$pam"
     fi
+    if head -n 1 "$greeter_pam" 2>/dev/null | grep -qF "$PAM_MARK"; then as_root rm -f "$greeter_pam"; fi
     as_root rm -rf "$LOGIN_LIB" "$LOGIN_STATE"
     # The record goes once what it names is back; a run that could not do that leaves it for the next.
     if [ -n "$again" ]; then
@@ -338,15 +395,16 @@ login_screen_refresh() {
   # user reads them now, so a copy an earlier build made as root through a link goes.
   as_root rm -rf "$LOGIN_LIB.new"
   as_root mkdir -p "$LOGIN_LIB.new/kde"
-  as_root cp -RP "$APPDIR/syncrain" "$LOGIN_LIB.new/"
+  copy_app_to_root "$LOGIN_LIB.new"
   copy_kde_settings "$LOGIN_LIB.new/kde"
-  as_root chmod -R a+rX "$LOGIN_LIB.new"
+  as_root chmod -R a+rX,go-w,ug-s "$LOGIN_LIB.new"
   as_root rm -rf "$LOGIN_LIB/syncrain" "$LOGIN_LIB/kde"
   as_root mv "$LOGIN_LIB.new/syncrain" "$LOGIN_LIB.new/kde" "$LOGIN_LIB/"
   as_root rm -rf "$LOGIN_LIB.new"
   clear_state_copies
   copy_to_root "$APPDIR/BUILD_NUMBER" "$LOGIN_LIB/BUILD_NUMBER"
   as_root chmod a+r "$LOGIN_LIB/BUILD_NUMBER"
+  if grep -qs syncrain "$GREETD_CONFIG"; then apply_greetd; fi
   info "the login screen: build $BUILD too"
   local rain=()
   # the login screen's options without its copy of the symbols file (here syncrain reads yours)
@@ -355,8 +413,9 @@ import json, sys
 args = json.load(open(sys.argv[1])).get("rain", [])
 skip = {i + 1 for i, a in enumerate(args) if a == "--glyphs"} | {i for i, a in enumerate(args) if a == "--glyphs"}
 [print(a) for i, a in enumerate(args) if i not in skip]' "$LOGIN_LIB/login.json" 2>/dev/null)
+  # only the still frame again: the splash and wallpapers stay as the operator has them now
   if in_plasma && [ -f "$HANDOVER_STATE" ]; then
-    handover "$APPDIR" on "${rain[@]}" >/dev/null || true
+    handover "$APPDIR" still "${rain[@]}" >/dev/null || true
   fi
 }
 
@@ -512,9 +571,9 @@ ExecStart=$(unit_words "$BINDIR/syncrain" "${ARGS[@]}")
 Restart=on-failure
 RestartSec=3
 # statuses a restart cannot change, so it would only start the same failure every 3 s: 69 no OpenGL here,
-# 2 no wallpaper layer (GNOME) or an unknown option, 70 a native wallpaper from another build
-# (syncrain --diagnose says why)
-RestartPreventExitStatus=2 69 70
+# 2 no wallpaper layer (GNOME) or an option it cannot use, 70 a native wallpaper from another build,
+# 78 a picture or font it cannot use (syncrain --diagnose says why)
+RestartPreventExitStatus=2 69 70 78
 
 [Install]
 WantedBy=graphical-session.target

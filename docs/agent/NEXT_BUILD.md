@@ -1,24 +1,19 @@
-# The next build is 19
+# The next build is 20
 
 The first line is parsed: `# The next build is <N>`, exactly one above `BUILD_NUMBER`.
 
-## Build 19: what the operator finds in 18, then the review's rest or the boot splash
+## Build 20: consolidation
 
-* Read what the operator sent last, and answer it in one plain sentence first.
-* **Build 18 on their desktop**: `./install.sh` moved the record of Plasma Login beside greetd's
-  config (`syncrain --diagnose` names it); build 17's hand-over if they have not said. Fix what
-  they find first.
-* **Their pick** (`docs/ROADMAP.md`): the review's other middling findings (M4 to M7, M9, in
-  `docs/build_notes/BUILD18_NOTES.md`) or the boot splash, a still frame of the rain (Plymouth)
-  until the login screen draws. Recommended: the review.
-* **The glow flare-up**, with the time they saw it: draw that moment and look.
-* **The other questions** in `docs/ROADMAP.md` (default frame rate, what pauses).
+* Read what the operator sent last, and answer it in one plain sentence first. A fault they find
+  in 19 is written down for build 21, which comes right after; 20 changes no behaviour.
+* Fold the build notes up to 18 into `docs/HISTORY.md` (19's and 20's stay in `docs/build_notes/`),
+  make every document true and short again, and write down what it finds as open items.
+* Then build 21: the previewer page (`docs/ROADMAP.md`, planned build 1).
 
 **Known blockers**: watts, NVIDIA's driver and Plasma's shell exist only on the operator's machine;
 a real greetd and PAM only there too (the lanes speak to a stand-in).
 
-**Acceptance**: each fix with a test that fails without it; the login screen stays optional
-(`tests/unit/test_the_login_screen_is_optional.py`); every lane passes.
+**Acceptance**: no change but in documents and comments; `**Type: consolidation**`; every lane passes.
 
 ## How to make a build
 

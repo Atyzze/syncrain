@@ -108,3 +108,41 @@ def test_off_outside_plasma_keeps_what_it_needs_to_try_again(tmp_path, monkeypat
     assert handover.state_path().exists() and handover.still_path().exists()
     assert handover.off(shell=shell)[-1] == "Plasma's wallpaper: as before"
     assert not handover.state_path().exists()
+
+
+def _homes(tmp_path, monkeypatch):
+    for key, sub in (("XDG_DATA_HOME", "data"), ("XDG_CONFIG_HOME", "config"), ("XDG_STATE_HOME", "state")):
+        monkeypatch.setenv(key, str(tmp_path / sub))
+    (tmp_path / "config").mkdir(exist_ok=True)
+    monkeypatch.setattr(handover, "make_still",
+                        lambda rain, path: (path.parent.mkdir(parents=True, exist_ok=True), path.write_bytes(b"p"), True)[2])
+    return tmp_path / "config/ksplashrc"
+
+
+def test_a_newer_build_makes_the_still_again_and_changes_nothing_chosen_since(tmp_path, monkeypatch):
+    rc = _homes(tmp_path, monkeypatch)
+    shell = Shell()
+    handover.on([], shell=shell)
+    handover.write_ini(rc, "KSplash", "Theme", "org.kde.breeze.desktop")        # chosen since, in Plasma
+    shell.desktops[1] = ["org.kde.image", "file:///home/op/beach.png", shell.desktops[1][2]]
+    chosen = [list(d) for d in shell.desktops]
+    scripts = len(shell.scripts)
+    assert handover.still(["--theme", "matrix"]) == ["the still frame: made again"]
+    assert len(shell.scripts) == scripts and shell.desktops == chosen
+    assert handover.read_ini(rc, "KSplash", "Theme") == "org.kde.breeze.desktop"
+    said = handover.off(shell=shell)
+    assert said == ["splash after login: the one chosen since stays",
+                    "Plasma's wallpaper: as before where the still was; 1 chosen since stay"]
+    assert shell.desktops[1][1] == "file:///home/op/beach.png", "the beach stays"
+    assert shell.desktops[0][1] == "file:///usr/share/wallpapers/cachyos.png"
+    assert handover.read_ini(rc, "KSplash", "Theme") == "org.kde.breeze.desktop"
+
+
+def test_a_run_that_broke_off_does_not_make_syncrain_s_splash_the_one_to_go_back_to(tmp_path, monkeypatch):
+    rc = _homes(tmp_path, monkeypatch)
+    rc.write_text("[KSplash]\nEngine=KSplashQML\nTheme=org.syncrain.splash\n")     # left, with no record
+    shell = Shell()
+    handover.on([], shell=shell)
+    assert json.loads(handover.state_path().read_text())["splash"] == {"Engine": None, "Theme": None}
+    handover.off(shell=shell)
+    assert handover.read_ini(rc, "KSplash", "Theme") is None, "Plasma's own splash"

@@ -36,13 +36,18 @@ class Greetd:
             out += chunk
         return out
 
-    def login(self, user: str, password: str, cmd: list[str], env: list[str]) -> tuple[bool, str]:
+    def login(self, user: str, password: str, cmd: list[str], env: list[str], ask=None,
+              tell=None) -> tuple[bool, str]:
         """Log `user` in and have greetd start `cmd` once this greeter exits: (done, what to show).
-        A secret prompt (the password) gets `password`; a visible one gets the user name; info and
-        error messages are passed on in the answer."""
+
+        PAM's conversation goes through as it comes. The first secret prompt gets `password`. Every
+        other prompt (a second factor, a PIN, a new password) goes to `ask(prompt, secret)`, whose
+        answer is passed on (None gives up); without `ask` the login stops there and says so, for
+        greetd's text login to finish. Info and error messages go to `tell` as they arrive, and are
+        in the answer too."""
         if not self.path:
             return False, "not started by greetd (no GREETD_SOCK)"
-        notes = []
+        notes, asked, password_used = [], 0, False
         try:
             with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
                 sock.settimeout(self.timeout)
@@ -52,17 +57,28 @@ class Greetd:
                     kind, text = reply.get("auth_message_type"), reply.get("auth_message", "")
                     if kind in ("info", "error"):
                         notes.append(text.strip())
+                        if tell:
+                            tell(text.strip())
                         answer = None
+                    elif kind == "secret" and not password_used:
+                        answer, password_used = password, True
+                        asked += 1
                     else:
-                        answer = password if kind == "secret" else user
+                        prompt = text.strip() or "Answer:"
+                        answer = ask(prompt, kind == "secret") if ask else None
+                        if answer is None:
+                            self._cancel(sock)
+                            why = "given up" if ask else "more than a password: use Text login"
+                            return False, "\n".join([*[n for n in notes if n], f"{prompt} ({why})"])
+                        asked += 1
                     reply = self._exchange(sock, {"type": "post_auth_message_response", "response": answer})
                 if reply.get("type") != "success":
                     self._cancel(sock)
-                    return False, self._said(reply, notes)
+                    return False, self._said(reply, notes, asked)
                 reply = self._exchange(sock, {"type": "start_session", "cmd": cmd, "env": env})
                 if reply.get("type") != "success":
                     self._cancel(sock)
-                    return False, self._said(reply, notes)
+                    return False, self._said(reply, notes, asked)
                 return True, "\n".join(n for n in notes if n)
         except (OSError, ValueError, GreetdError) as e:
             self._cancel_anew()
@@ -86,9 +102,9 @@ class Greetd:
             pass
 
     @staticmethod
-    def _said(reply: dict, notes) -> str:
+    def _said(reply: dict, notes, asked: int = 1) -> str:
         if reply.get("error_type") == "auth_error":
-            text = "Wrong password"
+            text = "Wrong password" if asked <= 1 else "Not accepted"
         else:
             text = reply.get("description") or "The login did not go through"
         return "\n".join([*[n for n in notes if n], text])

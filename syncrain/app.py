@@ -8,6 +8,7 @@ X11:     one desktop-type window covering the whole screen, one viewport per mon
 import argparse
 import ctypes
 import gc
+import math
 import os
 import signal
 import sys
@@ -25,7 +26,9 @@ EXIT_NO_LAYER = 2
 #: What every autostart service lists under RestartPreventExitStatus: a restart cannot change these,
 #: so it would only start the same failure again every few seconds, for good. 70 is the native
 #: wallpaper's for a scene from another build (syncrain/native/wallpaper.c).
-NO_RESTART = (EXIT_NO_LAYER, EXIT_NO_GL, 70)
+#: A setting it cannot use (a picture or symbols file it cannot read, a font): sysexits.h's EX_CONFIG.
+EXIT_CONFIG = 78
+NO_RESTART = (EXIT_NO_LAYER, EXIT_NO_GL, 70, EXIT_CONFIG)
 
 #: The oldest contexts the shaders compile on: GLSL 3.30 core, or GLSL ES 3.00 (what WebGL2 runs).
 MIN_GL = {False: (3, 3), True: (3, 0)}
@@ -40,12 +43,43 @@ class _ShowBuild(argparse.Action):
         parser.exit()
 
 
+#: What JavaScript's String.prototype.trim() removes: WhiteSpace and LineTerminator (ECMA-262).
+JS_SPACE = ("\t\n\v\f\r \u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009"
+            "\u200a\u2028\u2029\u202f\u205f\u3000\ufeff")
+
+
+def _number(low=None, high=None, above=None):
+    """An option's number: finite (never nan or inf, which every frame would carry), and within
+    what the option can use. A value outside ends with argparse's status 2, said at once."""
+    def parse(text):
+        try:
+            value = float(text)
+        except ValueError:
+            raise argparse.ArgumentTypeError(f"not a number: {text!r}") from None
+        if not math.isfinite(value):
+            raise argparse.ArgumentTypeError(f"not a finite number: {text!r}")
+        if above is not None and not value > above:
+            raise argparse.ArgumentTypeError(f"{text} is not above {above:g}")
+        if (low is not None and value < low) or (high is not None and value > high):
+            raise argparse.ArgumentTypeError(f"{text} is outside {low:g} to {high:g}" if high is not None
+                                             else f"{text} is below {low:g}")
+        return value
+    return parse
+
+
+def _image(text):
+    """A picture file that is there to be read (the native wallpaper and the GTK host read it later)."""
+    if not (os.path.isfile(text) and os.access(text, os.R_OK)):
+        raise argparse.ArgumentTypeError(f"no picture file to read at {text}")
+    return text
+
+
 def parse_args(argv=None):
     ap = argparse.ArgumentParser(prog="syncrain", description="Never-repeating, clock-synchronised code rain wallpaper.")
     ap.add_argument("--theme", default="nixos", help="nixos (default) or matrix")
     ap.add_argument("--channel", default="public",
                     help="stream name; everyone on the same channel with a synced clock sees the same frame")
-    ap.add_argument("--fps", type=float, default=30.0,
+    ap.add_argument("--fps", type=_number(above=0, high=1000), default=30.0,
                     help="frame rate cap (default 30); frames land on whole refreshes of the screen")
     ap.add_argument("--pause-under", choices=hidden.POLICIES, default="maximized",
                     help="on KDE Plasma, stop drawing a screen while a maximized or full-screen window covers "
@@ -57,27 +91,27 @@ def parse_args(argv=None):
                          "else Python and GTK), native (the native program only) or gtk (Python and GTK, as on "
                          "X11 and in a window)")
     ap.add_argument("--logo", choices=("white", "colours", "none"), help="NixOS logo variant (theme default otherwise)")
-    ap.add_argument("--background", metavar="IMAGE", help="use an image as the background instead of the theme gradient")
-    ap.add_argument("--mask", metavar="IMAGE", help="greyscale mask (same framing as --background): white = keep bright, no rain")
-    ap.add_argument("--bg-gamma", type=float, help="darkening curve for --background (default 2.0; 1 = unchanged)")
-    ap.add_argument("--bg-gain", type=float,
+    ap.add_argument("--background", type=_image, metavar="IMAGE", help="use an image as the background instead of the theme gradient")
+    ap.add_argument("--mask", type=_image, metavar="IMAGE", help="greyscale mask (same framing as --background): white = keep bright, no rain")
+    ap.add_argument("--bg-gamma", type=_number(above=0), help="darkening curve for --background (default 2.0; 1 = unchanged)")
+    ap.add_argument("--bg-gain", type=_number(low=0),
                     help="background brightness: the gradient's (default 1; lower is darker) or --background's "
                          "(default 0.42; 1 = unchanged)")
     ap.add_argument("--rainbow", choices=("logo", "all", "off"),
                     help="colour cycling: logo (default), all (the rain too) or off")
-    ap.add_argument("--spin", type=float, metavar="SECONDS", help="seconds per logo revolution (default 180, 0 = still)")
-    ap.add_argument("--drift", type=float, metavar="FRACTION",
+    ap.add_argument("--spin", type=_number(), metavar="SECONDS", help="seconds per logo revolution (default 180, 0 = still)")
+    ap.add_argument("--drift", type=_number(), metavar="FRACTION",
                     help="slow orbit of the logo / pan of the image, in screen heights (default 0.03, 0 = fixed)")
-    ap.add_argument("--speed", type=float, metavar="F",
+    ap.add_argument("--speed", type=_number(above=0), metavar="F",
                     help="how fast the symbols fall, times the theme's (default 1; 0.25 to 4)")
-    ap.add_argument("--density", type=float, metavar="F",
+    ap.add_argument("--density", type=_number(low=0), metavar="F",
                     help="how often a column starts a new stream, times the theme's (default 1; 0 to 2.3)")
-    ap.add_argument("--glow", type=float, metavar="F",
+    ap.add_argument("--glow", type=_number(low=0), metavar="F",
                     help="the glow around the centre and the logo, times the theme's (default 1; 0 = none)")
-    ap.add_argument("--bloom", type=float, metavar="F",
+    ap.add_argument("--bloom", type=_number(low=0), metavar="F",
                     help="the glow around the falling symbols, times the theme's (default 1; 0 = none)")
     ap.add_argument("--snow", choices=("on", "off"), help="the falling snowflakes (default on, where the theme has them)")
-    ap.add_argument("--hieroglyphs", type=float, metavar="SHARE",
+    ap.add_argument("--hieroglyphs", type=_number(low=0, high=1), metavar="SHARE",
                     help="share of the changing symbols that are Egyptian hieroglyphs (default: as the symbol sets "
                          "say, 0.15 in the themes; 0 = none, 1 = only)")
     ap.add_argument("--glyphs", metavar="FILE",
@@ -85,16 +119,16 @@ def parse_args(argv=None):
                          "~/.config/syncrain/glyphs.json if there is one, else the theme's; 'theme' for the theme's)")
     ap.add_argument("--write-glyphs", action="store_true",
                     help="write a starter symbols file (to --glyphs, or ~/.config/syncrain/glyphs.json) and exit")
-    ap.add_argument("--scale", type=float, default=1.0, help="render resolution scale, e.g. 0.75 on weak GPUs")
+    ap.add_argument("--scale", type=_number(above=0, high=4), default=1.0, help="render resolution scale, e.g. 0.75 on weak GPUs")
     ap.add_argument("--layer", choices=("background", "bottom"),
                     help="Wayland layer (default: bottom on KDE Plasma, whose own desktop sits on the background layer)")
     ap.add_argument("--window", action="store_true", help="ordinary window instead of a wallpaper")
-    ap.add_argument("--offset", type=float, default=0.0, help="add this many seconds to the clock")
-    ap.add_argument("--time", type=float, help="freeze the clock at this UNIX time (screenshots, tests)")
+    ap.add_argument("--offset", type=_number(), default=0.0, help="add this many seconds to the clock")
+    ap.add_argument("--time", type=_number(), help="freeze the clock at this UNIX time (screenshots, tests)")
     ap.add_argument("--screenshot", metavar="PNG", help="render one frame, save it, exit")
     ap.add_argument("--record", metavar="DIR", help="render a clip as numbered PNGs into DIR (from --time or now), exit")
-    ap.add_argument("--record-seconds", type=float, default=8.0)
-    ap.add_argument("--record-fps", type=float, default=30.0)
+    ap.add_argument("--record-seconds", type=_number(above=0), default=8.0)
+    ap.add_argument("--record-fps", type=_number(above=0, high=1000), default=30.0)
     ap.add_argument("--size", help="window size for --window / --record (default 1280x720), or the size "
                                    "--benchmark draws at (default: the first screen), e.g. 1920x1080")
     ap.add_argument("--list-themes", action="store_true")
@@ -108,7 +142,11 @@ def parse_args(argv=None):
                     help="check whether syncrain can draw on this machine, print what it found, exit")
     ap.add_argument("--build", action=_ShowBuild, help="print the build number and the stream fingerprint, exit")
     ap.add_argument("--version", action=_ShowBuild, help=argparse.SUPPRESS)   # the reflex spelling; says the build
-    return ap.parse_args(argv)
+    args = ap.parse_args(argv)
+    # the channel as the web page takes it: spaces around it (what JavaScript's trim() takes, which is
+    # not quite what str.strip() takes) are no part of the name, and none is public
+    args.channel = args.channel.strip(JS_SPACE) or "public"
+    return args
 
 
 def _preload_layer_shell():
@@ -429,6 +467,12 @@ def main(argv=None):
             except RuntimeError as e:          # a shader this driver will not compile
                 app.fail(f"the shaders did not compile here: {e}")
                 return
+            except Exception as e:  # noqa: BLE001 - a picture, a font or a symbols file it cannot use
+                if type(e).__module__.startswith("OpenGL"):  # the driver's, not a setting's
+                    app.fail(f"OpenGL failed while getting ready: {e}")
+                else:
+                    app.fail(f"the picture could not be made ready: {type(e).__name__}: {e}", code=EXIT_CONFIG)
+                return
             self.renderer = r
             app.started(describe_context(ctx, Gdk) + f", GTK renderer {renderer_name(self)}")
 
@@ -599,20 +643,23 @@ def main(argv=None):
                     self._frames, self._since = 0, now
                 elif not hasattr(self, "_since"):
                     self._since = now
-            if args.screenshot:
-                self._save(out, W, H, args.screenshot)
-                print(f"syncrain: saved {args.screenshot} ({W}x{H})", flush=True)
-                self.renderer = None                 # one frame only
-                GLib.idle_add(app.quit, priority=GLib.PRIORITY_HIGH)
-            elif args.record:
-                os.makedirs(args.record, exist_ok=True)
-                n = max(1, round(args.record_seconds * args.record_fps))
-                t0 = args.time if args.time is not None else time.time() + args.offset
-                for i in range(n):
-                    self.renderer.render(t0 + i / args.record_fps, out, 0, 0, W, H)
-                    self._save(out, W, H, os.path.join(args.record, f"frame_{i:05d}.png"))
-                print(f"syncrain: recorded {n} frames ({W}x{H}) into {args.record}", flush=True)
-                self.renderer = None
+            if args.screenshot or args.record:
+                try:
+                    if args.screenshot:
+                        self._save(out, W, H, args.screenshot)
+                        print(f"syncrain: saved {args.screenshot} ({W}x{H})", flush=True)
+                    else:
+                        os.makedirs(args.record, exist_ok=True)
+                        n = max(1, round(args.record_seconds * args.record_fps))
+                        t0 = args.time if args.time is not None else time.time() + args.offset
+                        for i in range(n):
+                            self.renderer.render(t0 + i / args.record_fps, out, 0, 0, W, H)
+                            self._save(out, W, H, os.path.join(args.record, f"frame_{i:05d}.png"))
+                        print(f"syncrain: recorded {n} frames ({W}x{H}) into {args.record}", flush=True)
+                except (OSError, ValueError, KeyError) as e:   # a folder it cannot write, a name with no type
+                    print(f"syncrain: not saved: {e}", file=sys.stderr, flush=True)
+                    app.exit_code = app.exit_code or 1
+                self.renderer = None                 # one frame, or one clip, only; then out
                 GLib.idle_add(app.quit, priority=GLib.PRIORITY_HIGH)
             return True
 
@@ -635,12 +682,13 @@ def main(argv=None):
             self.watch = None
             self.watch_said = False
             self._settle = None                # the GLib source that will settle memory, while it waits
+            self._rebuild = None               # the GLib source that will rebuild the screens, while it waits
             self.settled = False               # memory settled since the screens were last built
 
         def do_activate(self):
             self.hold()
             self.build()
-            display.get_monitors().connect("items-changed", lambda *_: GLib.idle_add(self.rebuild))
+            display.get_monitors().connect("items-changed", lambda *_: self.rebuild_soon())
             if args.pacing == "timer":
                 GLib.timeout_add(max(1, int(round(1000.0 / max(1.0, args.fps)))), self.tick)
             self.start_watch()
@@ -722,10 +770,11 @@ def main(argv=None):
                 where = "a window" if n == 0 else f"{n} screen{'s' if n != 1 else ''}"
                 print(f"{build.describe()}: {context}, {where}", flush=True)
 
-        def fail(self, reason):
-            """Give the desktop back at once and exit with EXIT_NO_GL; said once, not once per screen."""
+        def fail(self, reason, code=EXIT_NO_GL):
+            """Give the desktop back at once and exit with `code` (a status the services do not
+            restart on); said once, not once per screen."""
             if self.exit_code == 0:
-                self.exit_code = EXIT_NO_GL
+                self.exit_code = code
                 print(f"syncrain: {reason}\n"
                       "syncrain: nothing can be drawn, so the wallpaper is closed again. "
                       "`syncrain --diagnose` shows what this machine offers.", file=sys.stderr, flush=True)
@@ -733,7 +782,15 @@ def main(argv=None):
                 w.set_visible(False)
             GLib.idle_add(self.quit, priority=GLib.PRIORITY_HIGH)
 
+        def rebuild_soon(self):
+            """One rebuild for a burst of screen changes, at default priority: an idle one waits behind
+            the frames (their timers run at high priority) for as long as drawing keeps the loop
+            busy, which on slow OpenGL is for good."""
+            if self._rebuild is None:
+                self._rebuild = GLib.timeout_add(50, self.rebuild, priority=GLib.PRIORITY_DEFAULT)
+
         def rebuild(self):
+            self._rebuild = None
             for a in self.areas:
                 a.retire()
             for w in self.windows:

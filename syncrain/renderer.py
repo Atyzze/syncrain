@@ -180,7 +180,13 @@ def texture_sources(r, bundled=rgba_pil):
     `bundled` decodes the images that come with syncrain; an image the user names (--background,
     --mask) always goes through Pillow."""
     out = {}
-    w, h, data = r.glyphs.atlas()              # only the glyphs the symbol sets use (syncrain/glyphs.py)
+    try:
+        w, h, data = r.glyphs.atlas()          # only the glyphs the symbol sets use (syncrain/glyphs.py)
+    except Exception as e:  # noqa: BLE001 - a file's characters or font that cannot be drawn
+        if r.glyphs.source == "the theme":
+            raise
+        r.theme_glyphs(e, r.data_dir)
+        w, h, data = r.glyphs.atlas()
     out["atlas"] = (w, h, "mip", data)
     out["table"] = (len(r.glyphs.table), 1, "nearest", r.glyphs.table_bytes())
     wb, n_words = r.glyphs.words_bytes()
@@ -403,8 +409,13 @@ class Renderer:
                                 hieroglyphs=hieroglyphs)
         # the symbols: a symbols file (`glyphs`, else ~/.config/syncrain/glyphs.json if there is one),
         # else the theme's own sets
-        self.glyphs = glyph_sets.for_theme(self.meta, self.th, data_dir, path=glyphs, hieroglyphs=self.look["hieroglyphs"],
-                                           warn=lambda why: print(f"syncrain: {why}", file=sys.stderr, flush=True))
+        def warn(why):
+            print(f"syncrain: {why}", file=sys.stderr, flush=True)
+        try:
+            self.glyphs = glyph_sets.for_theme(self.meta, self.th, data_dir, path=glyphs,
+                                               hieroglyphs=self.look["hieroglyphs"], warn=warn)
+        except Exception as e:  # noqa: BLE001 - a file's characters or font it cannot use: the theme's still work
+            self.theme_glyphs(e, data_dir)
         self.data_dir = data_dir
         self.epoch0, self.cols = self.meta["epoch0"], self.meta["cols"]
         self.targets = {}
@@ -412,6 +423,13 @@ class Renderer:
         self.shared = None
         self.bg_size = self.mask_bbox = None
         self.ready = False
+
+    def theme_glyphs(self, why, data_dir):
+        """A symbols file whose characters or fonts cannot be used: said, and the theme's own symbols."""
+        print(f"syncrain: the symbols file could not be used ({type(why).__name__}: {why}); "
+              "the theme's own symbols instead", file=sys.stderr, flush=True)
+        self.glyphs = glyph_sets.for_theme(self.meta, self.th, data_dir, path="theme",
+                                           hieroglyphs=self.look["hieroglyphs"])
 
     def resource_key(self, use_es):
         """Everything the shared programs and textures depend on: two renderers with the same key

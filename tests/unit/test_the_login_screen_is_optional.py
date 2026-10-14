@@ -223,3 +223,59 @@ def test_build_17_s_record_survives_a_refused_way_back(another_user):
     assert second.returncode == 0, second.stdout + second.stderr
     assert os.readlink(base / "display-manager.service") == "/usr/lib/systemd/system/plasmalogin.service"
     assert not record.exists()
+
+
+def test_greetd_s_own_settings_stay_and_the_wallet_goes_to_the_service_it_names(another_user):
+    """Only [default_session] is syncrain's: a PAM service with a second factor, an automatic login and
+    the terminal stay, and the wallet lines go to that service, not to one greetd does not use. The
+    greeter itself runs without them (greetd-greeter, the service greetd runs its greeter under)."""
+    base = another_user.base
+    machine(base, "plasmalogin.service")
+    own = ('[terminal]\nvt = 2\n\n[general]\nservice = "greetd-otp"  # with a second factor\n\n'
+           '[default_session]\ncommand = "agreety --cmd /bin/sh"\nuser = "greeter"\n\n'
+           '[initial_session]\ncommand = "startplasma-wayland"\nuser = "op"\n')
+    (base / "etc/greetd/config.toml").write_text(own)
+    otp = PAM + "auth       required     pam_google_authenticator.so\n"
+    (base / "etc/pam.d/greetd-otp").write_text(otp)
+    was = login_side(base)
+    on = another_user.install("--login-screen")
+    assert on.returncode == 0, on.stdout + on.stderr
+    import tomllib
+    config = tomllib.loads((base / "etc/greetd/config.toml").read_text())
+    assert config["terminal"] == {"vt": 2} and config["general"] == {"service": "greetd-otp"}
+    assert config["initial_session"] == {"command": "startplasma-wayland", "user": "op"}
+    assert config["default_session"]["user"] == "greeter" and "login.sh" in config["default_session"]["command"]
+    assert (base / "etc/pam.d/greetd").read_text() == PAM, "a service greetd does not use is left alone"
+    added = (base / "etc/pam.d/greetd-otp").read_text()
+    assert added.startswith(otp) and "pam_kwallet5.so" in added
+    greeter = (base / "etc/pam.d/greetd-greeter").read_text()      # greetd's own name for the greeter's
+    assert greeter.splitlines()[1:] == otp.splitlines() and "kwallet" not in greeter
+    off = another_user.install("--login-screen-off")
+    assert off.returncode == 0, off.stdout + off.stderr
+    assert login_side(base) == was
+
+
+
+def test_an_upgrade_from_build_18_gets_greetd_s_own_settings_and_the_greeter_s_file(another_user):
+    """Build 18 wrote greetd's whole config and gave the greeter no PAM file of its own; a plain
+    ./install.sh of this build puts both right."""
+    base = another_user.base
+    machine(base, "plasmalogin.service")
+    own = '[terminal]\nvt = 2\n\n[default_session]\ncommand = "agreety --cmd /bin/sh"\nuser = "greeter"\n'
+    (base / "etc/greetd/config.toml").write_text(own)
+    assert another_user.install("--login-screen").returncode == 0
+    (base / "etc/pam.d/greetd-greeter").unlink()
+    login = base / "lib/syncrain/login/login.sh"
+    (base / "etc/greetd/config.toml").write_text(              # as build 18 left it
+        f'# written by syncrain\'s install.sh --login-screen\n[terminal]\nvt = 1\n\n[default_session]\n'
+        f'command = "sh -c \'test -x {login} && exec {login}; exec agreety --cmd startplasma-wayland\'"\n'
+        'user = "greeter"\n')
+    up = another_user.install()
+    assert up.returncode == 0, up.stdout + up.stderr
+    import tomllib
+    config = tomllib.loads((base / "etc/greetd/config.toml").read_text())
+    assert config["terminal"] == {"vt": 2} and "login.sh" in config["default_session"]["command"]
+    assert "kwallet" not in (base / "etc/pam.d/greetd-greeter").read_text()
+    assert another_user.install("--login-screen-off").returncode == 0
+    assert (base / "etc/greetd/config.toml").read_text() == own
+    assert not (base / "etc/pam.d/greetd-greeter").exists()

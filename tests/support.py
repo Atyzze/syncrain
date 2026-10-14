@@ -88,7 +88,7 @@ def stub(folder: Path, name: str, body: str) -> Path:
 
 #: Where login_install puts the system's side of the login screen, under its base folder.
 LOGIN_PATHS = {"SYNCRAIN_LOGIN_LIB": "lib", "SYNCRAIN_LOGIN_STATE": "state",
-               "SYNCRAIN_GREETD_CONFIG": "etc/greetd/config.toml", "SYNCRAIN_GREETD_PAM": "etc/pam.d/greetd",
+               "SYNCRAIN_GREETD_CONFIG": "etc/greetd/config.toml", "SYNCRAIN_PAM_DIR": "etc/pam.d",
                "SYNCRAIN_DM_LINK": "display-manager.service"}
 
 

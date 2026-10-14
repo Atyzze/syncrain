@@ -129,3 +129,17 @@ def test_shares_of_sets_with_nothing_to_draw_go_to_the_rest():
     r = resolve({"sets": [{"name": "a", "chars": "AB", "weight": 1}, {"name": "b", "chars": "C", "weight": 1}]})
     r.sets[1] = ("b", r.sets[1][1], 0)                 # as if it had nothing
     assert r.uniform() == [(1.0, 0, 2)]
+
+
+
+
+def test_any_problem_with_a_file_s_symbols_falls_back_to_the_theme(tmp_path, capsys):
+    """Not only a file that is not right: characters or a font that cannot be drawn (here half of a
+    character, which JSON can spell). The wallpaper draws the theme's symbols and says why."""
+    from syncrain import renderer
+    path = tmp_path / "glyphs.json"
+    path.write_text('{"sets": [{"name": "mine", "chars": "\\u4e00\\ud83d"}]}', encoding="utf-8")
+    r = renderer.from_args(__import__("syncrain.app", fromlist=["parse_args"]).parse_args(["--glyphs", str(path)]))
+    sources, _bg, _mask = renderer.texture_sources(r, renderer.rgba_pil)
+    assert r.glyphs.source == "the theme" and sources["atlas"][0] > 0
+    assert "could not be used (UnicodeEncodeError" in capsys.readouterr().err

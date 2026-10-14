@@ -9,6 +9,7 @@ given back" can be checked against what this compositor shows when nothing cover
 """
 from __future__ import annotations
 
+import json
 import os
 import re
 import shutil
@@ -314,6 +315,33 @@ def test_the_native_wallpaper_keeps_a_memory_record_and_trims_as_it_goes(root, t
             assert re.search(rf"pid {proc.pid}: the native wallpaper, up [\d.]+ h, \d+ MiB resident, "
                              r"__NV_DISABLE_EXPLICIT_SYNC=1, __GL_YIELD=USLEEP", report), report
             assert "memory record (" in report and lines[-1] in report, report
+        finally:
+            proc.send_signal(signal.SIGTERM)
+            proc.wait(timeout=30)
+    assert proc.returncode == 0
+
+
+def test_a_screen_that_never_draws_holds_no_memory_back(root, tmp_path):
+    """One of two screens is off before the wallpaper starts (sway never asks it for a second frame):
+    the other hands memory back after its first frames, and the trims go on every few minutes (here
+    half a second), as the record shows."""
+    need(shutil.which("sway") is not None and shutil.which("swaymsg") is not None, "no sway and swaymsg")
+    state = tmp_path / "state"
+    with headless_sway(tmp_path / "run", screen="320x180") as session:
+        sway_env = dict(os.environ, **session)
+        subprocess.run(["swaymsg", "-q", "create_output"], env=sway_env, check=True)
+        outputs = json.loads(subprocess.run(["swaymsg", "-r", "-t", "get_outputs"], env=sway_env, check=True,
+                                            capture_output=True, text=True).stdout)
+        subprocess.run(["swaymsg", "-q", "output", outputs[-1]["name"], "power", "off"], env=sway_env, check=True)
+        env = wallpaper_env(root, session, SYNCRAIN_MEMORY_SECONDS="0.5", XDG_STATE_HOME=str(state))
+        proc, line = start(root, env)
+        record = state / "syncrain" / "memory.log"
+        try:
+            assert HOSTS["native"] in line and "2 screens" in line, line + proc.stderr.read()
+            deadline = time.monotonic() + 40
+            while time.monotonic() < deadline and len(record.read_text().splitlines() if record.exists() else []) < 2:
+                time.sleep(0.5)
+            assert len(record.read_text().splitlines() if record.exists() else []) >= 2, "no trims"
         finally:
             proc.send_signal(signal.SIGTERM)
             proc.wait(timeout=30)

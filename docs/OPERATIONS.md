@@ -26,7 +26,9 @@ git clone https://github.com/Atyzze/syncrain && cd syncrain   # or unpack SYNCRA
   machine logs in: installing, upgrading and removing the wallpaper leave the display manager,
   what starts at boot and their files as they are.
 * `--login-screen`: greetd instead of SDDM (or Plasma Login); the rain and the same box on every
-  screen, then Plasma, with its splash and wallpaper a still frame of the rain. If it fails (or
+  screen, then Plasma, with its splash and wallpaper a still frame of the rain. Only greetd's
+  `[default_session]` changes; what PAM asks after the password (a second factor) is asked in the
+  box. If it fails (or
   after "Text login" in the box), greetd's text login asks. What started at boot before is kept in
   `/etc/greetd/display-manager.before-syncrain`. The installs of the user who set it up keep it
   current, and their `--uninstall` takes it out; other users' installs leave it alone.
@@ -124,7 +126,8 @@ syncrain sets `__NV_DISABLE_EXPLICIT_SYNC=1` and `__GL_YIELD=USLEEP` for itself 
 `syncrain --diagnose`, inside the desktop session: a verdict first, then the session, libraries,
 cards, OpenGL, screens, the native wallpaper and, on KDE, KWin's answer about covered screens. If
 OpenGL cannot start, syncrain exits with status 69. The service does not retry that, nor 2 (no
-wallpaper layer, or an unknown option) or 70 (a native wallpaper from another build).
+wallpaper layer, or an option it cannot use), 70 (a native wallpaper from another build) or 78 (a
+picture or font it cannot use).
 `journalctl --user -u syncrain` shows the startup line.
 
 ## Power and memory

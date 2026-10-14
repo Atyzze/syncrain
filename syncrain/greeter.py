@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import os
+import queue
 import shlex
 import signal
 import subprocess
@@ -263,7 +264,7 @@ def run_box(config: dict, client: Greetd) -> int:
     for s in found:
         names.append(s["name"])
     shared = {"session": pick(found, config.get("session")) if found else 0, "message": "", "busy": False,
-              "peek": False, "shown": set()}
+              "peek": False, "shown": set(), "asking": None, "text_after": False}
     boxes: list[dict] = []
 
     def tell(text):
@@ -306,6 +307,14 @@ def run_box(config: dict, client: Greetd) -> int:
         threading.Thread(target=work, daemon=True).start()
 
     def text_login():
+        # While PAM asks for more (a second factor), the login is given up first, then the text login
+        # comes, so greetd holds no half-made session.
+        if shared["asking"] is not None:
+            say("text login: giving up the login under way first")
+            shared["text_after"] = True
+            answer(None)
+            tell("Giving up this login...")
+            return
         # Not while greetd is checking a login: leaving now would leave greetd holding that half-made
         # session, and the text login's first attempt would fail on it.
         if shared["busy"]:
@@ -315,7 +324,40 @@ def run_box(config: dict, client: Greetd) -> int:
         say("text login asked for")
         loop.quit()
 
+    def asking_look(b):
+        """A box while PAM asks: the password field takes the answer, Text login can give up."""
+        prompt, secret = shared["prompt"]
+        for w in (b["password"], b["login"], b["text"]):
+            w.set_sensitive(True)
+        b["password"].set_placeholder_text(prompt)
+        b["password"].set_visibility(shared["peek"] or not secret)
+
+    def ask_here(prompt, secret, answers):
+        """PAM asks for more than the password: the password field takes the answer."""
+        shared["asking"], shared["prompt"] = answers, (prompt, secret)
+        say(f"asked: {prompt}")
+        tell(prompt)
+        password_text.set_text("", -1)
+        for b in boxes:
+            asking_look(b)
+            b["password"].grab_focus()
+        later(next_test)
+        return False
+
+    def answer(text):
+        answers, shared["asking"] = shared["asking"], None
+        busy(True)
+        for b in boxes:
+            b["password"].set_placeholder_text("Password")
+            b["password"].set_visibility(shared["peek"])
+        tell("Logging in...")
+        answers.put(text)
+
     def attempt(*_):
+        if shared["asking"] is not None:
+            answer(password_text.get_text())
+            password_text.set_text("", -1)
+            return
         if shared["busy"]:
             return
         name = user_text.get_text().strip()
@@ -331,12 +373,26 @@ def run_box(config: dict, client: Greetd) -> int:
         busy(True)
         tell("Logging in...")
 
+        def ask(prompt, secret):
+            answers = queue.Queue()
+            GLib.idle_add(ask_here, prompt, secret, answers)
+            try:
+                return answers.get(timeout=300)
+            except queue.Empty:                   # nobody answered: the login is given up
+                GLib.idle_add(lambda: (shared.update(asking=None), False)[1])
+                return None
+
         def work():
-            ok, said = client.login(name, secret, session_command(session), session_env(session))
+            ok, said = client.login(name, secret, session_command(session), session_env(session), ask=ask,
+                                    tell=lambda text: GLib.idle_add(lambda: (tell(text), False)[1]))
             GLib.idle_add(done, ok, said, name, session)
         threading.Thread(target=work, daemon=True).start()
 
     def done(ok, said, name, session):
+        shared["asking"] = None
+        for b in boxes:
+            b["password"].set_placeholder_text("Password")
+            b["password"].set_visibility(shared["peek"])
         if ok:
             say(f"logged in {name}: {shlex.join(session['cmd'])}")
             remember(name, session["id"])
@@ -352,6 +408,9 @@ def run_box(config: dict, client: Greetd) -> int:
         say(f"not logged in: {said.replace(chr(10), ' / ')}")
         tell(said)
         busy(False)
+        if shared["text_after"]:
+            text_login()
+            return False
         password_text.set_text("", -1)
         for b in boxes:
             b["password"].grab_focus()
@@ -440,6 +499,8 @@ def run_box(config: dict, client: Greetd) -> int:
         boxes.append(entry)
         if shared["busy"]:
             busy(True)
+        if shared["asking"] is not None:              # a screen came while PAM asks: it asks there too
+            asking_look(entry)
         win.present()
 
     def place(*_):
@@ -454,8 +515,9 @@ def run_box(config: dict, client: Greetd) -> int:
             make(monitor)
 
     # The tests type into the box through this: a list of {"user", "password", "session", "wait"
-    # (seconds before typing)} tried in turn; {"text": true} presses Text login. An entry with
-    # "during": true comes while the login before it is still being checked.
+    # (seconds before typing)} tried in turn; {"text": true} presses Text login; {"answer"} answers
+    # what PAM asks after the password. An entry with "during": true comes while the login before
+    # it is still being checked.
     tests = json.loads(os.environ.get("SYNCRAIN_GREETER_TEST_INPUT") or "[]")
 
     def later(fn):
@@ -468,6 +530,10 @@ def run_box(config: dict, client: Greetd) -> int:
         t = tests.pop(0)
         if t.get("text"):
             text_login()
+            return False
+        if "answer" in t:
+            password_text.set_text(t["answer"], -1)
+            attempt()
             return False
         if "user" in t:
             user_text.set_text(t["user"], -1)
