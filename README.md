@@ -56,8 +56,9 @@ browser (Chromium), nix. What each needs: `docs/agent/ENVIRONMENT.md`.
 **What costs you if you get it wrong**
 
 * Only `tools/package_release.py` makes an archive and writes `BUILD_NUMBER`. No version strings.
-* The stream is frozen: a change to a shader, a theme, the atlas, a logo or `syncrain/engine.py`
-  changes every machine's picture; `tools/stream_freeze.py --write` re-takes it, on purpose only.
+* The stream is frozen: a change to a shader, a theme, the atlas, a logo, `syncrain/engine.py` or
+  `syncrain/glyphs.py` changes every machine's picture; `tools/stream_freeze.py --write` re-takes
+  it, on purpose only.
 * Three hosts draw the same frame: the page (JavaScript), the GTK host (Python) and the native
   wallpaper (C). Change one, change all; the lanes compare them.
 * Never ask GTK for an OpenGL version (build 2 drew nothing on NVIDIA).
@@ -66,11 +67,13 @@ browser (Chromium), nix. What each needs: `docs/agent/ENVIRONMENT.md`.
 ### Layout
 
     syncrain/          app.py (options, GTK host), native.py (starts the native wallpaper), renderer.py,
-                       gl.py, pacing.py, hidden.py (KWin), engine.py, build.py, diagnose.py, bench.py,
-                       power.py, cover.py, data/ (shaders, themes, atlas, logos)
+                       gl.py, pacing.py, hidden.py (KWin), engine.py, glyphs.py (symbols), build.py,
+                       diagnose.py, bench.py, power.py, cover.py, data/ (shaders, themes, atlas, logos)
+    syncrain/          the login screen: greeter.py (the box), greetd.py, greetdconf.py, handover.py,
+                       login/ (greetd's command)
     syncrain/native/   the native wallpaper in C
     web/               template.html; index.html and artifact.html are generated from it
-    nix/               package, web bundle, NixOS and home-manager modules
+    nix/               package, web bundle, NixOS and home-manager modules and their options
     tools/             package_release.py, test_suite.py, stream_freeze.py, build_web.py, build_assets.py,
                        prepare_environment.sh
     tests/             one folder per lane; fixtures/stream_freeze.json

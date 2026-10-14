@@ -8,23 +8,22 @@ Rules learned by shipping their opposite, one line each. When and how: `docs/HIS
   NVIDIA. Take what comes and check it.
 * **Force the failures the sandbox can't have.** Mesa hides what NVIDIA refuses, so the lanes run
   OpenGL ES only, desktop OpenGL only, and none.
-* **A wallpaper that cannot draw leaves at once**, with status 69, which the service won't restart.
 * **On a fast card the watts are a frame count**: about 0.17 J a frame per screen. Fewer frames
   save power; faster code or fewer pixels barely do.
+* **Compare watts within one sweep**: a row moves by a watt or more from run to run.
 * **Copies cost more than drawing**: GTK's Vulkan hand-over cost 25.5 W, its OpenGL path 10.6 W.
-* **A language buys memory and processor time, not watts**: in C, 123 MiB and 0.9% of a core;
-  Python and GTK, 205 MiB and 4.7%; the card's watts the same.
-* **Memory is mostly what a program loads** (interpreter, toolkit, driver); syncrain's own state is a
-  few MiB.
+* **A language buys memory and processor time, not watts**: C 123 MiB and 0.9% of a core, Python
+  and GTK 205 MiB and 4.7%. Most of either is what the program loads; syncrain's own state is a few MiB.
 * **GTK shares GL objects between all contexts of a display**: delete a widget's own objects when it
   goes, or every screen change leaks (build 7: 120 MiB each).
 * **GTK 4.16+ sends GLArea frames out as dmabufs and back in**, unless `GDK_DISABLE=dmabuf`.
-* **A cold shader cache leaves memory in the heap** until it is handed back (`malloc_trim` after the
-  first frames).
+* **The C heap keeps freed memory until asked** (`malloc_trim`): memory that falls by itself was
+  freed, not leaked; a cold shader cache leaves tens of MiB there.
 * **NVIDIA's Wayland driver leaks a fixed amount per frame with explicit sync on**; flat on Mesa.
   `__NV_DISABLE_EXPLICIT_SYNC=1` stops it.
 * **C that must match Python must do Python's arithmetic**: float `//`, `round`, the order of
   operations. Compare both, printed exactly.
+* **Python rounds halves to even, JavaScript up**: say which, in both, when the two must agree.
 
 ## Frame timing
 
@@ -45,38 +44,41 @@ Rules learned by shipping their opposite, one line each. When and how: `docs/HIS
   `Scripting.start` runs them all.
 * **A KWin script runs on KWin's main thread**: read the cheap properties first.
 * **`QTimer.start()` restarts a running timer**: start it only when it is idle.
-* **Exit with status 1 when the compositor goes**, as GTK does, or the service never restarts you.
 * **gtk4-layer-shell must load before libwayland-client.**
 * **A Qt program sets the locale**: `strtod` then reads "0x1.8p-1" by Dutch rules. Parse numbers
   in the C locale (`c_strtod`).
-* **GTK waits seconds for the desktop portal** where there is none (a login screen):
-  `GDK_DEBUG=no-portals`.
+* **A toolkit's item inside someone else's shell breaks where no lane can see** (builds 13 and 14's
+  Plasma wallpaper). Our own program, on our own surface, holds up.
+* **One screen that never draws must not hold up what all screens share** (the memory trim).
+
+## The login screen
+
+* **GTK waits seconds for the desktop portal** where there is none: `GDK_DEBUG=no-portals`.
 * **greetd's PAM does not open KDE's wallet**; SDDM's does. Add its lines, as SDDM has them.
-* **root copying a user's file follows the user's links**, and `chmod -R` follows a link it is
-  given by name: the user reads, root only writes, into a folder root made.
-* **A record of what to put back lives outside what gets removed**, goes last, and counts only
-  while what replaced it still runs. Without one, leave things as they are rather than guess.
 * **greetd joins a command's words with spaces and has sh run them**: send one word, quoted for sh.
 * **greetd signals the greeter alone**: a greeter that starts a compositor in its own session
   stops it on SIGTERM.
-* **A shared folder such as /tmp is no fallback for state**: any user can leave a file there.
-* **Change only your part of someone else's config** (greetd's `[default_session]`), and write to
-  the PAM service it names, not the one you expect.
 * **PAM may ask more than once**: answer the first password prompt with the password and show
   the rest, in its own words.
-* **One screen that never draws must not hold up what all screens share** (the memory trim).
-* **Python rounds halves to even, JavaScript up**: say which, in both, when the two must agree.
+* **Change only your part of someone else's config** (greetd's `[default_session]`), and write to
+  the PAM service it names, not the one you expect.
+* **root copying a user's file follows the user's links**, and `chmod -R` follows a link it is
+  given by name: the user reads, root only writes, into a folder root made.
+* **A shared folder such as /tmp is no fallback for state**: any user can leave a file there.
+* **A record of what to put back lives outside what gets removed**, goes last, and counts only
+  while what replaced it still runs. Without one, leave things as they are rather than guess.
 
 ## Launching, services, releases
 
 * **`python -m` puts the current directory first**: the launcher sets `PYTHONSAFEPATH=1`.
 * **systemd unescapes inside single quotes**: double each `\`, `%` and `$`, then quote.
+* **With RestartSec=3, systemd's start limit never trips**: every status a restart cannot change
+  (2, 69, 70, 78) goes in RestartPreventExitStatus, or the service retries it for good.
+* **Exit with status 1 when the compositor goes**, as GTK does, or the service never restarts you.
 * **"syncrain" in a command line is not a syncrain**: read the argument list.
 * **Two trees under one name is what build numbers prevent.**
 * **A reviewer who didn't write the build finds what the gate can't.**
 * **Generated files go stale silently**: the release regenerates them and the gate compares.
-* **With RestartSec=3, systemd's start limit never trips**: every status a restart cannot change
-  goes in RestartPreventExitStatus, or the service retries it for good.
 * **The lanes run a newer Python than pyproject.toml promises**: f-strings changed in 3.12, so a
   test reads the app as 3.10 and 3.11 do.
 
@@ -87,16 +89,12 @@ Rules learned by shipping their opposite, one line each. When and how: `docs/HIS
 * **Atlas lookups need explicit gradients**, or cell edges pick the wrong mip level.
 * **Integer hashing is the only randomness bit-exact on every GPU.**
 * **A loop shows on a wallpaper within seconds** (the GIFs before build 1).
-* **A toolkit's item inside someone else's shell breaks where no lane can see**: builds 13 and 14's
-  Plasma wallpaper passed every lane and a real shell in an Arch root, and broke on the operator's
-  desktop. Our own program, on our own surface, is what holds up there.
+* **A frame is a function of the clock**: for a fault seen on screen, ask for the minute, and draw
+  that moment again.
 
 ## The sandbox
 
-* It restarts and keeps only files; the lanes start their own displays.
-* `pkill -f` and `pgrep -f` match their own shell; stop processes by PID.
+The traps of the sandbox itself: `docs/agent/ENVIRONMENT.md`.
+
 * A script named after a standard module replaces it.
 * A heredoc ends at its terminator, even inside the text; tool parameters decode JSON escapes.
-* Two cores and software rendering: keep timing tests small.
-* A Unix socket path over 108 bytes fails: keep runtime directories short.
-* A clean Arch has no `make`: CMake needs it named (build 13 found it in an Arch root).

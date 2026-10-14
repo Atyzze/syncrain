@@ -10,12 +10,11 @@ Where syncrain runs. The build sandbox: `docs/agent/ENVIRONMENT.md`.
   screens on).
 * syncrain there (sweep of build 8, 2026-10-09): 123 MiB and 0.9% of a core at 30 fps; +11.9 W at
   30 fps, +7.3 W at 20, +3.5 W at 15; 0 W behind a covering window; 97 to 100% even and steady.
-* Builds 8 to 10 grew about 0.9 MiB a minute while drawing (btop: 154 MiB after 44 minutes, 200
-  after about 90). Build 11 (explicit sync off): 110 MiB at start, 225 after 18 h and slowing, then
-  170 at once, so most of it was freed memory not yet handed back. Build 12 hands it back every
-  five minutes; not yet seen there.
-* They start syncrain from a terminal (fish). Builds 13 and 14's Plasma wallpaper was "severely
-  broken" there (2026-10-11); build 15 removes it.
+* Memory: builds 8 to 10 grew 0.9 MiB a minute (NVIDIA's explicit sync, off since build 11); build
+  11 rose to 225 MiB in 18 h, then fell to 170 by itself: freed, not leaked. Build 12 and later hand
+  it back every five minutes; no record from there yet.
+* They started syncrain from a terminal (fish). Builds 13 and 14's Plasma wallpaper was "severely
+  broken" there (2026-10-11).
 * On Plasma syncrain takes the bottom layer and covers the desktop icons; "show desktop" hides it.
 * Login screen: Plasma Login (`plasmalogin.service`, not SDDM). Build 16's `install.sh
   --login-screen` replaced it with greetd on 2026-10-13 (greeter UID 939); `--login-screen-off`

@@ -20,7 +20,8 @@ git clone https://github.com/Atyzze/syncrain && cd syncrain   # or unpack SYNCRA
 * Packages: `python python-gobject python-cairo python-pillow gtk4 gtk4-layer-shell`, plus
   `gcc pkgconf wayland dbus` to build the native wallpaper. If that build fails, the installer says
   why and Python and GTK draw instead.
-* `--theme`, `--channel`, `--rainbow` and `--arg ...` (repeatable) go into the autostart service.
+* `--theme`, `--channel`, `--rainbow` and `--arg ...` (repeatable) go into the autostart service and
+  the login screen's rain. Also `--prefix DIR`, `--no-deps`, `--yes`; `./install.sh --help`.
 * Builds 13 and 14's Plasma wallpaper (dropped in build 15) is removed by any later install.
 * The login screen is optional. Until `--login-screen` is run, the installer never touches how the
   machine logs in: installing, upgrading and removing the wallpaper leave the display manager,
@@ -28,10 +29,9 @@ git clone https://github.com/Atyzze/syncrain && cd syncrain   # or unpack SYNCRA
 * `--login-screen`: greetd instead of SDDM (or Plasma Login); the rain and the same box on every
   screen, then Plasma, with its splash and wallpaper a still frame of the rain. Only greetd's
   `[default_session]` changes; what PAM asks after the password (a second factor) is asked in the
-  box. If it fails (or
-  after "Text login" in the box), greetd's text login asks. What started at boot before is kept in
-  `/etc/greetd/display-manager.before-syncrain`. The installs of the user who set it up keep it
-  current, and their `--uninstall` takes it out; other users' installs leave it alone.
+  box. If it fails (or after "Text login" in the box), greetd's text login asks. What started at
+  boot before is kept in `/etc/greetd/display-manager.before-syncrain`. The installs of the user
+  who set it up keep it current, and their `--uninstall` takes it out; other users' leave it alone.
 * Back: `./install.sh --login-screen-off` puts back what started at boot before (SDDM, Plasma Login,
   greetd's own login, or none) and greetd's config and PAM file. A display manager picked since
   stays; one removed since leaves greetd with its own config; if systemctl fails otherwise, running
@@ -39,7 +39,7 @@ git clone https://github.com/Atyzze/syncrain && cd syncrain   # or unpack SYNCRA
 * From a text console (Ctrl+Alt+F3), with SDDM or Plasma Login recorded: `sudo systemctl enable
   --force` and its unit, then `sudo reboot`. `--diagnose` shows the record and the last starts.
 * Upgrading: run the newer `./install.sh`; it names the build it replaces and restarts the
-  wallpaper. `syncrain --build` says what is installed.
+  autostart service if it runs. `syncrain --build` says what is installed.
 
 **NixOS** (flake): `services.syncrain = { enable = true; theme = "nixos"; channel = "public"; };`
 with `syncrain.nixosModules.default` (or `homeManagerModules.default`). Options: `enable`,
@@ -73,18 +73,18 @@ web-wallpaper plugin can host it, behind the desktop icons.
 | `--spin S` | `180` | Seconds per logo turn; 0 = still |
 | `--drift F` | `0.03` | Logo orbit (or image pan) in screen heights; 0 = fixed |
 | `--bg-gain F` | `1` | Background brightness; lower is darker (0.42 with `--background`) |
-| `--glow F` | `1` | Glow around the centre and the logo; 0 = none |
-| `--bloom F` | `1` | Glow around the falling symbols; 0 = none |
+| `--glow F` | `1` | Glow around the centre and the logo, 0 (none) to 2 |
+| `--bloom F` | `1` | Glow around the falling symbols, 0 (none) to 2 |
 | `--speed F` | `1` | Fall speed, 0.25 to 4 |
 | `--density F` | `1` | How often a column starts a stream, 0 to 2.3 |
 | `--snow` | `on` | `off`: no falling snowflakes |
 | `--hieroglyphs F` | sets' | Share of the changing symbols that are Egyptian hieroglyphs (the themes: 0.15) |
 | `--glyphs FILE` | see below | A symbols file; `theme` for the theme's own symbols |
 | `--write-glyphs` | - | Write a starter symbols file (a bit of everything) and exit |
-| `--scale` | `1.0` | Render resolution scale (0.75 on a weak GPU) |
+| `--scale` | `1.0` | Render resolution scale, up to 4 (0.75 on a weak GPU) |
 | `--layer` | auto | `background` or `bottom`; auto is `bottom` on KDE |
 | `--window` | - | A normal window instead of the wallpaper |
-| `--size WxH` | `1280x720` | Size for `--window`, `--record` and `--benchmark` |
+| `--size WxH` | `1280x720` | Size for `--window` and `--record`; for `--benchmark` (default: the first screen) |
 | `--offset S` | `0` | Add S seconds to the clock |
 | `--time T` | - | Freeze the clock at UNIX time T |
 | `--screenshot PNG` | - | Draw one frame, save it, exit |
@@ -123,8 +123,9 @@ syncrain sets `__NV_DISABLE_EXPLICIT_SYNC=1` and `__GL_YIELD=USLEEP` for itself 
 
 ## When it does not draw
 
-`syncrain --diagnose`, inside the desktop session: a verdict first, then the session, libraries,
-cards, OpenGL, screens, the native wallpaper and, on KDE, KWin's answer about covered screens. If
+`syncrain --diagnose`, inside the desktop session: a verdict first, then the session, running
+wallpapers, symbols, the login screen, cards, libraries, screens, OpenGL, covered screens (on
+Wayland; KWin's answer on KDE) and the native wallpaper. If
 OpenGL cannot start, syncrain exits with status 69. The service does not retry that, nor 2 (no
 wallpaper layer, or an option it cannot use), 70 (a native wallpaper from another build) or 78 (a
 picture or font it cannot use).

@@ -45,25 +45,31 @@ against burn-in; nothing flashes.
   `execve`s the program: same pid, no Python or GTK left. One EGL context for every screen,
   layer-shell surfaces, frames paced like GTK's (presentation feedback and frame callbacks). What a
   frame computes on the processor is ported from Python bit for bit (`tests/native/`). A failure
-  before the first frame hands over to the GTK host; a lost compositor, or 5 s without a frame
-  shown, exits with status 1 so the service restarts it.
+  before the first frame hands over to the GTK host; a lost compositor, or 5 s of frames that
+  cannot be shown, exits with status 1 so the service restarts it.
 * **GTK host** (`syncrain/app.py`, `syncrain/renderer.py`): X11, windows, `--screenshot`,
   `--record`, and the fallback. A GLArea per viewport, OpenGL through libepoxy (`syncrain/gl.py`),
   `GSK_RENDERER=gl` and `GDK_DISABLE=dmabuf`.
 * **Web page** (`web/template.html`): WebGL2; `tools/build_web.py` generates `web/index.html` and
   `web/artifact.html`.
 
-**The login screen** (`syncrain/login/`, `syncrain/greeter.py`, `syncrain/greetd.py`): greetd runs
-`login.sh` as its user `greeter`; that runs KWin, and in it the native wallpaper and a GTK box on the
-overlay layer, one per screen sharing what is typed. The box speaks greetd's IPC (JSON over its socket); greetd checks the password (PAM)
-and starts the session once KWin is gone. No login, no marker file: `login.sh` hands over to
-greetd's text login. Installed to `/usr/local/lib/syncrain`, logs in `/var/lib/syncrain-login`.
-After the login, Plasma's splash and wallpaper show a still frame of the rain (`syncrain/handover.py`).
-Only `install.sh --login-screen` puts any of it there, with a record of what started at boot
-before (`/etc/greetd/display-manager.before-syncrain`) that `--login-screen-off` goes back to.
-
 The lanes compare them: native and GTK host to the pixel (at whole-number scales; at 125% or 150%
-GTK draws more pixels and scales them down), the page within texture filtering.
+GTK draws more pixels and scales them down), the page within texture filtering on screens
+wider than about 900 px (open item L12).
+
+## The login screen (`syncrain/login/`, `syncrain/greeter.py`, `syncrain/greetd.py`)
+
+* greetd runs `login.sh` as its user `greeter`; that runs KWin, and in it the native wallpaper and a
+  GTK box on the overlay layer, one per screen sharing what is typed.
+* The box speaks greetd's IPC (JSON over its socket): the password to PAM's first prompt, further
+  prompts shown in the box. greetd checks it and starts the session once KWin is gone.
+* No login (no marker file): `login.sh` hands over to greetd's text login.
+* Installed to `/usr/local/lib/syncrain` (root's files), state and logs in `/var/lib/syncrain-login`,
+  the greeter's settings fresh at every start. Only greetd's `[default_session]` changes
+  (`syncrain/greetdconf.py`).
+* After the login, Plasma's splash and wallpaper show a still frame of the rain (`syncrain/handover.py`).
+* Only `install.sh --login-screen` puts any of it there, with a record of what started at boot
+  before (`/etc/greetd/display-manager.before-syncrain`) that `--login-screen-off` goes back to.
 
 ## When a frame is drawn (`syncrain/pacing.py`, `syncrain/native/timing.c`)
 
@@ -90,8 +96,9 @@ which screens a maximized or full-screen window covers; those stop drawing until
 ## Builds and the stream (`syncrain/build.py`)
 
 * `BUILD_NUMBER` is the only identity; there are no versions.
-* The stream id is the start of a SHA-256 over the files that decide the picture;
-  `tests/fixtures/stream_freeze.json` freezes it.
+* The stream id is the start of a SHA-256 over `STREAM_FILES` (`syncrain/engine.py`,
+  `syncrain/glyphs.py`, `syncrain/data/`); `tests/fixtures/stream_freeze.json` freezes it. Not yet
+  covered: the hosts' geometry and the page (open item L20, `docs/ROADMAP.md`).
 
 ## Packaging and release
 

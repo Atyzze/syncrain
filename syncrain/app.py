@@ -1,4 +1,6 @@
-"""syncrain native wallpaper: GTK4 + OpenGL (or OpenGL ES, whichever GTK hands out).
+"""syncrain's options, and its GTK host: GTK4 + OpenGL (or OpenGL ES, whichever GTK hands out).
+
+On Wayland the native wallpaper (syncrain/native.py) draws instead where it is built.
 
 Wayland: one layer-shell surface per monitor (via gtk4-layer-shell); works on Hyprland, Sway,
          niri, river, Wayfire, labwc, COSMIC and KDE Plasma.

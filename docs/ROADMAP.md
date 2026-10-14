@@ -17,50 +17,35 @@ Open questions, planned builds, the cadence and the constraints. What shipped: `
   the json config file, if then applied with that exported json, it should look exactly like it
   did in the html previewer"; "fix the bugs first of course". Builds 19 and 21 (20 is the
   consolidation).
-
 * **2026-10-14 12:10**: a full review of build 17; "Yes, make build 18 please" with M1 to M3 and
   the one-line fixes; on GitHub, "makes sure that the login screen replacement remains fully
   optional, and that those who just want the wallpaper that their existing login method isn't
   touched". Build 18.
-
 * **2026-10-13 15:29**: build 16 works; the box on all screens, always; no Plasma logo or old
   wallpaper between the login and the rain. Build 17.
-
-* **2026-10-13 13:08**: a photo of the broken Plasma wallpaper (all white, all hieroglyphs); "yes,
-  make it" (the login screen). Build 16.
-
-* **2026-10-11 19:03**: the Plasma wallpaper "was severely broken"; "stay closer to the barebone
-  linux kernel ... our own boot sequence ... the rain ... as the login screen ... then load
-  KDE/Plasma"; greetd rather than a login manager of our own. Build 15 drops the Plasma wallpaper;
-  build 16 is the login screen.
-* **2026-10-11 18:29**: "a json config ... the exact symbol/language-set to include and what %/bias
-  if any, or all equally neutral". Build 15.
-* **2026-10-10 13:38**: "yes make build 13, the plasma plugin" (asked at 13:28 for a way to start it
-  without a terminal, and for the lock and login screens). Builds 13 and 14; the login screen is next.
-* **2026-10-10 12:29**: a darker background and less glow in the centre, parameters for speed and
-  for how many lanes spawn, the snow off, Egyptian hieroglyphs; a rare glow flare-up; memory "a
-  slowdown/plateau ... is this a non issue?", then "dropped back to 170MiB". Build 12.
-* **2026-10-09 13:07**: memory still creeps on build 8 ("Will it ever gc and go back down?"); the
-  documents: "Keep it minimal please". Builds 10 and 11.
-* **2026-10-09 11:36**: build 8 approved for GitHub; a warning before the sweep's black screens.
-  Builds 8 and 9.
-* **2026-10-09 07:05**: the smallest footprint, power first; does another language help? Build 8.
-* **2026-10-09 00:02**: build 8 delivered in the chat, on GitHub only after their trial.
-* **2026-10-08**: a documented GitHub repository.
-* **2026-10-07**: less power without losing smoothness (builds 4, 5); build numbers, not versions
-  (build 3).
-* **2026-10-06**: a turning, rainbow NixOS logo against burn-in and an Arch installer (build 2); a
-  live, never-repeating, clock-synced wallpaper (build 1).
+* Earlier answers, dated: `docs/HISTORY.md`, "The operator's words".
 
 ## Planned builds
 
 1. **The previewer page (build 21)**: every option and symbol set on the page, drawn live;
-   "Export config" saves `config.json`; the desktop reads it (`install.sh --config`, or the file
-   in `~/.config/syncrain/`) and draws the same frame. Needs the page and the desktop to agree at
-   every size and scale first (review L11, L12) and the stream id to cover all that decides the
-   picture (L20).
+   "Export config" saves `config.json`; the desktop reads it (`./install.sh --config config.json`,
+   or the file in `~/.config/syncrain/`) and draws the same frame. Needs L11, L12 and L20 first.
 2. **The boot splash**: a still frame of the rain (Plymouth), until the login screen's live one.
 3. **A NixOS image** with syncrain as its wallpaper and login screen.
+
+## Open items
+
+What the documents and the review of build 17 leave to a build that changes code.
+
+| Item | Where the fix goes |
+| --- | --- |
+| L8: KDE's wallet does not open after greetd's text login | not known yet; the wallet lines are `install.sh`'s, in greetd's PAM service |
+| L11: `--scale` below about 0.4 changes the picture | the cell size in `syncrain/renderer.py` (`geometry`), `syncrain/native/timing.c` (`geometry_compute`), `web/template.html` |
+| L12: on screens under about 900 px wide the page and the desktop differ: a cell is at least 12 device px in the hosts, 14 CSS px times the scale in the page | the same three places |
+| L20: the stream id does not cover `renderer.py`'s geometry, `native/timing.c` or `web/template.html` | `syncrain/build.py` (`STREAM_FILES`) |
+| L21: no `flake.lock`, so a Nix build takes whatever nixpkgs is current | `flake.lock` |
+| A font file name that is not UTF-8 makes a symbols file fall back to the theme's symbols | `syncrain/glyphs.py`, a stream file: waits for a build that changes the stream |
+| The page clamps `scale` to 0.25 to 3 and `fps` to 1 to 240; the command line takes `--scale` up to 4 and `--fps` up to 1000 | `web/template.html` or `syncrain/app.py`, with the previewer |
 
 ## Build cadence
 

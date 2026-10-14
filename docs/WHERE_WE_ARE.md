@@ -1,4 +1,4 @@
-# Where we are, at build 19
+# Where we are, at build 20
 
 The project on one page. Detail: `docs/agent/HANDOFF.md`.
 
@@ -14,32 +14,30 @@ name, so everyone on a channel sees the same rain. Linux (Wayland, X11) and the 
 * **Power**: about 11 W at 30 fps; the watts follow the frames, not the language.
 * **Covered screens are not drawn** (0 W behind a full-screen window), and every frame lands on
   the refresh.
-* **Memory**: build 11 grew from 110 to 225 MiB in 18 h, slowing, then fell to 170 by itself: freed
-  memory not yet handed back, not a leak. Build 12 hands it back every five minutes and keeps a
-  record; `syncrain --diagnose` shows it.
-* **Your picture options** (build 12): `--glow`, `--bloom`, `--bg-gain` (darker), `--speed`,
-  `--density`, `--snow off`, `--hieroglyphs` (0.15 by default).
+* **Memory**: freed memory goes back every five minutes, with a record; `syncrain --diagnose`
+  shows it.
+* **Your picture options**: `--glow`, `--bloom`, `--bg-gain` (darker), `--speed`, `--density`,
+  `--snow off`, `--hieroglyphs` (0.15 by default).
 * **The glow flare-up**: not in the frames syncrain computes (two hours checked). Note the time
   when you see it, and that moment can be drawn again.
-* **The Plasma wallpaper** (builds 13 and 14) broke on your desktop; build 15 removes it.
-* **Your own symbols** (build 15): `syncrain --write-glyphs`, then edit
-  `~/.config/syncrain/glyphs.json`: sets of characters (any language, your favourites), each with
-  a weight or a share.
-* **The login screen** (build 16, working on your desktop): `./install.sh --login-screen`; greetd,
-  the rain and a login box on every screen (17), then Plasma, its splash and wallpaper a still of
-  the rain (17). A failure falls back to a text login. Optional: without it the installer never
-  touches your login, and `--login-screen-off` puts back what started at boot before (18).
-* **A review of build 17**: builds 18 and 19 fix its findings that matter now (a second factor at
-  the login, greetd's own settings kept, a wallpaper chosen since kept); a few small ones are open.
-* **Why the Plasma wallpaper went white**: Dutch number format inside Plasma; fixed in build 16.
+* **Your own symbols**: `syncrain --write-glyphs`, then edit `~/.config/syncrain/glyphs.json`: sets
+  of characters (any language, your favourites), each with a weight or a share.
+* **The login screen** (working on your desktop): `./install.sh --login-screen`; greetd, the rain
+  and a login box on every screen (a second factor asked there too), then Plasma, its splash and
+  wallpaper a still of the rain. A failure falls back to a text login. Optional: without it the
+  installer never touches your login, and `--login-screen-off` puts back what started at boot.
+* **A review of build 17**: builds 18 and 19 fixed what matters now; a few small items are open
+  (`docs/ROADMAP.md`, "Open items").
+* **Build 20** changes nothing on screen: the documents are checked against the code and short
+  again.
 * **On GitHub**: github.com/Atyzze/syncrain, every build up to 19.
 
 ## What comes next
 
-* **Build 20**: consolidation (documents only, every number ending in 0).
-* **Build 21**: the page as a live previewer of every option and symbol set, exporting a config
-  file the desktop draws exactly alike.
+* **Build 21**: the page as a live previewer of every option and symbol set, exporting a
+  `config.json` the desktop draws exactly alike.
 * **Then**: the boot splash; a NixOS image.
+* **Build 30**: the next consolidation (every number ending in 0).
 
 ## The decision in front of you
 
