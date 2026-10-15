@@ -27,8 +27,18 @@
         syncrain-web = final.callPackage ./nix/web.nix { };
       };
 
-      nixosModules.default = import ./nix/nixos-module.nix self;
+      # keyed, so a configuration that imports both (backdrop imports default) gets it once
+      nixosModules.default = { key = "syncrain"; imports = [ (import ./nix/nixos-module.nix self) ]; };
+      # the flavour: Plasma 6 with the rain as wallpaper, login screen and lock screen
+      nixosModules.backdrop = { key = "syncrain-backdrop"; imports = [ self.nixosModules.default ./nix/backdrop.nix ]; };
       homeManagerModules.default = import ./nix/hm-module.nix self;
+
+      # nix flake init -t github:Atyzze/syncrain: a NixOS desktop with syncrain backdrop
+      templates.default = {
+        path = ./nix/template;
+        description = "A NixOS desktop with syncrain backdrop: the rain as wallpaper, login screen and lock screen";
+        welcomeText = "Copy /etc/nixos/hardware-configuration.nix here, change the lines marked CHANGE in configuration.nix, git add, then: sudo nixos-rebuild switch --flake .#backdrop";
+      };
 
       # `nix flake check` evaluates a NixOS system with the service enabled
       checks = forAllSystems (pkgs:

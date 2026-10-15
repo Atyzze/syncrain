@@ -163,6 +163,8 @@ which screens a maximized or full-screen window covers; those stop drawing until
   optional systemd user service.
 * `nix/package.nix`: the package (the native wallpaper and the login screen's Python in `libexec/`),
   with NixOS and home-manager modules beside it; the NixOS module also builds the login screen's
-  folder (greetd's command) and points KWin at the lock screen (`nix/lockscreen.nix`).
+  folder (greetd's command) and points KWin at the lock screen (`nix/lockscreen.nix`);
+  `nix/backdrop.nix` is the flavour (Plasma 6 with all of it) and `nix/template/` the flake
+  `nix flake init -t` makes from it.
 * `tools/package_release.py`: bump, rebuild the pages, run every lane, stamp the notes, write
   `SYNCRAIN<N>.tar.zst`.

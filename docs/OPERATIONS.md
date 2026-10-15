@@ -87,6 +87,11 @@ git clone https://github.com/Atyzze/syncrain && cd syncrain   # or unpack SYNCRA
 `nix/options.nix` (some ranges are narrower than the command line's: `scale` up to 1, `fps` up to
 240). Without installing: `nix run github:Atyzze/syncrain -- --window`.
 
+**The flavour**: `nix flake init -t github:Atyzze/syncrain` makes a flake for a whole NixOS
+desktop (`nix/template/`: its README says the five steps): `syncrain.nixosModules.backdrop`
+(`nix/backdrop.nix`: Plasma 6, the rain as wallpaper, login screen and lock screen, SDDM off, a
+network, sound, the clock in sync; every one a default) with your hardware and boot loader.
+
 On a Plasma 6 system (`services.desktopManager.plasma6.enable`), the NixOS module also gives the
 login and lock screens:
 

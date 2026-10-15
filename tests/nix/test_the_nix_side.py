@@ -193,3 +193,27 @@ def test_the_nixos_module_sets_up_the_login_and_lock_screens(evaluated):
     assert evaluated["nixos"]["pre"] is None, "no lock screen asked for, no scene written"
     assert any("sddm.enable = false" in m for m in s["sddm"])
     assert any("services.syncrain.enable = true" in m for m in s["noWallpaper"])
+
+
+def test_the_flake_template_is_a_whole_backdrop_system(root, checkouts):
+    """`nix flake init -t github:Atyzze/syncrain`: the template's configuration with
+    syncrain.nixosModules.backdrop evaluates to a NixOS system (tests/nix/template.nix, a stand-in
+    for the machine's hardware): Plasma 6, the rain's login and lock screens, no SDDM, no Plymouth."""
+    nixpkgs, _ = checkouts
+    done = subprocess.run(["nix-instantiate", "--eval", "--strict", "--json", str(root / "tests/nix/template.nix"),
+                           "--arg", "src", str(root), "--arg", "nixpkgs", nixpkgs],
+                          capture_output=True, text=True, timeout=900)
+    assert done.returncode == 0, done.stderr[-3000:]
+    t = json.loads(done.stdout)
+    assert t["failed"] == [] and "-nixos-system-backdrop-" in t["toplevel"], t
+    assert (t["plasma"], t["sddm"], t["greetd"], t["login"], t["lock"], t["plymouth"]) == \
+        (True, False, True, True, True, False)
+    assert t["loginUser"] == "alice" and "PLASMA_DEFAULT_SHELL=org.syncrain.lockscreen" in t["kwinDropin"]
+    flake = (root / "flake.nix").read_text()
+    assert "templates.default" in flake and "path = ./nix/template;" in flake
+    assert 'key = "syncrain"' in flake and "nixosModules.backdrop" in flake
+    template = root / "nix/template"
+    assert sorted(p.name for p in template.iterdir()) == ["README.md", "configuration.nix", "flake.nix"]
+    assert "syncrain.nixosModules.backdrop" in (template / "flake.nix").read_text()
+    assert 'inputs.nixpkgs.follows = "nixpkgs"' in (template / "flake.nix").read_text()
+    assert (template / "configuration.nix").read_text().count("CHANGE") >= 4

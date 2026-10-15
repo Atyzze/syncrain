@@ -94,11 +94,22 @@ on the login screen or the desktop, it is. That clear cut is by design.
 **When it does not draw**: `syncrain --diagnose` says what this machine offers and why.
 **Remove it**: `./install.sh --uninstall` (the system's packages stay).
 
-**On NixOS**, the base it is built for: `nix run github:Atyzze/syncrain -- --window` to try it;
-the flake's NixOS module gives the wallpaper, the login screen and the lock screen
-(`services.syncrain = { enable = true; loginScreen.enable = true; lockScreen.enable = true; }`, on
-Plasma 6 with SDDM off; [`docs/OPERATIONS.md`](docs/OPERATIONS.md) has the rest), its home-manager
-module the wallpaper.
+**On NixOS**, the base it is built for: `nix run github:Atyzze/syncrain -- --window` to try it.
+The whole desktop, Plasma 6 with the rain as wallpaper, login screen and lock screen, from the
+flake's template:
+
+```sh
+mkdir ~/backdrop && cd ~/backdrop
+nix flake init -t github:Atyzze/syncrain
+cp /etc/nixos/hardware-configuration.nix .
+$EDITOR configuration.nix            # your boot loader, name and user: the lines marked CHANGE
+git init && git add . && sudo nixos-rebuild switch --flake .#backdrop
+```
+
+Or in a configuration of your own: `syncrain.nixosModules.backdrop` (the whole flavour), or
+`nixosModules.default` and `services.syncrain = { enable = true; loginScreen.enable = true;
+lockScreen.enable = true; }` ([`docs/OPERATIONS.md`](docs/OPERATIONS.md) has the rest); the
+home-manager module gives the wallpaper.
 
 **Elsewhere**: in a browser, `index.html` alone; as a web wallpaper its URL takes the options
 (`hud=0` hides the controls). Every option, other desktops, power and recipes:

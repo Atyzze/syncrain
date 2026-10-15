@@ -12,6 +12,9 @@ Open questions, planned builds, the cadence and the constraints. What shipped: `
 
 ## Decisions answered
 
+* **2026-10-15, after build 32**: the NixOS image as a flake template ("1-click apply": `nix flake init -t`,
+  the machine's hardware, `nixos-rebuild switch`), not an installer ISO for now. Build 33.
+
 * **2026-10-15 13:37**: the name: "syncrain backdrop", "since ye its more than jsut a wallapepr, its
   also a lockscreen, a screensaver". NixOS is "the 5th paradigm of course, the default/base"; they
   run CachyOS now and will move to NixOS, where syncrain should come along as it is. Build 30
@@ -33,9 +36,8 @@ Open questions, planned builds, the cadence and the constraints. What shipped: `
 
 ## Planned builds
 
-1. **A NixOS image** (33 or later) with syncrain as its wallpaper, login screen and lock screen,
-   the base the others are written against, from the module's options (build 32): a flake with a
-   Plasma 6 system and an installer ISO, built by `nix build`; tried in a VM where one runs.
+1. **An installer ISO** of the flavour, if wanted (the operator chose the template first,
+   2026-10-15): several GB to build, and tried only where a VM runs.
 
 ## Open items
 

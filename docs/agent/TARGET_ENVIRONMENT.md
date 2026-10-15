@@ -27,7 +27,8 @@ Where syncrain runs. The build sandbox: `docs/agent/ENVIRONMENT.md`.
 The base syncrain is written for: the operator is moving there from CachyOS, and is making a NixOS
 image of their own. The flake's package and modules are built and evaluated every release
 (`tests/nix/`), and the NixOS module's login screen runs in a headless KWin there; no NixOS
-machine has booted them yet. The NixOS module gives the wallpaper, login screen and lock screen.
+machine has booted them yet. The NixOS module gives the wallpaper, login screen and lock screen;
+the flake template's whole system (Plasma 6 with all of it) builds here.
 
 ## What every target needs
 

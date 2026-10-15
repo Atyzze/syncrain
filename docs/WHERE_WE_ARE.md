@@ -1,4 +1,4 @@
-# Where we are, at build 32
+# Where we are, at build 33
 
 The project on one page. Detail: `docs/agent/HANDOFF.md`.
 
@@ -32,12 +32,15 @@ plain text by design: the text means the machine is not up yet, the rain that it
 * **NixOS** (build 32): the module gives the wallpaper, the login screen and the lock screen
   (`loginScreen.enable`, `lockScreen.enable`); its login screen runs in a headless KWin here, but
   no NixOS machine has booted it yet.
-* **On GitHub**: github.com/Atyzze/syncrain, every build up to 32.
+* **Your NixOS flavour** (build 33): `nix flake init -t github:Atyzze/syncrain`, your hardware and
+  boot loader, `nixos-rebuild switch`: Plasma 6 with the rain as wallpaper, login and lock screen.
+  The whole system builds here; no machine has booted it yet.
+* **On GitHub**: github.com/Atyzze/syncrain, every build up to 33.
 
 ## What comes next
 
-* **Next**: the NixOS image: a flake that builds a Plasma 6 system with all of it, and an installer
-  ISO, for you to try in a VM or on a spare disk; or what you find on the lock screen.
+* **Next**: what you find when you try it (the lock screen on CachyOS, the flavour on NixOS); an
+  installer ISO if you want one.
 * **Build 40**: the next consolidation (every number ending in 0).
 
 ## The decision in front of you
