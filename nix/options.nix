@@ -29,7 +29,7 @@ in
     default = null;
     description = ''
       The preset the look starts from: `syncrain` (green, 64 colours in a wave, the NixOS logo),
-      `nixos` (ice blue, snow, the NixOS logo) or `matrix` (green). Null: the settings file's, else syncrain.
+      `nixos` (ice blue, snow, the NixOS logo) or `matrix` (green, no snow). Null: the settings file's, else syncrain.
     '';
   };
 
@@ -99,9 +99,9 @@ in
   };
 
   logo = mkOption {
-    type = types.nullOr (types.either (types.enum [ "syncrain" "nixos" "nixos-colours" "white" "colours" "none" ]) types.path);
+    type = types.nullOr (types.either (types.enum [ "syncrain" "nixos" "white" "none" "nixos-colours" "colours" ]) types.path);
     default = null;
-    description = "The logo: `syncrain`, `nixos`, `nixos-colours`, `none` or a picture (null: the preset's).";
+    description = "The logo: `syncrain`, `nixos`, `none` or a picture (null: the preset's). `nixos-colours`, gone in build 28, draws `nixos`.";
   };
 
   logoColor = mkOption {
@@ -188,7 +188,7 @@ in
   snow = mkOption {
     type = types.nullOr types.bool;
     default = null;
-    description = "The falling snowflakes (null: the preset's, on for nixos, off for syncrain and matrix).";
+    description = "The falling snowflakes (null: the preset's, on for syncrain and nixos, off for matrix).";
   };
 
   hieroglyphs = mkOption {

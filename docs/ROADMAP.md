@@ -12,6 +12,13 @@ Open questions, planned builds, the cadence and the constraints. What shipped: `
 
 ## Decisions answered
 
+* **2026-10-15 12:52**: "the functionality where the user can generate a .gif or .mp4 as
+  recorded/set by their index.html preferences", "a loop, a static one ... just displayed as a
+  video", keeping "the native real dynamic channel"; and GitHub explaining the main functionality and
+  how to install. Build 29 (below); the README rewritten in 28.
+* **2026-10-15 12:49**: "this 'nixos colours' option doesnt seem to do anything meaningful, get rid
+  of it"; their new settings file as the default; the README "well instructed" and matching it;
+  "any other issues". Build 28.
 * **2026-10-15 10:45**: on the lock screen, the box hidden until "recent key input or mouse
   movement", gone again "after a minute of inactivity", and typing in any box updates all of them,
   "so it never matters which screen is visible". Build 27.
@@ -49,7 +56,12 @@ Open questions, planned builds, the cadence and the constraints. What shipped: `
 
 ## Planned builds
 
-1. **A NixOS image** with syncrain as its wallpaper and login screen.
+1. **A video of the look** (29): the page's "Save video" renders the current settings frame by
+   frame and crossfades the end into the start, so it loops seamlessly (WebM, MP4 where the browser
+   encodes it); `syncrain --video FILE --seconds N --size WxH` the same with ffmpeg (MP4, and GIF
+   for small previews). Measure a video wallpaper's watts against the live rain's on their machine
+   before claiming it uses less.
+2. **A NixOS image** with syncrain as its wallpaper and login screen.
 
 ## Open items
 

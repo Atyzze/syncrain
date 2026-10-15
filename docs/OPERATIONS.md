@@ -76,7 +76,7 @@ the session's environment.
 
 **Browser**: `index.html` at the top of the folder, one self-contained file; Settings tries every
 option live and saves them for the desktop (below). As a wallpaper page, URL parameters: `preset`,
-`channel`, `fps`, `logo` (`syncrain`, `nixos`, `nixos-colours`, `none`), `logo-size`, `logo-cycle`, `cycle`, `flavours`, `flavour-layout`,
+`channel`, `fps`, `logo` (`syncrain`, `nixos`, `none`), `logo-size`, `logo-cycle`, `cycle`, `flavours`, `flavour-layout`,
 `vignette`, `spin`, `drift`, `speed`, `density`, `glow`, `bloom`, `bg-gain`, `snow=off`,
 `hieroglyphs`, `scale`, `hud=0` (no control strip or settings), `t=<unix seconds>` (frozen clock).
 A Plasma web-wallpaper plugin can host it, behind the desktop icons.
@@ -97,7 +97,7 @@ A Plasma web-wallpaper plugin can host it, behind the desktop icons.
 | `--cycle S` | preset's | Seconds a turn of the colour wheel, every flavour together (an RGB keyboard's rainbow); 0 = the colours stay |
 | `--background-colors C,C,C` | preset's | The background gradient: top, bottom, centre glow |
 | `--vignette F` | preset's | How much darker the corners are, 0 to 1 |
-| `--logo` | preset's | `syncrain`, `nixos`, `nixos-colours`, `none`, or a picture file (PNG or JPEG) |
+| `--logo` | preset's | `syncrain`, `nixos`, `none`, or a picture file (PNG or JPEG) |
 | `--logo-color C` | its own | One colour over the logo's shape, any logo or picture; `own` for its own colours |
 | `--logo-size F` | preset's | The logo's height in screen heights, 0.05 to 0.9 |
 | `--logo-cycle S` | preset's | Seconds a turn of the logo's rainbow (over its colour); 0 = its own colours |
@@ -112,7 +112,7 @@ A Plasma web-wallpaper plugin can host it, behind the desktop icons.
 | `--bloom F` | `1` | Glow around the falling symbols, 0 (none) to 2 |
 | `--speed F` | `1` | Fall speed, 0.25 to 4 |
 | `--density F` | `1` | How often a column starts a stream, 0 to 2.3 |
-| `--snow` | preset's | `on` or `off`: the falling snowflakes (on for nixos, off for matrix) |
+| `--snow` | preset's | `on` or `off`: the falling snowflakes (on for syncrain and nixos, off for matrix) |
 | `--hieroglyphs F` | sets' | Share of the changing symbols that are Egyptian hieroglyphs (the presets: 0.15) |
 | `--config FILE` | see below | A settings file (the web page saves one); `none` for none. Options given go over it |
 | `--check-config` | - | Read the settings file and the options, say what they come to, exit (2 if wrong) |

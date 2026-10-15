@@ -1,4 +1,4 @@
-# Where we are, at build 27
+# Where we are, at build 28
 
 The project on one page. Detail: `docs/agent/HANDOFF.md`.
 
@@ -35,15 +35,16 @@ name, so everyone on a channel sees the same rain. Linux (Wayland, X11) and the 
 * **Your own look** (build 22): the rain's colours, how many at once (each column its own, by the
   channel or as a wave), a colour cycle like an RGB keyboard's, the background, any picture as the
   logo, the hidden words. Presets to start from: **Syncrain** (your look, the default: your settings file of
-  2026-10-14 22:33, build 24), NixOS and Matrix; your redrawn logo stays a choice (`--logo syncrain`).
-  One colour over any logo (build 23).
+  2026-10-15 12:49, build 28: snow on, a bigger NixOS logo), NixOS and Matrix; your redrawn logo
+  stays a choice (`--logo syncrain`); the NixOS colours logo is gone. One colour over any logo.
 * **A review of build 17**: builds 18 and 19 fixed what matters now; a few small items are open
   (`docs/ROADMAP.md`, "Open items").
-* **On GitHub**: github.com/Atyzze/syncrain, every build up to 27.
+* **On GitHub**: github.com/Atyzze/syncrain, every build up to 28.
 
 ## What comes next
 
-* **Next**: what you find on the lock screen; else an open item, or a NixOS image. No boot splash:
+* **Next**: a video of your look from the page or the command line, looping seamlessly (29); then
+  what you find on the lock screen, an open item, or a NixOS image. No boot splash:
   the boot stays plain text, as you set it.
 * **Build 30**: the next consolidation (every number ending in 0).
 

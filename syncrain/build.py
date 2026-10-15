@@ -53,7 +53,6 @@ STREAM_FILES = (
     "data/themes.json",
     "data/glyphs.png",
     "data/logo-white.png",
-    "data/logo-colours.png",
     "data/logo-syncrain.png",
     "data/shaders/common.glsl",
     "data/shaders/state.frag",

@@ -1,45 +1,68 @@
 # syncrain
 
-A live code-rain wallpaper that never loops and stays in sync across machines: every frame is a
-function of the UTC clock and a channel name. Your colours (one, or many at once, cycling like an
-RGB keyboard), your logo and your symbols, starting from a preset: **syncrain** (the default: 64
-colours at once, a rainbow across the screen turning every 440 s, the NixOS logo in a turning rainbow,
-black behind), **nixos** (blue rain, snow, the NixOS snowflake)
-or **matrix** (green). A wallpaper on Linux (Wayland, X11) and a web page.
+A live code-rain wallpaper that never repeats and stays in sync across machines. Every frame is
+worked out from the UTC clock and a channel name, so everyone on the same channel sees the same
+rain at the same moment, and it never loops. It runs as your desktop wallpaper on Linux (Wayland
+and X11, KDE Plasma included; on GNOME only in a window or the page), optionally as your login and
+lock screen, and as a web page.
 
 <p align="center">
-  <img src="docs/images/syncrain.jpg" width="49%" alt="The syncrain preset: katakana, digits and hieroglyphs falling in columns over black, the colours in a rainbow wave across the screen, around the NixOS snowflake in rainbow colours">
-  <img src="docs/images/nixos.jpg" width="49%" alt="The nixos preset: pale blue characters and Egyptian hieroglyphs falling in columns over dark blue, with snowflakes and the NixOS snowflake in rainbow colours in the middle">
+  <img src="docs/images/syncrain.jpg" width="49%" alt="The default look: katakana, digits and Egyptian hieroglyphs falling in columns over black with snow, the columns in a rainbow wave across the screen, the NixOS snowflake in rainbow colours in the middle">
+  <img src="docs/images/nixos.jpg" width="49%" alt="The nixos preset: pale blue characters and hieroglyphs falling over dark blue, with snowflakes and the NixOS snowflake in rainbow colours in the middle">
 </p>
-<p align="center"><sub>The channel <code>public</code> at 2026-10-07 00:00:07 UTC.
-<code>syncrain --window --time 1791331207</code> draws that moment on any machine.</sub></p>
+<p align="center"><sub>Left, the default; right, the nixos preset. Channel <code>public</code> at 2026-10-07
+00:00:07 UTC: <code>syncrain --window --time 1791331207</code> draws that moment on any machine.</sub></p>
 
-## Try it
+## What you get
 
-Arch, CachyOS, EndeavourOS, Manjaro:
+* **The default look** (the `syncrain` preset): katakana, digits and hieroglyphs with white-hot
+  tails, 64 colours at once in a rainbow wave across the screen that turns once every 440 s, the
+  NixOS snowflake in the middle in its own turning rainbow, snow, on black. Hidden words (`AI`,
+  `NEURAL`, `MATRIX` and more) fall now and then.
+* **Two more presets**: `nixos` (ice blue, snow) and `matrix` (classic green). Every colour,
+  speed, the logo (or a picture of your own), the symbols and the words can be changed.
+* **Your desktop wallpaper**: a small native program (under 1% of a core, and about 11 W at 30 fps
+  on two screens of the operator's RTX 5090, measured before the default had snow); on KDE Plasma a
+  screen under a full-screen or maximized window is not drawn at all.
+* **Optional**: the rain as your login screen (greetd, with a login box on every screen) and as
+  KDE Plasma's lock screen (the rain stays live; the box appears when you move the mouse or press
+  a key, and is the same on every screen). Without asking for them, the installer leaves both alone.
+* **The web page** (`index.html`): the same rain in a browser, and a Settings panel to try every
+  option live and save it as `config.json` for the desktop.
+
+## Install (Arch, CachyOS, EndeavourOS, Manjaro)
 
 ```sh
 git clone https://github.com/Atyzze/syncrain && cd syncrain
-./install.sh                 # pacman packages, then the app in ~/.local
-syncrain --window            # in a window
-syncrain                     # as your wallpaper (Ctrl+C stops it)
-./install.sh --autostart     # start it with every login
-./install.sh --login-screen  # optional: also the login screen (greetd)
-./install.sh --lock-screen   # optional, KDE Plasma 6: also the lock screen
+./install.sh                 # pacman packages (asks for sudo once), then everything in ~/.local
+syncrain --window            # try it in a window
+./install.sh --autostart     # the wallpaper, started with every login
 ```
 
-**Try every setting first**: open `index.html` (next to `install.sh`), press Settings, move anything
-and watch the rain change, then Save config.json and run `./install.sh --config config.json`. The
-desktop draws what the page showed.
+A release archive (`SYNCRAIN<N>.tar.zst`) works the same: unpack it and run `./install.sh` from the
+folder. Running a newer build's `./install.sh` upgrades in place and restarts the wallpaper.
 
-* **The login screen is optional**: without `--login-screen` the installer leaves yours as it is,
-  and `./install.sh --login-screen-off` puts it back.
-* **So is the lock screen**: `--lock-screen` gives KDE Plasma's own locker the rain and syncrain's
-  box (from your next login); `./install.sh --lock-screen-off` gives Plasma's back.
-* **NixOS**: `nix run github:Atyzze/syncrain -- --window`; the flake has NixOS and home-manager modules.
-* **Browser**: open `index.html`; as a web wallpaper, its URL takes the options (`hud=0` hides the controls).
+**Make it yours**: open `index.html` in a browser, press Settings, change anything and watch the
+rain follow, then Save config.json and run `./install.sh --config config.json`. The desktop draws
+exactly what the page showed.
 
-Options, other systems, power and recipes: [`docs/OPERATIONS.md`](docs/OPERATIONS.md).
+**Login and lock screen** (both optional, both undone exactly):
+
+```sh
+./install.sh --login-screen      # the rain and a login box at boot (greetd); --login-screen-off undoes it
+./install.sh --lock-screen       # KDE Plasma 6: the rain behind your lock screen box; --lock-screen-off undoes it
+```
+
+After `--lock-screen`, log out and back in once. Should the lock screen ever not unlock:
+Ctrl+Alt+F3, log in, `loginctl unlock-sessions`, then `./install.sh --lock-screen-off`.
+
+**When it does not draw**: `syncrain --diagnose` says what this machine offers and why.
+**Remove it**: `./install.sh --uninstall` (the pacman packages stay).
+
+**Elsewhere**: on NixOS, `nix run github:Atyzze/syncrain -- --window`, and the flake has NixOS and
+home-manager modules. In a browser, `index.html` alone; as a web wallpaper its URL takes the options
+(`hud=0` hides the controls). Every option, other desktops, power and recipes:
+[`docs/OPERATIONS.md`](docs/OPERATIONS.md).
 
 ## Working on syncrain
 

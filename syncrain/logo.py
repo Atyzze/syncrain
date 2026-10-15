@@ -15,8 +15,10 @@ import io
 import os
 
 #: The shipped logos by the names the settings use, and by the files' own names.
-SHIPPED = {"nixos": "white", "nixos-colours": "colours", "white": "white", "colours": "colours",
-           "syncrain": "syncrain"}
+SHIPPED = {"nixos": "white", "white": "white", "syncrain": "syncrain",
+           # the NixOS logo in its own colours, gone in build 28 (under its rainbow it looked much as
+           # the white one does): a settings file that still names it draws the NixOS logo instead
+           "nixos-colours": "white", "colours": "white"}
 SIDE = 1024
 DATA_PREFIX = "data:image/png;base64,"
 
@@ -26,7 +28,7 @@ class LogoError(ValueError):
 
 
 def normalize(choice: str) -> str:
-    """'white', 'colours', 'syncrain', 'none', a data URI or a picture file's path."""
+    """'white', 'syncrain', 'none', a data URI or a picture file's path."""
     return SHIPPED.get(choice, choice)
 
 
@@ -80,7 +82,7 @@ def check(choice: str) -> str:
     if os.path.isfile(choice) and os.access(choice, os.R_OK):
         open_picture(choice)
         return choice
-    raise LogoError(f"no logo {choice[:60]!r}: syncrain, nixos, nixos-colours, none, or a picture file")
+    raise LogoError(f"no logo {choice[:60]!r}: syncrain, nixos, none, or a picture file")
 
 
 def prepare(im):
@@ -109,7 +111,7 @@ def texture(choice: str, data_dir: str, bundled):
     """(width, height, RGBA bytes) of a logo other than none. `bundled` reads the shipped ones."""
     from .renderer import rgba_pil
     choice = normalize(choice)
-    if choice in ("white", "colours", "syncrain"):
+    if choice in ("white", "syncrain"):
         return bundled(os.path.join(data_dir, f"logo-{choice}.png"))
     if is_data(choice):
         return rgba_pil(decode(choice))

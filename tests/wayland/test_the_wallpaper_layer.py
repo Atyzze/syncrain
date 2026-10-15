@@ -107,7 +107,7 @@ SYMBOLS = '{"balance": "glyphs", "sets": [{"name": "a", "chars": "Ж★ΩअД�
 
 
 @pytest.mark.parametrize("look", [[], ["--speed", "2", "--density", "0.5", "--glow", "0", "--bloom", "1.5",
-                                        "--bg-gain", "0.5", "--snow", "on", "--hieroglyphs", "1"], ["--glyphs"],
+                                        "--bg-gain", "0.5", "--snow", "off", "--hieroglyphs", "1"], ["--glyphs"],
                                   ["--logo"]],
                          ids=["defaults", "every-option", "a-symbols-file", "a-look-of-one-s-own"])
 def test_the_native_wallpaper_draws_the_gtk_host_s_frame(root, sway, tmp_path, look):

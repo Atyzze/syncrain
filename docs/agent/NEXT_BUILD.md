@@ -1,14 +1,15 @@
-# The next build is 28
+# The next build is 29
 
 The first line is parsed: `# The next build is <N>`, exactly one above `BUILD_NUMBER`.
 
-## Build 28: what the operator asks next
+## Build 29: what the operator asks next
 
 * Read what the operator sent last, and answer it in one plain sentence first.
-* Build 27's lock screen (the box on input, the same on every screen) is what they try; fix first
-  what they find there.
-* With nothing asked: an open item, or the NixOS image (`docs/ROADMAP.md`). No boot splash: the
-  operator keeps the boot plain text (2026-10-15); never touch the bootloader, initramfs or Plymouth.
+* The video of the look (`docs/ROADMAP.md`, "Planned builds" 1), as offered on 2026-10-15 12:52:
+  the page's Save video and `syncrain --video`, a seamless loop; the live channel stays the default.
+  Then the README's section on it.
+* No boot splash: the operator keeps the boot plain text (2026-10-15); never touch the bootloader,
+  initramfs or Plymouth.
 
 **Known blockers**: watts, NVIDIA's driver and Plasma's shell exist only on the operator's machine;
 a real greetd and PAM only there too (the lanes speak to a stand-in). The page's Save inside the

@@ -1,4 +1,4 @@
-# Handoff: the state of syncrain at build 27
+# Handoff: the state of syncrain at build 28
 
 What is true now, for a context that has just opened this tree. Where this page and the code
 disagree, the code is right; fix the page in the same build.
@@ -51,10 +51,11 @@ This page, `docs/agent/NEXT_BUILD.md`, `docs/agent/WORKING_WITH_THE_OPERATOR.md`
   vignette, flavours (each column one of N hues, by the channel or as a wave) and a colour cycle,
   any picture as the logo (`syncrain/logo.py`; the page puts the texture in the settings file), its
   size and rainbow, the hidden words. One flavour and no cycle is the picture as it was.
-* **The default is the operator's own look** (build 24): the `syncrain` preset is their settings
-  file of 2026-10-14 22:33 (white-tailed matrix colours, 64 in a wave turning every 440 s, the NixOS
-  logo's rainbow every 30 s, black background, bloom 5); drawn by build 23, that file is the same
-  frame. Their redrawn logo (`syncrain/data/logo-syncrain.svg`, build 23) stays a choice. One colour
+* **The default is the operator's own look** (builds 24 and 28): the `syncrain` preset is their
+  settings file of 2026-10-15 12:49 (white-tailed matrix colours, 64 in a wave turning every 440 s,
+  the NixOS logo at 0.44 with its rainbow every 40 s, snow, black background, bloom 5); drawn by
+  build 27, that file is the same frame. The NixOS logo in its own colours is gone (build 28; the
+  name still draws the NixOS one). Their redrawn logo (`syncrain/data/logo-syncrain.svg`, build 23) stays a choice. One colour
   over any logo: `--logo-color`, `logo_color`.
 * **The lock screen** (builds 25 to 27, optional, `install.sh --lock-screen`): Plasma's own locker loads
   the shell package `org.syncrain.lockscreen` (`syncrain/lockscreen/`), named by
@@ -70,8 +71,8 @@ This page, `docs/agent/NEXT_BUILD.md`, `docs/agent/WORKING_WITH_THE_OPERATOR.md`
   as `~/.config/syncrain/config.json`, read under the command line (`syncrain/app.py`,
   `CONFIG_KEYS`); the login screen's rain reads a copy. The browser lane draws one file on the page
   and the desktop and compares the frames. `--theme` refuses an unknown theme with status 2.
-* **Stream**: `a9c058f3` since build 24 (the syncrain preset); `f98ef1ca` in 23; `25b02556` in 22; `def5684f` 15 to 21; `c18f8be2` in 12 to 14; `48e6bf9c` 3 to 11.
-* **GitHub**: `main` holds builds 7 to 27, one commit each (`syncrain build <N>`).
+* **Stream**: `85ace386` since build 28 (the preset, the colours logo gone); `a9c058f3` 24 to 27; `f98ef1ca` in 23; `25b02556` in 22; `def5684f` 15 to 21; `c18f8be2` in 12 to 14; `48e6bf9c` 3 to 11.
+* **GitHub**: `main` holds builds 7 to 28, one commit each (`syncrain build <N>`).
 
 ## Waits on the operator
 

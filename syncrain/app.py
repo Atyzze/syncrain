@@ -293,7 +293,7 @@ def parse_args(argv=None):
                          "else Python and GTK), native (the native program only) or gtk (Python and GTK, as on "
                          "X11 and in a window)")
     ap.add_argument("--logo", type=_logo, metavar="LOGO",
-                    help="syncrain, nixos, nixos-colours, none, or a picture file (PNG or JPEG); the preset's otherwise")
+                    help="syncrain, nixos, none, or a picture file (PNG or JPEG); the preset's otherwise")
     ap.add_argument("--logo-color", type=_logo_colour, metavar="C",
                     help="one colour over the logo, #rrggbb (the default: the logo's own; 'own' for its own again)")
     ap.add_argument("--logo-size", type=_number(low=0.05, high=0.9), metavar="F",
@@ -340,7 +340,7 @@ def parse_args(argv=None):
                          "syncrain preset has none)")
     ap.add_argument("--bloom", type=_number(low=0), metavar="F",
                     help="the glow around the falling symbols, times the preset's (default 1; 0 = none)")
-    ap.add_argument("--snow", choices=("on", "off"), help="the falling snowflakes (the preset's otherwise: on for nixos, off for syncrain and matrix)")
+    ap.add_argument("--snow", choices=("on", "off"), help="the falling snowflakes (the preset's otherwise: on for syncrain and nixos, off for matrix)")
     ap.add_argument("--hieroglyphs", type=_number(low=0, high=1), metavar="SHARE",
                     help="share of the changing symbols that are Egyptian hieroglyphs (default: as the symbol sets "
                          "say, 0.15 in the presets; 0 = none, 1 = only)")

@@ -8,7 +8,7 @@ Outputs (into syncrain/data/):
                  use into its own atlas (syncrain/glyphs.py).
   themes.json    the presets (each one's palette, symbol sets, hidden words, snow and logo settings),
                  which one is the default, and the list of glyphs.png's slots.
-  logo-white.png / logo-colours.png   the official NixOS snowflake (CC-BY 4.0), with colour bled into the
+  logo-white.png the official NixOS snowflake (CC-BY 4.0), with colour bled into the
                  transparent area so mipmapped edges stay clean (only with --nixos-artwork).
                  logo-syncrain.png comes from its drawing, by tools/build_logo.py.
 
@@ -98,10 +98,10 @@ MATRIX_BACKGROUND = {'mode': 'gradient', 'top': rgb('#020604'), 'bottom': rgb('#
                      'center': rgb('#06180f'), 'vignette': 0.4}
 
 themes = {
-    # the operator's own (their settings file of 2026-10-14, 22:33): the matrix colours with a white
-    # tail and a bright glow, 64 of them at once in a wave across the screen turning every 440 s, the
-    # NixOS logo turning its rainbow every 30 s, a black background, twice build 23's bloom; their
-    # digits (no 6 or 7) and `sSs` among the symbols
+    # the operator's own (their settings files of 2026-10-14 22:33 and 2026-10-15 12:49): the matrix
+    # colours with a white tail and a bright glow, 64 of them at once in a wave across the screen
+    # turning every 440 s, the NixOS logo at 0.44 turning its rainbow every 40 s, snow, a black
+    # background, twice build 23's bloom; their digits (no 6 or 7) and `sSs` among the symbols
     'syncrain': {
         'label': 'Syncrain',
         'glyphs': SYNCRAIN_GLYPHS,
@@ -110,12 +110,12 @@ themes = {
         # their background gain 0 drew it black whatever its colours: black colours draw the same
         'background': {'mode': 'gradient', 'top': [0.0, 0.0, 0.0], 'bottom': [0.0, 0.0, 0.0],
                        'center': [0.0, 0.0, 0.0], 'vignette': 0.66},
-        'logo': {'default': 'white', 'size': 0.35, 'glow': [0.3, 0.9, 0.6], 'glowStrength': 0.0,
-                 'spin': 300, 'hueCycle': 30, 'drift': 0.0},
+        'logo': {'default': 'white', 'size': 0.44, 'glow': [0.3, 0.9, 0.6], 'glowStrength': 0.0,
+                 'spin': 300, 'hueCycle': 40, 'drift': 0.0},
         # bloom 5: their 2 times build 23's 2.5, so the slider's 1 is their look
         'rain': dict(RAIN, bloom=5.0, cycle=440, flavours=64, flavourLayout='wave'),
         'snow': SNOW,
-        'snowDefault': False,
+        'snowDefault': True,
     },
     'nixos': {
         'label': 'NixOS snow',
@@ -173,7 +173,7 @@ with open(os.path.join(args.out, 'themes.json'), 'w', encoding='utf-8') as fh:
     json.dump(meta, fh, ensure_ascii=False, separators=(',', ':'))
 
 # ---- official NixOS logo, rasterised, with colour bled outward under the transparent area
-for variant, svg in (('white', 'nix-snowflake-white.svg'), ('colours', 'nix-snowflake-colours.svg')):
+for variant, svg in (('white', 'nix-snowflake-white.svg'),):
     if not args.nixos_artwork:
         break
     import cv2

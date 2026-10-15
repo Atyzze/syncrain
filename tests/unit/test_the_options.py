@@ -252,14 +252,24 @@ def test_the_default_is_the_operator_s_own_look():
     r = from_args(parse_args(["--config", "none"]), glyphs="theme")
     assert (r.theme_name, r.logo_choice, r.th["rain"]["flavours"], r.th["rain"]["cycle"],
             r.th["rain"]["flavourLayout"]) == ("syncrain", "white", 64, 440, "wave")
-    assert "sSs" in r.th["wordText"] and r.look["snow"] is False
-    # their settings file of 2026-10-14 22:33 over build 23's preset: bloom 2 times 2.5, the background
-    # at gain 0 (black colours draw the same), no glow, the NixOS logo's rainbow every 30 s
+    assert "sSs" in r.th["wordText"] and r.look["snow"] is True
+    # their settings files of 2026-10-14 22:33 and 2026-10-15 12:49: bloom 2 times build 23's 2.5, the
+    # background at gain 0 (black colours draw the same), no glow, the NixOS logo at 0.44 and its
+    # rainbow every 40 s, snow
     uniforms = {n: v for _, n, _, v in static_uniforms(r)}
     assert uniforms["uBloomK"] == (5.0,) and uniforms["uLogoGlowK"] == (0.0,)
     assert r.th["background"]["top"] == r.th["background"]["center"] == [0.0, 0.0, 0.0]
     assert r.th["colors"]["deep"] == [1.0, 1.0, 1.0] and r.th["colors"]["glow"] == [0.0, 1.0, 0.3176]
-    assert (r.th["logo"]["spin"], r.th["logo"]["hueCycle"], r.th["logo"]["drift"], r.th["logo"]["size"]) == (300, 30, 0.0, 0.35)
+    assert (r.th["logo"]["spin"], r.th["logo"]["hueCycle"], r.th["logo"]["drift"], r.th["logo"]["size"]) == (300, 40, 0.0, 0.44)
     nixos = from_args(parse_args(["--config", "none", "--preset", "nixos"]), glyphs="theme")
     assert nixos.logo_choice == "white" and nixos.th["rain"]["flavours"] == 1, "nixos as it was"
     assert from_args(parse_args(["--config", "none", "--logo", "syncrain"]), glyphs="theme").logo_choice == "syncrain"
+
+
+def test_the_nixos_colours_logo_gone_since_build_28_draws_the_nixos_one(tmp_path):
+    """A settings file or a command line from before build 28 still starts: the NixOS logo."""
+    from syncrain.renderer import from_args
+    for name in ("nixos-colours", "colours"):
+        assert from_args(parse_args(["--config", "none", "--logo", name]), glyphs="theme").logo_choice == "white"
+        path = settings(tmp_path, logo=name)
+        assert from_args(parse_args(["--config", path]), glyphs="theme").logo_choice == "white"

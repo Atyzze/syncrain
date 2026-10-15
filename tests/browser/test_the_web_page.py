@@ -39,7 +39,7 @@ def page(root):
 
 
 #: Every picture option, as the page's URL says it and as the command line does.
-LOOK = {"speed": "0.5", "density": "1.7", "glow": "0.3", "bloom": "0.25", "bg-gain": "0.6", "snow": "on",
+LOOK = {"speed": "0.5", "density": "1.7", "glow": "0.3", "bloom": "0.25", "bg-gain": "0.6", "snow": "off",
         "hieroglyphs": "0.6"}
 #: The bloom is blurred in 8-bit textures, whose last bit Chromium's rasterizer and Mesa's round
 #: differently, and the bloom's gain multiplies that: with it off the two are 0.03 apart, at the
@@ -122,7 +122,7 @@ def test_a_theme_that_is_no_theme_gives_the_default_one(page):
 #: A settings file with every setting moved, and symbol sets of the shipped glyphs only (others are
 #: drawn by each side's own fonts, which are not the same pixels).
 SETTINGS = {
-    "contract": "syncrain-config-1", "theme": "matrix", "channel": "friends", "rainbow": "all", "logo": "colours",
+    "contract": "syncrain-config-1", "theme": "matrix", "channel": "friends", "rainbow": "all", "logo": "nixos",
     "spin": 60, "drift": 0.05, "speed": 1.3, "density": 1.2, "glow": 0.7, "bloom": 1.4, "bg_gain": 0.8,
     "snow": False, "hieroglyphs": 0.3, "fps": 30, "pause_under": "never",
     "glyphs": {"balance": "glyphs", "sets": [
