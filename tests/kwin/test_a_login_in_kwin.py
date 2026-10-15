@@ -26,9 +26,11 @@ def sessions(share):
     (folder / "gone.desktop").write_text("[Desktop Entry]\nExec=gone\nTryExec=/nonexistent/gone\nName=Gone\n")
 
 
-def run_login(tmp_path, typed, delay=0.0, more=None):
+def run_login(tmp_path, typed, delay=0.0, more=None, folder=None, python=None):
     """login.sh as greetd runs it, KWin headless with two screens; (log, greetd stand-in). `delay` is
-    how long greetd takes to check a password, `more` what PAM asks after it (tests/fake_greetd.py)."""
+    how long greetd takes to check a password, `more` what PAM asks after it (tests/fake_greetd.py).
+    `folder` is a login screen's folder of its own (login.sh, the app, login.json: the NixOS
+    module's), run with `python` and nothing of this tree's environment."""
     needs()
     kwin = os.environ.get("SYNCRAIN_KWIN") or shutil.which("kwin_wayland")
     run = tmp_path / "run"
@@ -39,18 +41,23 @@ def run_login(tmp_path, typed, delay=0.0, more=None):
     text = tmp_path / "text-login"
     text.write_text(f"#!/bin/sh\necho \"$@\" > {tmp_path}/text-login.ran\n")
     text.chmod(0o755)
-    env = {k: v for k, v in os.environ.items()
-           if k not in ("DISPLAY", "WAYLAND_DISPLAY", "LD_PRELOAD", "SYNCRAIN_REEXEC", "DBUS_SESSION_BUS_ADDRESS",
-                        "GDK_BACKEND", "XDG_CURRENT_DESKTOP")}
+    drop = {"DISPLAY", "WAYLAND_DISPLAY", "LD_PRELOAD", "SYNCRAIN_REEXEC", "DBUS_SESSION_BUS_ADDRESS",
+            "GDK_BACKEND", "XDG_CURRENT_DESKTOP"}
+    if folder:
+        drop |= {"PYTHONPATH", "GI_TYPELIB_PATH", "LD_LIBRARY_PATH", "SYNCRAIN_WALLPAPER"}
+    env = {k: v for k, v in os.environ.items() if k not in drop}
+    if not folder:
+        env["SYNCRAIN_LOGIN_CONFIG"] = str(tmp_path / "login.json")
     env.update(XDG_RUNTIME_DIR=str(run), HOME=str(tmp_path / "home"), GREETD_SOCK=greetd.path,
-               XDG_DATA_DIRS=str(tmp_path / "share"), SYNCRAIN_LOGIN_CONFIG=str(tmp_path / "login.json"),
+               XDG_DATA_DIRS=str(tmp_path / "share"),
                SYNCRAIN_LOGIN_STATE=str(tmp_path / "state"), SYNCRAIN_LOGIN_KWIN=kwin,
                SYNCRAIN_LOGIN_KWIN_ARGS="--virtual --width 320 --height 180 --output-count 2 --no-lockscreen "
                                         "--no-global-shortcuts --no-kactivities --socket wayland-login",
                SYNCRAIN_LOGIN_TEXT=str(text), SYNCRAIN_DEBUG_FPS="1", GTK_A11Y="none",
-               SYNCRAIN_PYTHON=sys.executable, SYNCRAIN_GREETER_TEST_INPUT=json.dumps(typed))
+               SYNCRAIN_PYTHON=str(python or sys.executable), SYNCRAIN_GREETER_TEST_INPUT=json.dumps(typed))
+    login = (folder or ROOT) / "syncrain" / "login" / "login.sh"
     try:
-        done = subprocess.run(["sh", str(ROOT / "syncrain" / "login" / "login.sh")], env=env, cwd=tmp_path,
+        done = subprocess.run(["sh", str(login)], env=env, cwd=tmp_path,
                               capture_output=True, text=True, timeout=180)
     finally:
         greetd.close()

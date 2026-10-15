@@ -1,13 +1,15 @@
-# The next build is 32
+# The next build is 33
 
 The first line is parsed: `# The next build is <N>`, exactly one above `BUILD_NUMBER`.
 
-## Build 32: what the operator asks next
+## Build 33: what the operator asks next
 
 * Read what the operator sent last, and answer it in one plain sentence first.
-* Without a request: the NixOS image's first step, the login and lock screens in the NixOS module
-  (`docs/ROADMAP.md`, "Planned builds" and "Open items"); or what they find on the lock screen.
-* No boot splash: never touch the bootloader, initramfs or Plymouth.
+* Without a request: the NixOS image (`docs/ROADMAP.md`, "Planned builds"): a flake output with a
+  Plasma 6 system using `services.syncrain` (wallpaper, login screen, lock screen) and an
+  installer ISO; built here, tried in a VM where KVM exists (not in this sandbox).
+* No boot splash: never touch the bootloader, initramfs or Plymouth (an image keeps boot plain
+  text too: no Plymouth).
 
 **Known blockers**: watts, NVIDIA's driver and Plasma's shell exist only on the operator's machine;
 a real greetd and PAM only there too (the lanes speak to a stand-in). The page's Save inside the

@@ -33,8 +33,9 @@ Open questions, planned builds, the cadence and the constraints. What shipped: `
 
 ## Planned builds
 
-1. **A NixOS image** (32 or later) with syncrain as its wallpaper, login screen and lock screen,
-   the base the others are written against: the modules' login and lock screens first (open item).
+1. **A NixOS image** (33 or later) with syncrain as its wallpaper, login screen and lock screen,
+   the base the others are written against, from the module's options (build 32): a flake with a
+   Plasma 6 system and an installer ISO, built by `nix build`; tried in a VM where one runs.
 
 ## Open items
 
@@ -50,7 +51,7 @@ What the documents and the review of build 17 leave to a build that changes code
 | The lock screen draws at 30 fps on every screen while locked and lit (NVIDIA's explicit-sync growth is not turned off in KWin's greeter) | measure there; a lower rate after a while without input, `syncrain/lockscreen/rainitem.cpp` |
 | The lock screen shows no keyboard layout (Plasma's does) | `syncrain/lockscreen/package/` |
 | Plasma still loads its lock-screen wallpaper under syncrain's, unseen | `kscreenlockerrc`, only with `--lock-screen` |
-| The login and lock screens on NixOS: the module starts the wallpaper only; `nix/lockscreen.nix` builds the lock screen, nothing points KWin at it, and no option sets greetd up | `nix/nixos-module.nix` (the NixOS image's work) |
+| The login and lock screens on NixOS (build 32): evaluated, built, the login screen run in a headless KWin; never booted, and no VM here (no KVM) | someone booting it, or the image's VM test |
 | Debian, Fedora and openSUSE: installed in roots, never booted; Fedora's SELinux may stop greetd running the login screen from `/usr/local/lib` | someone booting one; `restorecon` or a policy note in `install.sh` |
 | Ubuntu 24.04 and openSUSE Leap 16.0: no gtk4-layer-shell (the native wallpaper draws), Qt below 6.5 (no lock screen) | nothing to do until they update |
 | A video's watts against the live rain's: not measured (no graphics card in the sandbox) | measure on their machine before claiming it uses less |

@@ -137,3 +137,59 @@ def test_the_package_finds_fc_list_without_a_path_of_its_own(built):
     wrapper = (built / "bin" / "syncrain").read_text(errors="replace")
     found = re.findall(r"(/nix/store/[^:'\"\s\x00]*fontconfig[^:'\"\s\x00/]*/bin)", wrapper)
     assert found and any(os.access(os.path.join(d, "fc-list"), os.X_OK) for d in found), wrapper[-2000:]
+
+
+@pytest.fixture(scope="module")
+def nixos_login(root, checkouts, tmp_path_factory):
+    """The NixOS module's login screen folder and the package it runs (tests/nix/login.nix)."""
+    nixpkgs, _ = checkouts
+    out = tmp_path_factory.mktemp("nixlogin") / "result"
+    done = subprocess.run(["nix-build", str(root / "tests/nix/login.nix"), "--arg", "src", str(root),
+                           "--arg", "nixpkgs", nixpkgs, "-o", str(out)], capture_output=True, text=True, timeout=1800)
+    assert done.returncode == 0, done.stderr[-3000:]
+    return out
+
+
+def test_the_nixos_login_screen_logs_in_through_the_box(nixos_login, tmp_path):
+    """The module's folder, as greetd would run it: login.sh with the package's Python (the app,
+    GTK, gtk4-layer-shell and the native wallpaper, nothing of this tree's), in a headless KWin with
+    two screens; the rain draws, a box on each, a wrong and then the right password, Plasma asked for."""
+    from tests.kwin.test_a_login_in_kwin import PLASMA, run_login
+    folder = nixos_login / "folder"
+    assert json.loads((folder / "login.json").read_text()) == {
+        "user": "op", "session": "plasma.desktop", "rain": ["--preset", "matrix", "--fps", "10", "--scale", "1.000000"]}
+    log, greetd = run_login(tmp_path, [{"password": "wrong", "wait": 4}, {"password": "right"}],
+                            folder=folder, python=nixos_login / "package/libexec/syncrain/python3")
+    assert "native wallpaper, 2 screens" in log, f"the rain never drew:\n{log[-4000:]}"
+    shown = [line for line in log.splitlines() if " box shown on " in line]
+    assert len({line.split()[-1] for line in shown}) == 2, log[-4000:]
+    assert [s["cmd"] for s in greetd.started()] == [[PLASMA]], log[-4000:]
+    assert f"build {build.BUILD_NUMBER}" in log.splitlines()[0]
+
+
+def test_the_nixos_module_sets_up_the_login_and_lock_screens(evaluated):
+    """Evaluated on a Plasma 6 system (tests/nix/services.nix): greetd runs the folder's login.sh
+    as greeter, with Plasma's KWin, the package's Python and greetd's text login; the lock screen's
+    drop-in names syncrain's shell package to KWin alone; the wallpaper writes the lock scene first."""
+    s = evaluated["screens"]
+    assert s["failed"] == [] and s["greetd"] and s["greeter"] == "greeter"
+    words = s["command"].replace("'", "").split()
+    assert words[0].endswith("/bin/env") and words[-1].endswith("-syncrain-login-31/syncrain/login/login.sh".replace(
+        "31", str(build.BUILD_NUMBER)))
+    env = dict(w.split("=", 1) for w in words[1:-1])
+    assert env["PATH"].startswith("/run/wrappers/bin:") and "-kwin-" in env["PATH"]
+    assert env["SYNCRAIN_PYTHON"].endswith("/libexec/syncrain/python3")
+    assert env["SYNCRAIN_LOGIN_TEXT"].endswith("/bin/agreety") and "-desktops/share:" in env["XDG_DATA_DIRS"]
+    assert "d /var/lib/syncrain-login 0700 greeter greeter -" in s["tmpfiles"]
+    path = env["PATH"].split(":")
+    assert any(os.access(os.path.join(d, "systemctl"), os.X_OK) for d in path), "the box's power buttons"
+    assert path[-1] == "/run/current-system/sw/bin" and env["XDG_DATA_DIRS"].endswith(":/run/current-system/sw/share")
+    assert s["session"] == "plasma" and any("no session of this system" in m for m in s["badSession"])
+    assert s["kwinDropin"].splitlines()[0] == "[Service]" and "\"PATH=" not in s["kwinDropin"]
+    assert 'Environment="PLASMA_DEFAULT_SHELL=org.syncrain.lockscreen"' in s["kwinDropin"]
+    assert "-syncrain-lockscreen-" in s["kwinDropin"] and s["shells"]
+    assert s["pre"].startswith("-/nix/store/") and "--write-scene %h/.local/state/syncrain/lock-screen.scene" in s["pre"]
+    assert s["pre"].split("lock-screen.scene", 1)[1].strip() == s["exec"].split("/bin/syncrain", 1)[1].strip()
+    assert evaluated["nixos"]["pre"] is None, "no lock screen asked for, no scene written"
+    assert any("sddm.enable = false" in m for m in s["sddm"])
+    assert any("services.syncrain.enable = true" in m for m in s["noWallpaper"])

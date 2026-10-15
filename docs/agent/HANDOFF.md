@@ -1,4 +1,4 @@
-# Handoff: the state of syncrain at build 31
+# Handoff: the state of syncrain at build 32
 
 What is true now, for a context that has just opened this tree. Where this page and the code
 disagree, the code is right; fix the page in the same build. Each fact has one home; this page
@@ -21,7 +21,8 @@ This page, `docs/agent/NEXT_BUILD.md`, `docs/agent/WORKING_WITH_THE_OPERATOR.md`
 
 * **What syncrain is**: syncrain backdrop, the rain for the whole session: the desktop wallpaper,
   the login screen and the lock screen (both optional), the web page and videos (the operator's
-  name, 2026-10-15). NixOS is the base; `install.sh` covers Arch, Debian, Fedora and openSUSE
+  name, 2026-10-15). NixOS is the base: its module gives the wallpaper, login screen and lock screen (build 32);
+  `install.sh` covers Arch, Debian, Fedora and openSUSE
   (each installed for real in a root of its own, `docs/agent/ENVIRONMENT.md`).
 * **The operator's machine**: CachyOS, KDE Plasma 6 on Wayland, two screens, RTX 5090; its numbers
   in `docs/agent/TARGET_ENVIRONMENT.md`. It runs build 16 or later (its login screen worked there on
@@ -41,7 +42,7 @@ This page, `docs/agent/NEXT_BUILD.md`, `docs/agent/WORKING_WITH_THE_OPERATOR.md`
 * **Stream**: `822ea58a` since build 29 (sentences' gaps and trails in `state.frag`); `85ace386` in
   28; `a9c058f3` 24 to 27; `f98ef1ca` in 23; `25b02556` in 22; `def5684f` 15 to 21; `c18f8be2` in 12
   to 14; `48e6bf9c` 3 to 11.
-* **GitHub**: `main` holds builds 7 to 31, a commit `syncrain build <N>` each, and a few
+* **GitHub**: `main` holds builds 7 to 32, a commit `syncrain build <N>` each, and a few
   documents-only commits between them.
 
 ## Waits on the operator

@@ -87,6 +87,33 @@ git clone https://github.com/Atyzze/syncrain && cd syncrain   # or unpack SYNCRA
 `nix/options.nix` (some ranges are narrower than the command line's: `scale` up to 1, `fps` up to
 240). Without installing: `nix run github:Atyzze/syncrain -- --window`.
 
+On a Plasma 6 system (`services.desktopManager.plasma6.enable`), the NixOS module also gives the
+login and lock screens:
+
+```nix
+services.syncrain = {
+  enable = true;
+  settings = ./config.json;
+  loginScreen = { enable = true; user = "alice"; };   # greetd runs the rain and the box; SDDM off
+  lockScreen.enable = true;                           # Plasma's locker shows the rain and the box
+};
+services.displayManager.sddm.enable = false;
+```
+
+* `loginScreen`: greetd runs `login.sh` from a folder the module builds (the app, its build and
+  `login.json`: `user` offered first, `session` offered first (`services.displayManager.defaultSession`,
+  else `plasma`), the rain with the wallpaper's options) as `greeter`, with Plasma's KWin, the
+  package's Python (`libexec/syncrain/python3`) and greetd's text login if the box fails. KDE's
+  wallet opens through the login PAM service Plasma sets up. Not there: automatic login (it says
+  so), and the still frame of the rain after a login (`install.sh`'s hand-over).
+* Follow the system's nixpkgs (`inputs.syncrain.inputs.nixpkgs.follows = "nixpkgs"`), so the
+  package's graphics libraries match the system's driver.
+* `lockScreen`: a drop-in for KWin's unit alone names syncrain's shell package (in the system's
+  `share/plasma/shells`) and QML module; the wallpaper writes the lock screen's scene before each
+  start. A `plasmashellrc` that names a `ShellPackage` wins over it (`install.sh --lock-screen` takes
+  out one that names Plasma's own; on NixOS, delete that line by hand), and Plasma must start
+  through systemd (its default). The home-manager module has neither.
+
 **Other systems**: GTK 4, gtk4-layer-shell, PyGObject, pycairo and Pillow, then `pip install .`.
 For the native wallpaper: `sh syncrain/native/build.sh <path>` and `SYNCRAIN_WALLPAPER=<path>` in
 the session's environment.

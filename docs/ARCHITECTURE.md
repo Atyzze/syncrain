@@ -161,7 +161,8 @@ which screens a maximized or full-screen window covers; those stop drawing until
 
 * `install.sh` (Arch, Debian, Fedora, openSUSE: `set_packages`): the family's packages, the app in `~/.local`, the native wallpaper built with gcc, an
   optional systemd user service.
-* `nix/package.nix`: the package (the native wallpaper in `libexec/`), with NixOS and home-manager
-  modules beside it.
+* `nix/package.nix`: the package (the native wallpaper and the login screen's Python in `libexec/`),
+  with NixOS and home-manager modules beside it; the NixOS module also builds the login screen's
+  folder (greetd's command) and points KWin at the lock screen (`nix/lockscreen.nix`).
 * `tools/package_release.py`: bump, rebuild the pages, run every lane, stamp the notes, write
   `SYNCRAIN<N>.tar.zst`.

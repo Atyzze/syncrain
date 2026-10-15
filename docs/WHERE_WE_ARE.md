@@ -1,4 +1,4 @@
-# Where we are, at build 31
+# Where we are, at build 32
 
 The project on one page. Detail: `docs/agent/HANDOFF.md`.
 
@@ -29,12 +29,15 @@ plain text by design: the text means the machine is not up yet, the rain that it
 * **Videos** (build 29): `syncrain --video rain.mp4` or the page's Video section, a seamless loop.
 * **Four families** (build 31): `./install.sh` on Arch, Debian, Fedora and openSUSE, each installed
   for real in a root of its own; anything else gets the packages named, or its AI agent.
-* **On GitHub**: github.com/Atyzze/syncrain, every build up to 31.
+* **NixOS** (build 32): the module gives the wallpaper, the login screen and the lock screen
+  (`loginScreen.enable`, `lockScreen.enable`); its login screen runs in a headless KWin here, but
+  no NixOS machine has booted it yet.
+* **On GitHub**: github.com/Atyzze/syncrain, every build up to 32.
 
 ## What comes next
 
-* **Next**: a NixOS image with the wallpaper, login screen and lock screen, the base the others
-  follow; or what you find on the lock screen.
+* **Next**: the NixOS image: a flake that builds a Plasma 6 system with all of it, and an installer
+  ISO, for you to try in a VM or on a spare disk; or what you find on the lock screen.
 * **Build 40**: the next consolidation (every number ending in 0).
 
 ## The decision in front of you

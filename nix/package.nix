@@ -67,6 +67,18 @@ python3Packages.buildPythonApplication {
     )
   '';
 
+  # The login screen runs `python -m syncrain.greeter` and the rain as `python -m syncrain`: a Python
+  # with the app and its libraries, and this wrapper's environment (the NixOS module's loginScreen).
+  # The app comes last on PYTHONPATH: login.sh names its own folder first, with login.json beside it.
+  postFixup = ''
+    makeWrapper ${python3Packages.python.withPackages (ps: with ps; [ pygobject3 pillow pycairo ])}/bin/python3 \
+      $out/libexec/syncrain/python3 "''${makeWrapperArgs[@]}" \
+      --suffix PYTHONPATH : $out/${python3Packages.python.sitePackages}
+  '';
+
+  # where the app is, for the NixOS module's login screen (the system's Python may be another version)
+  passthru.sitePackages = python3Packages.python.sitePackages;
+
   pythonImportsCheck = [ "syncrain.engine" "syncrain.build" ];
 
   meta = {
