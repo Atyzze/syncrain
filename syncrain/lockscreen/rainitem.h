@@ -8,6 +8,7 @@
 
 #include <QElapsedTimer>
 #include <QQuickFramebufferObject>
+#include <QSGRendererInterface>
 #include <QTimer>
 #include <QtQml/qqmlregistration.h>
 
@@ -41,6 +42,7 @@ public:
 
     // what the render thread copies in synchronize
     int m_generation = 0;
+    bool m_armed = false;                 // the window has shown its first frame: the scene may load
     double m_lead = 1.0 / 60.0;
 
     // from the render thread, queued
@@ -64,6 +66,7 @@ private:
     double refreshRate() const;
 
     QString m_scene;
+    QMetaObject::Connection m_shown;
     qreal m_fps = 30.0;
     qreal m_fixedTime;
     QString m_status = QStringLiteral("preparing");

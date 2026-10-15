@@ -1,11 +1,11 @@
-# The next build is 26
+# The next build is 27
 
 The first line is parsed: `# The next build is <N>`, exactly one above `BUILD_NUMBER`.
 
-## Build 26: what the operator asks next
+## Build 27: what the operator asks next
 
 * Read what the operator sent last, and answer it in one plain sentence first.
-* Build 25 made the lock screen (optional); fix first what they find there.
+* Build 26 is the first lock screen they get (25 was not delivered); fix first what they find there.
 * Then the boot splash through the LUKS prompt (`docs/ROADMAP.md`, "Planned builds" 1): first what
   their initramfs is (CachyOS: mkinitcpio or dracut, with or without Plymouth), asked through an
   existing command's output, never one of ours.

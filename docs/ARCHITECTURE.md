@@ -107,9 +107,10 @@ GTK draws more pixels and scales them down), the page within texture filtering.
   the one `PLASMA_DEFAULT_SHELL` names. `install.sh --lock-screen` sets that, with
   `QML_IMPORT_PATH`, in a drop-in for KWin's unit alone: Plasma's shell keeps its layout under its
   own package's name and never sees it.
-* The package `org.syncrain.lockscreen` (falling back to `org.kde.plasma.desktop`) is QML only: the
-  box (`Box.qml`, the login box's look) drives the `authenticator` the locker gives it, as Plasma's
-  own does; PAM decides. The rain and the Caps Lock note come through Loaders, so the box works
+* The package `org.syncrain.lockscreen` (falling back to `org.kde.plasma.desktop`) is QML only: one
+  conversation with the `authenticator` the locker gives it for all screens (`Pam.qml`, a singleton
+  on the locker's one engine), by Plasma 6.7's rules (PAM restarted only after a refusal's delay),
+  and on each screen the box (`Box.qml`, the login box's look); PAM decides. The rain and the Caps Lock note come through Loaders, so the box works
   without them.
 * The rain is `SyncRain` (`rainitem.cpp`, the QML module `org.syncrain`): the native passes into a
   framebuffer on Qt Quick's OpenGL context, from the scene file `syncrain --write-scene` writes; the

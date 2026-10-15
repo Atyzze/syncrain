@@ -248,6 +248,10 @@ bool scene_load(struct scene *scene, int fd, char *why, size_t why_size)
 	return true;
 fail:
 	scene_unmap(scene);
+	free(scene->kwin_script);
+	free(scene->fallback);                /* one allocation, its strings inside it */
+	scene->kwin_script = NULL;
+	scene->fallback = NULL;
 	return false;
 }
 

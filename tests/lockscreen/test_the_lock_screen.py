@@ -7,12 +7,15 @@ the real lock, root to give PAM a service `kde` of the test's own (/etc/pam.d/kd
 is none, removed after). What is checked:
 
 * the item draws the desktop's frame (the GTK host's, to within a level, beside the box);
-* the box answers PAM as Plasma's own lock screen does: a wrong password is said and cleared, the
-  right one quits the locker; and without the rain's module the box still unlocks, on black;
+* the box answers PAM as Plasma 6.7's own lock screen does: a wrong password is said and cleared,
+  PAM is asked again only after its delay, a password typed during it is kept for the next question,
+  PAM's Dutch prompt does not hide the refusal, the right one quits the locker; and without the
+  rain's module the box still unlocks, on black;
 * a real headless KWin, locked over D-Bus, starts kscreenlocker_greet, which loads syncrain's lock
   screen from what KWin's unit is given (PLASMA_DEFAULT_SHELL, QML_IMPORT_PATH) on both screens; a
   wrong password typed on KWin's keyboard (libei, as a person types) leaves it locked, the right
-  one unlocks it, and PAM saw exactly those two.
+  one a second after another wrong one (inside PAM's 2 s delay) unlocks it, and PAM saw exactly
+  what was typed.
 """
 from __future__ import annotations
 
@@ -115,13 +118,40 @@ def test_the_lock_screen_draws_the_desktop_s_frame(greeter, app, tmp_path):
     assert outside_the_box(shot, gtk) < 0.6
 
 
+def steps(said: str) -> list[str]:
+    return [line.split("flow: ", 1)[1] for line in said.splitlines() if "flow: " in line]
+
+
 def test_the_box_unlocks_with_what_pam_accepts_and_says_what_it_refused(greeter):
+    """The right password typed at once after a wrong one, while PAM waits out its 2 s delay: kept,
+    and handed over when PAM asks again; PAM is never started too soon, nothing typed is lost."""
     code, said = greeter("flow")
     assert code == 0, said
-    lines = [line.split("flow: ", 1)[1] for line in said.splitlines() if "flow: " in line]
-    assert lines[0].startswith("asked ") and lines[0].endswith("focus true"), lines
+    lines = steps(said)
+    assert lines[0] == "asked 1 times, focus true", lines
     assert lines[1:] == ["responded wrong", "after the wrong one, field '', message 'Unlocking failed'",
                          "responded right", "stopped"], lines
+
+
+def test_pam_asking_again_in_dutch_leaves_the_refusal_said(greeter):
+    code, said = greeter("again")
+    assert code == 0, said
+    assert steps(said)[1:] == ["responded wrong", "after the wrong one, field '', message 'Unlocking failed'",
+                               "asked again, message 'Unlocking failed'", "responded right", "stopped"], said
+
+
+def test_a_screen_plugged_in_again_while_pam_asks_still_unlocks(greeter):
+    """kscreenlocker makes a screen's lock screen anew when it comes back; PAM's question is the
+    locker's, not the screen's, so the new box's password still goes to it."""
+    code, said = greeter("replug")
+    assert code == 0, said
+    assert steps(said) == ["replugged", "responded right", "stopped"], said
+
+
+def test_a_question_whose_answer_shows_is_answered(greeter):
+    code, said = greeter("visible")
+    assert code == 0, said
+    assert steps(said) == ["responded right", "stopped"], said
 
 
 def test_without_the_rain_s_module_the_box_still_unlocks(greeter, tmp_path):
@@ -147,7 +177,9 @@ def pam(tmp_path):
     check = tmp_path / "check-password.sh"
     check.write_text(f'#!/bin/sh\nIFS= read -r pw\necho "$pw" >> "{tries}"\n[ "$pw" = "right" ]\n')
     check.chmod(0o755)
-    PAM_SERVICE.write_text(f"{PAM_MARK}\nauth required pam_exec.so expose_authtok quiet {check}\n"
+    # pam_faildelay: a refusal asks for 2 s, as Arch's pam_unix does
+    PAM_SERVICE.write_text(f"{PAM_MARK}\nauth optional pam_faildelay.so delay=2000000\n"
+                           f"auth required pam_exec.so expose_authtok quiet {check}\n"
                            "account required pam_permit.so\n")
     yield tries
     PAM_SERVICE.unlink()
@@ -201,8 +233,8 @@ class Kwin:
                 raise AssertionError(f"{why}; KWin's log:\n{self.said()[-3000:]}")
             time.sleep(0.25)
 
-    def type(self, built, tmp, word):
-        """`word` and Enter on KWin's keyboard, through libei (KWin's RemoteDesktop EIS)."""
+    def type(self, built, tmp, *words):
+        """Each word and Enter on KWin's keyboard, a second apart, through libei (KWin's RemoteDesktop EIS)."""
         from gi.repository import Gio, GLib
         typer = tmp / "type"
         if not typer.exists():
@@ -219,7 +251,7 @@ class Kwin:
             GLib.Variant("(i)", (1,)), GLib.VariantType("(hi)"), Gio.DBusCallFlags.NONE, 10000, None, None)
         fd = fds.get(result.unpack()[0])
         try:
-            done = subprocess.run([str(typer), str(fd), word], pass_fds=(fd,), capture_output=True, text=True,
+            done = subprocess.run([str(typer), str(fd), *words], pass_fds=(fd,), capture_output=True, text=True,
                                   timeout=60)
         finally:
             os.close(fd)
@@ -262,10 +294,12 @@ def test_kwin_locks_with_syncrain_s_lock_screen_and_pam_unlocks_it(built, scene,
         assert "Failed to load lockscreen QML" not in said and "Lockscreen QML outdated" not in said, said[-3000:]
         assert kwin.screensaver() is True
         kwin.type(built, tmp_path, "wrong")
-        time.sleep(3)
+        time.sleep(4)
         assert kwin.screensaver() is True, "a wrong password leaves it locked"
-        kwin.type(built, tmp_path, "right")
+        # the right one a second after a wrong one, inside PAM's 2 s delay: kept, not lost
+        kwin.type(built, tmp_path, "wrong", "right")
         kwin.wait(lambda: kwin.screensaver() is False, 20, "the right password did not unlock it")
-        assert pam.read_text().splitlines() == ["wrong", "right"]
+        assert pam.read_text().splitlines() == ["wrong", "wrong", "right"]
+        assert "Authentication attempt too soon" not in kwin.said(), "PAM restarted inside its delay"
     finally:
         kwin.stop()

@@ -1,9 +1,10 @@
 /*
     syncrain's lock screen: the rain behind syncrain's own box, on every screen.
 
-    kscreenlocker_greet loads this file from the shell package org.syncrain.lockscreen (install.sh
-    --lock-screen points KWin's lock screen at it) and gives it `authenticator` (PAM),
-    `kscreenlocker_userName` and the property `locked`. Nothing here can unlock but PAM saying yes.
+    kscreenlocker_greet loads this file, once for each screen, from the shell package
+    org.syncrain.lockscreen (install.sh --lock-screen points KWin's lock screen at it) and gives it
+    `authenticator` (PAM), `kscreenlocker_userName` and the property `locked`. The conversation with
+    PAM is Pam.qml's, one for all the screens; nothing here can unlock but PAM saying yes.
     The rain (Rain.qml) and the Caps Lock note (CapsLock.qml) come through Loaders: if either cannot
     load, the screen is black behind the box and unlocking works as before. If this file itself
     cannot load, kscreenlocker draws its own built-in lock screen.
@@ -21,10 +22,6 @@ Item {
     property bool suspendToDiskSupported: false
     signal suspendToRam()
     signal suspendToDisk()
-
-    // what the box shows under the password field (PAM's words, or ours)
-    property string message: ""
-    property bool failing: false
 
     implicitWidth: 800
     implicitHeight: 600
@@ -46,67 +43,36 @@ Item {
         source: Qt.resolvedUrl("CapsLock.qml")
     }
 
-    function say(text) {
-        if (text && text.length > 0)
-            root.message = text;
-    }
-
     Connections {
-        target: typeof authenticator === "undefined" ? null : authenticator
-        function onFailed(kind) {
-            if (kind != 0)                     // a fingerprint or smartcard reader's, not the password's
-                return;
-            root.failing = true;
-            root.say(qsTr("Unlocking failed"));
-            box.clear();
-            authenticator.startAuthenticating();
-            shake.restart();
-        }
-        function onSucceeded() {
-            authenticator.stopAuthenticating();
-            Qt.quit();
-        }
-        function onInfoMessageChanged() { root.failing = false; root.say(authenticator.infoMessage); }
-        function onErrorMessageChanged() { root.failing = true; root.say(authenticator.errorMessage); }
-        function onPromptChanged() { root.failing = false; root.say(authenticator.prompt); }
-        function onPromptForSecretChanged() {
-            box.focusPassword();
-            const p = authenticator.promptForSecret;
-            // PAM's plain "Password:" is what the field already says
-            if (p && p.replace(/[:\s]+$/, "").toLowerCase() !== "password")
-                root.say(p);
-        }
+        target: Pam
+        function onRefused() { shake.restart(); }
+        function onAsked() { box.focusPassword(); }
     }
 
-    // PAM is asked again every second while the screen is up (as Plasma's own lock screen does), so
-    // a typed password always has a conversation to go to
-    Timer {
-        interval: 1000
-        repeat: true
-        triggeredOnStart: true
-        running: typeof authenticator !== "undefined" && !authenticator.unlocked
-        onTriggered: authenticator.startAuthenticating()
-    }
-
-    // the screen under the pointer takes the keyboard
+    // the screen under the pointer takes the keyboard; a click starts PAM if it stopped
     MouseArea {
         anchors.fill: parent
         hoverEnabled: true
         acceptedButtons: Qt.LeftButton
         onPositionChanged: if (root.Window.window && !root.Window.window.active) root.Window.window.requestActivate()
-        onPressed: box.focusPassword()
+        onPressed: { box.focusPassword(); Pam.start(); }
     }
 
     Box {
         id: box
         anchors.centerIn: parent
         title: typeof kscreenlocker_userName === "undefined" ? "" : kscreenlocker_userName
-        message: [caps.item && caps.item.on ? qsTr("Caps Lock is on") : "", root.message].filter(s => s).join("\n")
-        failing: root.failing
+        message: [caps.item && caps.item.on ? qsTr("Caps Lock is on") : "", Pam.message].filter(s => s).join("\n")
+        failing: Pam.failing
+        allowEmpty: Pam.passwordless
+        onEdited: { if (Pam.failing) Pam.message = ""; Pam.start(); }
         onSubmitted: password => {
-            root.message = "";
-            root.failing = false;
-            authenticator.respond(password);
+            if (Pam.passwordless) {            // PAM has already said yes, without a password
+                Pam.auth.stopAuthenticating();
+                Qt.quit();
+                return;
+            }
+            Pam.hand(password);
         }
 
         SequentialAnimation {
@@ -119,5 +85,10 @@ Item {
         }
     }
 
-    Component.onCompleted: box.focusPassword()
+    Component.onCompleted: {
+        if (!Pam.auth && typeof authenticator !== "undefined")
+            Pam.auth = authenticator;
+        box.focusPassword();
+        Pam.start();
+    }
 }

@@ -53,7 +53,9 @@ git clone https://github.com/Atyzze/syncrain && cd syncrain   # or unpack SYNCRA
   in once. Unlocking is still Plasma's PAM service `kde`; without the module the box shows on black,
   and a lock screen that cannot load is Plasma's built-in one. Should it ever not unlock:
   Ctrl+Alt+F3, log in, `loginctl unlock-sessions`. `--lock-screen-off` takes exactly those files
-  away; `--uninstall` too.
+  away; `--uninstall` too. What KWin starts (Xwayland, an input method) also sees the drop-in's
+  variables, and its `QML_IMPORT_PATH` replaces one the session had; Plasma's shell, started by
+  systemd, does not see them (were it to, it would open a fresh desktop layout).
 * Upgrading: run the newer `./install.sh`; it names the build it replaces and restarts the
   autostart service if it runs. `syncrain --build` says what is installed.
 

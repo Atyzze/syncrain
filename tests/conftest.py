@@ -23,6 +23,10 @@ sys.path.insert(0, str(ROOT))
 # the lanes draw with the themes' own unless a test names one.
 os.environ["XDG_CONFIG_HOME"] = __import__("tempfile").mkdtemp(prefix="syncrain-config-")
 os.environ["XDG_CACHE_HOME"] = __import__("tempfile").mkdtemp(prefix="syncrain-cache-")
+# The lock screen's scene of this machine's (~/.local/state/syncrain/lock-screen.scene) is rewritten
+# by every wallpaper start: the lanes' starts write one of their own, which no test leaves behind.
+os.environ["SYNCRAIN_LOCK_SCENE"] = os.path.join(__import__("tempfile").mkdtemp(prefix="syncrain-state-"),
+                                                 "lock-screen.scene")
 
 
 def need(ok: bool, what: str) -> None:

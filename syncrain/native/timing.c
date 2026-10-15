@@ -7,6 +7,7 @@
  */
 #define _GNU_SOURCE
 #include <locale.h>
+#include <stdbool.h>
 #include <math.h>
 #include <stdlib.h>
 #include <time.h>
@@ -18,10 +19,19 @@
  * and 14's Plasma wallpaper drew everything white for that). */
 double c_strtod(const char *s, char **end)
 {
+	/* made once, whichever thread comes first: the lock screen loads a scene on each screen's
+	 * render thread at once */
 	static locale_t c;
-	if (!c)
-		c = newlocale(LC_ALL_MASK, "C", (locale_t)0);
-	return c ? strtod_l(s, end, c) : strtod(s, end);
+	locale_t got = __atomic_load_n(&c, __ATOMIC_ACQUIRE);
+	if (!got) {
+		locale_t made = newlocale(LC_ALL_MASK, "C", (locale_t)0), none = (locale_t)0;
+		if (made && !__atomic_compare_exchange_n(&c, &none, made, false, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE)) {
+			freelocale(made);
+			made = none;                  /* the other thread's */
+		}
+		got = made;
+	}
+	return got ? strtod_l(s, end, got) : strtod(s, end);
 }
 
 /* Objects/floatobject.c, _float_div_mod: fmod, then the quotient snapped to the nearest integer. */

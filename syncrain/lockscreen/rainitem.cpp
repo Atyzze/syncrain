@@ -3,6 +3,7 @@
 #include <QCoreApplication>
 #include <QFile>
 #include <QOpenGLContext>
+#include <QOpenGLFunctions>
 #include <QOpenGLFramebufferObject>
 #include <QPointer>
 #include <QQuickOpenGLUtils>
@@ -53,6 +54,7 @@ public:
     {
         auto *s = static_cast<SyncRain *>(item);
         m_item = s;
+        m_armed = s->m_armed;
         m_wantPath = s->scene();
         m_wantGeneration = s->m_generation;
         m_fixedTime = s->fixedTime();
@@ -68,11 +70,17 @@ public:
 
     void render() override
     {
-        if (m_generation != m_wantGeneration)
+        if (m_armed && m_generation != m_wantGeneration)
             load();
         QOpenGLFramebufferObject *fbo = framebufferObject();
-        if (!m_passes || !fbo)
+        if (!fbo)
             return;
+        if (!m_passes) {                      // nothing yet, or nothing to draw: see through to black
+            QOpenGLFunctions *f = QOpenGLContext::currentContext()->functions();
+            f->glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+            f->glClear(GL_COLOR_BUFFER_BIT);
+            return;
+        }
         const double t = std::isnan(m_fixedTime) ? nowSeconds() + m_lead : m_fixedTime;
         passes_draw(m_passes, t, fbo->handle(), 0, 0, fbo->width(), fbo->height());
         QQuickOpenGLUtils::resetOpenGLState();
@@ -162,6 +170,7 @@ private:
     QPointer<SyncRain> m_item;                // set in synchronize, while the GUI thread waits
     QString m_wantPath;
     int m_wantGeneration = 0, m_generation = 0;
+    bool m_armed = false;
     double m_fixedTime = NAN, m_lead = 0.0;
     struct scene m_scene {};
     bool m_hasScene = false;
@@ -270,7 +279,7 @@ double SyncRain::refreshRate() const
 // timed from a fixed origin so the timer does not drift against the refresh.
 void SyncRain::schedule()
 {
-    if (m_scene.isEmpty() || !std::isnan(m_fixedTime) || m_status.startsWith(QStringLiteral("error")))
+    if (!m_armed || m_scene.isEmpty() || !std::isnan(m_fixedTime) || m_status.startsWith(QStringLiteral("error")))
         return;
     const double hz = refreshRate();
     const int step = std::max(1, (int)std::ceil(hz / m_fps - 1e-6));
@@ -294,11 +303,38 @@ void SyncRain::tick()
     }
 }
 
+// The scene is loaded only once the window has shown a frame: compiling and uploading it takes a
+// moment, and KWin gives the lock screen the keyboard only after its first frame, so the box comes
+// first whatever the driver does with the rain.
 void SyncRain::itemChange(ItemChange change, const ItemChangeData &value)
 {
     QQuickFramebufferObject::itemChange(change, value);
-    if (change == ItemSceneChange && value.window) {
+    if (change != ItemSceneChange || !value.window)
+        return;
+    // QQuickWindow::graphicsApi() still says OpenGL when the software backend draws (kscreenlocker
+    // retries a crashed greeter with QT_QUICK_BACKEND=software), so the backend is asked too
+    if (QQuickWindow::graphicsApi() != QSGRendererInterface::OpenGL
+        || QQuickWindow::sceneGraphBackend() == QStringLiteral("software")) {
+        failed(QStringLiteral("Qt Quick draws without OpenGL here (software after a crash, or QSG_RHI_BACKEND); "
+                              "syncrain's rain needs OpenGL"));
+        return;
+    }
+    if (m_armed)
+        return;
+    QQuickWindow *w = value.window;
+    QPointer<QQuickWindow> seen = w;              // queued: the window may be gone when this runs
+    m_shown = connect(w, &QQuickWindow::frameSwapped, this, [this, seen] {
+        disconnect(m_shown);
+        if (!seen)
+            return;
+        QSGRendererInterface *ri = seen->rendererInterface();
+        if (!ri || ri->graphicsApi() != QSGRendererInterface::OpenGL) {
+            failed(QStringLiteral("Qt Quick draws this screen without OpenGL; syncrain's rain needs OpenGL"));
+            return;
+        }
+        m_armed = true;
+        update();
         m_next = 0.0;
         schedule();
-    }
+    }, Qt::QueuedConnection);
 }

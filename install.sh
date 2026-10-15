@@ -484,19 +484,26 @@ lock_screen_build() {
     info "the lock screen's module did not build (it is built with: ${LOCK_PACKAGES[*]})"
     return 1
   fi
+  # (inside a function called from `if`, set -e is off: each step says when it fails)
   rm -rf -- "${LOCK_QML:?}.new"
-  mkdir -p "$LOCK_QML.new/org/syncrain"
-  cp "$work"/qml/org/syncrain/qmldir "$work"/qml/org/syncrain/*.qmltypes "$work"/qml/org/syncrain/*.so \
-     "$LOCK_QML.new/org/syncrain/"
+  if ! { mkdir -p "$LOCK_QML.new/org/syncrain" \
+         && cp "$work"/qml/org/syncrain/qmldir "$work"/qml/org/syncrain/*.qmltypes "$work"/qml/org/syncrain/*.so \
+               "$LOCK_QML.new/org/syncrain/"; }; then
+    rm -rf -- "${work:?}" "${LOCK_QML:?}.new"
+    info "the lock screen's module could not be copied"
+    return 1
+  fi
   rm -rf -- "${work:?}" "${LOCK_QML:?}"
-  mv "$LOCK_QML.new" "$LOCK_QML"
-  mkdir -p "${XDG_DATA_HOME:-$HOME/.local/share}/plasma/shells"
+  mv "$LOCK_QML.new" "$LOCK_QML" || { info "the lock screen's module could not be put in place"; return 1; }
+  mkdir -p "${XDG_DATA_HOME:-$HOME/.local/share}/plasma/shells" || return 1
   rm -rf -- "${LOCK_SHELL:?}.new"
-  cp -r "$APPDIR/syncrain/lockscreen/package" "$LOCK_SHELL.new"
+  cp -r "$APPDIR/syncrain/lockscreen/package" "$LOCK_SHELL.new" \
+    || { info "the lock screen's package could not be copied"; return 1; }
   rm -rf -- "${LOCK_SHELL:?}"
-  mv "$LOCK_SHELL.new" "$LOCK_SHELL"
-  mkdir -p "$LOCK_STATE"
-  if ! "$BINDIR/syncrain" --write-scene "$LOCK_SCENE"; then
+  mv "$LOCK_SHELL.new" "$LOCK_SHELL" || { info "the lock screen's package could not be put in place"; return 1; }
+  mkdir -p "$LOCK_STATE" || return 1
+  # this run's options; a wallpaper the run then restarts writes it again with the service's own
+  if ! "$BINDIR/syncrain" --write-scene "$LOCK_SCENE" "${ARGS[@]}"; then
     info "the lock screen's scene could not be made, so it shows the box on black (see above)"
     return 1
   fi
@@ -538,8 +545,12 @@ EOF
 # Every install while the lock screen is in place: its module, package and scene on this build too.
 lock_screen_refresh() {
   lock_screen_installed || return 0
-  if lock_screen_build >/dev/null; then info "the lock screen: build $BUILD too"
-  else info "the lock screen keeps what it had (see above)"; fi
+  local said
+  if said="$(lock_screen_build 2>&1)"; then info "the lock screen: build $BUILD too"
+  else
+    printf '%s\n' "$said"
+    info "the lock screen could not be brought to build $BUILD (above); unlocking works as before"
+  fi
 }
 
 lock_screen_off() {
@@ -737,6 +748,10 @@ unit_words() {
   printf '%s' "${out# }"
 }
 
+# The lock screen before the wallpaper's (re)start below: the started wallpaper then writes the lock
+# screen's scene last, with the service's own options.
+if [ "$LOCK" = 1 ]; then lock_screen_on; else lock_screen_refresh; fi
+
 if [ "$AUTOSTART" = 1 ]; then
   bold "Setting up autostart"
   mkdir -p "$UNITDIR"
@@ -772,7 +787,6 @@ elif [ -f "$UNIT" ] && have_user_systemd && systemctl --user is-active --quiet s
 fi
 
 if [ "$LOGIN" = 1 ]; then login_screen_on; else login_screen_refresh; fi
-if [ "$LOCK" = 1 ]; then lock_screen_on; else lock_screen_refresh; fi
 
 # ---- 5. what next
 desktop="${XDG_CURRENT_DESKTOP:-}"

@@ -28,7 +28,8 @@ version = { file = "BUILD_NUMBER" }
 [tool.setuptools.package-data]
 syncrain = ["data/*.png", "data/*.json", "data/shaders/*", "native/*.c", "native/*.h", "native/build.sh",
             "native/protocols/*.xml", "lockscreen/*.cpp", "lockscreen/*.h", "lockscreen/CMakeLists.txt",
-            "lockscreen/package/metadata.json", "lockscreen/package/contents/lockscreen/*.qml"]
+            "lockscreen/package/metadata.json", "lockscreen/package/contents/lockscreen/*.qml",
+            "lockscreen/package/contents/lockscreen/qmldir"]
 
 [tool.pytest.ini_options]
 minversion = "7.0"

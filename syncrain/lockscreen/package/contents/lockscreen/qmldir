@@ -1,0 +1,2 @@
+# the conversation with PAM, one for every screen
+singleton Pam 1.0 Pam.qml

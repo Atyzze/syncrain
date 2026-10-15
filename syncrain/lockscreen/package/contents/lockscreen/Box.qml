@@ -12,7 +12,9 @@ Rectangle {
     property string title: ""
     property string message: ""
     property bool failing: false
+    property bool allowEmpty: false          // PAM needs no password: Unlock with an empty field
     signal submitted(string password)
+    signal edited()
 
     function clear() { password.text = ""; focusPassword(); }
     function focusPassword() { password.forceActiveFocus(); }
@@ -28,7 +30,7 @@ Rectangle {
     border.width: 1
 
     function send() {
-        if (password.text.length === 0)
+        if (password.text.length === 0 && !box.allowEmpty)
             return;
         const typed = password.text;
         password.text = "";
@@ -67,6 +69,7 @@ Rectangle {
                 border.color: password.activeFocus ? Qt.rgba(126 / 255, 182 / 255, 1, 0.85) : box.edge
             }
             onAccepted: box.send()
+            onTextEdited: box.edited()
             Keys.onEscapePressed: text = ""
 
             AbstractButton {

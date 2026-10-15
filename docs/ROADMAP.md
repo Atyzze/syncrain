@@ -13,7 +13,8 @@ Open questions, planned builds, the cadence and the constraints. What shipped: `
 ## Decisions answered
 
 * **2026-10-14 22:44**: the lock screen too, "a login box in the midde of our own", and "booted up
-  as soon as possible, even before LUKS pwd is asked". Builds 25 and 26 (below).
+  as soon as possible, even before LUKS pwd is asked". Builds 25 and 26 (the lock screen), 27
+  (below).
 * **2026-10-14 22:33**: "can we push this as new default template for syncrain on our github
   please", their settings file attached; the lock screen "still goes back to plasma thing" (Plasma's
   kscreenlocker; syncrain has not drawn it since build 15). Build 24.
@@ -42,7 +43,7 @@ Open questions, planned builds, the cadence and the constraints. What shipped: `
 
 ## Planned builds
 
-1. **The boot splash through the LUKS prompt** (26): a Plymouth theme drawing the rain, with the
+1. **The boot splash through the LUKS prompt** (27): a Plymouth theme drawing the rain, with the
    disk password asked in syncrain's box, until the login screen's live rain. Optional.
 2. **A NixOS image** with syncrain as its wallpaper and login screen.
 
@@ -57,6 +58,9 @@ What the documents and the review of build 17 leave to a build that changes code
 | L20: the stream id does not cover `renderer.py`'s geometry, `native/timing.c` or `index.html` | `syncrain/build.py` (`STREAM_FILES`) |
 | L21: no `flake.lock`, so a Nix build takes whatever nixpkgs is current | `flake.lock` |
 | An SVG as the logo: the page takes one, the desktop's `--logo` does not (Pillow draws no SVG) | `syncrain/logo.py`, with GTK's loader (librsvg) |
+| The lock screen draws at 30 fps on every screen while locked and lit (NVIDIA's explicit-sync growth is not turned off in KWin's greeter) | measure there; a lower rate after a while without input, `syncrain/lockscreen/rainitem.cpp` |
+| The lock screen shows no keyboard layout, and each screen's box keeps its own text (Plasma's shows the layout and syncs them) | `syncrain/lockscreen/package/` |
+| Plasma still loads its lock-screen wallpaper under syncrain's, unseen | `kscreenlockerrc`, only with `--lock-screen` |
 | The lock screen on NixOS: `nix/lockscreen.nix` builds it; nothing points KWin at it yet | `nix/nixos-module.nix` |
 | The settings file holds no `background`, `mask`, `scale` or `layer` (the page cannot preview a picture file) | `syncrain/app.py` (`CONFIG_KEYS`) and the page, if wanted |
 
