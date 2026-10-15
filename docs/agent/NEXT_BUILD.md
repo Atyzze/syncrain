@@ -1,8 +1,8 @@
-# The next build is 37
+# The next build is 38
 
 The first line is parsed: `# The next build is <N>`, exactly one above `BUILD_NUMBER`.
 
-## Build 37: the installer's items of the review of build 33
+## Build 38: Nix and the test harness: the review of build 33's items 2, 12, 16 to 18, 20 to 22 and 47
 
 * Read what the operator sent last, and answer it in one plain sentence first.
 * Then the review of build 33, in order (`docs/ROADMAP.md`, "Planned builds"). None of the builds

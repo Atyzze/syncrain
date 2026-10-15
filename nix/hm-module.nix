@@ -18,11 +18,17 @@ in
         Description = "syncrain live wallpaper";
         PartOf = [ "graphical-session.target" ];
         After = [ "graphical-session.target" ];
+        # a compositor or GPU that comes back after minutes still gets its wallpaper (the restarts slow
+        # down to one in two minutes); a failure no restart mends ends after 30 tries in ten minutes
+        StartLimitIntervalSec = 600;
+        StartLimitBurst = 30;
       };
       Service = {
         ExecStart = "${lib.getExe cfg.package} ${exec}";
         Restart = "on-failure";
         RestartSec = 3;
+        RestartSteps = 10;
+        RestartMaxDelaySec = 120;
         # statuses a restart cannot change: 69 no OpenGL here, 2 no wallpaper layer (GNOME) or an
         # option it cannot use, 70 a native wallpaper from another build, 78 a picture or font it
         # cannot use (`syncrain --diagnose`)

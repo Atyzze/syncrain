@@ -39,13 +39,20 @@ git clone https://github.com/Atyzze/syncrain && cd syncrain   # or unpack SYNCRA
   boot where nothing did) and recorded once greetd is in, so a run that stops leaves no record.
 * Elsewhere: `./install.sh` names what to install by hand, then `./install.sh --no-deps`; or hand
   the repository to an AI agent to adapt `install.sh`.
-* `--preset`, `--channel`, `--rainbow` and `--arg ...` (repeatable) go into the autostart service, the
-  lock screen's scene and, on a run with `--login-screen`, the login screen's rain. Also `--prefix
-  DIR`, `--no-deps`, `--yes`; `./install.sh --help`.
+* `--preset`, `--channel`, `--rainbow` and `--arg ...` (repeatable) are checked as the wallpaper
+  reads them, then go into the autostart service, the lock screen's scene and the login screen's
+  rain. The service is written again at every install where it is: with the options given now, or
+  with its own when none are given. Also `--prefix DIR` (or `SYNCRAIN_PREFIX`), `--no-deps`,
+  `--yes`; `./install.sh --help`.
 * `--config FILE`: a settings file from the web page, checked, then kept as
   `~/.config/syncrain/config.json` (one there before is kept as `config.json.before`). The service
-  is written again with only the options of that run, so the file decides; the login screen's rain
-  gets a copy.
+  and the login screen's rain are written again with only the options of that run, so the file
+  decides; the login screen gets a copy of it.
+* The app is made beside the installed one and swapped in whole, and only a folder this script
+  installed is ever replaced or removed (never the folder it runs from). The launcher runs the
+  Python the install checked: the system's with GTK 4's bindings, else the first on PATH with them
+  (`SYNCRAIN_PYTHON` picks another). `--uninstall` also takes the cache and state, and keeps
+  `~/.config/syncrain` (the settings).
 * The login screen is optional. Until `--login-screen` is run, the installer never touches how the
   machine logs in: installing, upgrading and removing the wallpaper leave the display manager,
   what starts at boot and their files as they are.

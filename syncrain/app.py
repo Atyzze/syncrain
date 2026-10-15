@@ -708,12 +708,12 @@ def main(argv=None):
             elif args.host == "native":
                 print("syncrain: the native wallpaper is not built here (install.sh builds it; "
                       "`syncrain --diagnose` says what it needs)", file=sys.stderr)
-                return 1
+                return 2                                  # a restart cannot build it
         elif args.host == "native":
             print("syncrain: the native wallpaper draws only the wallpaper on a Wayland session, paced by the "
                   "refresh; use --host gtk for X11, --window, --screenshot, --record, --video and --pacing timer",
                   file=sys.stderr)
-            return 1
+            return 2                                      # nor change what was asked
     _preload_layer_shell()
     if args.power_sweep:
         from .power import run_sweep

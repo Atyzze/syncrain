@@ -38,7 +38,7 @@ set_packages() {
     debian)
       PACKAGES=(python3 python3-gi python3-gi-cairo python3-cairo python3-pil gir1.2-gtk-4.0)
       LAYER_PACKAGES=(libgtk4-layer-shell0 gir1.2-gtk4layershell-1.0)   # the typelib does not bring the library
-      BUILD_PACKAGES=(gcc pkgconf libwayland-dev libdbus-1-dev)
+      BUILD_PACKAGES=(gcc libc6-dev pkgconf libwayland-dev libdbus-1-dev)   # gcc only recommends libc6-dev
       LOCK_PACKAGES=(cmake make g++ qt6-base-dev qt6-declarative-dev)
       LOGIN_PACKAGES=(greetd) ;;
     fedora)
@@ -61,7 +61,9 @@ set_packages() {
       LOGIN_PACKAGES=("greetd and agreety") ;;
   esac
 }
-PREFIX="${PREFIX:-$HOME/.local}"
+# SYNCRAIN_PREFIX, not PREFIX: a PREFIX left in the environment by a build of something else would
+# move the install without anyone asking
+PREFIX="${SYNCRAIN_PREFIX:-$HOME/.local}"
 SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 AUTOSTART=0 UNINSTALL=0 NODEPS=0 YES=0 LOGIN=0 LOGIN_OFF=0 LOCK=0 LOCK_OFF=0
 THEME="" CHANNEL="" RAINBOW="" CONFIG="" EXTRA=()
@@ -166,7 +168,7 @@ Options:
   --channel NAME        stream name (default: public)
   --rainbow MODE        logo (default), all or off
   --arg ARG             extra argument for syncrain, repeatable (e.g. --arg --fps --arg 24)
-  --prefix DIR          install under DIR instead of ~/.local
+  --prefix DIR          install under DIR instead of ~/.local (or SYNCRAIN_PREFIX)
   --no-deps             skip the system's packages (installed by hand: see the error without it)
   --yes                 do not ask the package manager for confirmation
   --uninstall           remove syncrain
@@ -196,8 +198,49 @@ while [ $# -gt 0 ]; do
   shift
 done
 
+# The prefix goes into the launcher and the service's ExecStart: a whole path, and none of the
+# characters a shell or systemd would read as their own
+# (links stay as written, so a linked ~/.local is still the folder on PATH; a realpath without -m
+# still gets a whole path)
+PREFIX="$(realpath -ms -- "$PREFIX" 2>/dev/null || case "$PREFIX" in /*) printf '%s\n' "$PREFIX" ;; *) printf '%s\n' "$PWD/$PREFIX" ;; esac)"
+case "$PREFIX" in
+  *[\"\$\`\\%]*|*$'\n'*) die "the prefix $PREFIX holds a character the launcher and the service cannot carry (\" \$ \` \\ %)" ;;
+esac
 APPDIR="$PREFIX/share/syncrain"
 BINDIR="$PREFIX/bin"
+# The Python syncrain runs with: the system's (/usr/bin/python3, where the family's packages go) when
+# it has GTK 4's bindings, cairo and Pillow, else the first python3 on PATH that has them (--no-deps, by hand), else
+# whichever there is (the check after the packages says what is missing). Not simply the first on
+# PATH: pyenv, conda or a venv there has none of the system's packages. SYNCRAIN_PYTHON decides.
+pick_python() {
+  local p
+  if [ -n "${SYNCRAIN_PYTHON:-}" ]; then printf '%s\n' "$SYNCRAIN_PYTHON"; return; fi
+  for p in /usr/bin/python3 "$(command -v python3 2>/dev/null || true)"; do
+    if [ -n "$p" ] && [ -x "$p" ] && "$p" -c 'import gi; gi.require_version("Gtk", "4.0"); from gi.repository import Gtk; import cairo, PIL' 2>/dev/null; then
+      printf '%s\n' "$p"; return
+    fi
+  done
+  command -v python3 2>/dev/null || printf '/usr/bin/python3\n'
+}
+PY="$(pick_python)"
+# The installs this script made carry this file; it removes no folder without it.
+MARKER=".installed-by-syncrain"
+# Whether $1 may be replaced or removed: nothing there, this script's install (its marker, or from
+# before the marker: the app with no install.sh or .git beside it), and never the folder this script
+# runs from or one holding it.
+ours_to_replace() {
+  local dir src
+  [ -e "$1" ] || return 0
+  dir="$(realpath -m -- "$1")" src="$(realpath -m -- "$SRC")"
+  case "$src/" in "$dir"/*) die "this folder ($SRC) is where the app goes ($1): unpack the release elsewhere and run install.sh from there" ;; esac
+  if [ -f "$1/$MARKER" ]; then return 0; fi
+  if [ -d "$1" ] && [ -z "$(ls -A -- "$1")" ]; then return 0; fi
+  if [ -d "$1/syncrain" ] && [ ! -e "$1/install.sh" ] && [ ! -e "$1/.git" ]; then return 0; fi
+  local why="no syncrain folder in it"
+  if [ -e "$1/.git" ]; then why="a .git in it"; elif [ -e "$1/install.sh" ]; then why="an install.sh in it"
+  elif [ ! -d "$1" ]; then why="not a folder"; fi
+  die "$1 is not an install of this script's (no $MARKER, $why), so it stays as it is"
+}
 UNITDIR="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
 UNIT="$UNITDIR/syncrain.service"
 have_user_systemd() { command -v systemctl >/dev/null && systemctl --user show-environment >/dev/null 2>&1; }
@@ -280,7 +323,7 @@ copy_settings() {
 }
 # Whether the settings file names symbol sets of its own (they go over a symbols file).
 settings_have_sets() {
-  [ -f "$1" ] && python3 -c 'import json, sys; sys.exit(0 if isinstance(json.load(open(sys.argv[1], encoding="utf-8")).get("glyphs"), dict) else 1)' "$1" 2>/dev/null
+  [ -f "$1" ] && "$PY" -c 'import json, sys; sys.exit(0 if isinstance(json.load(open(sys.argv[1], encoding="utf-8")).get("glyphs"), dict) else 1)' "$1" 2>/dev/null
 }
 # The copies of those settings login.sh made in the state folder go when they are copied anew: it
 # makes them again at its next start. (find does not go into a link in the folder's place.)
@@ -292,7 +335,7 @@ clear_state_copies() {
 # The hand-over after a login (syncrain/handover.py): Plasma's splash and wallpaper become a still
 # frame of the rain. It needs this user's Plasma session (its shell sets the wallpaper).
 in_plasma() { case "${XDG_CURRENT_DESKTOP:-}" in *KDE*) [ -n "${WAYLAND_DISPLAY:-}${DISPLAY:-}" ] ;; *) false ;; esac; }
-handover() { PYTHONPATH="$1" PYTHONSAFEPATH=1 python3 -m syncrain.handover "${@:2}"; }
+handover() { PYTHONPATH="$1" PYTHONSAFEPATH=1 "$PY" -m syncrain.handover "${@:2}"; }
 HANDOVER_STATE="${XDG_STATE_HOME:-$HOME/.local/state}/syncrain/handover.json"
 # This user's splash and wallpaper as they were: this folder's code, or the installed one's when this
 # folder is too old to have it.
@@ -303,7 +346,7 @@ handover_off() {
 # Who set the login screen up (login.json), or nothing. On a machine with more users, another user's
 # installs, upgrades and removals of the wallpaper leave it as that user set it up.
 login_user() {
-  python3 -c 'import json, sys; print(json.load(open(sys.argv[1], encoding="utf-8")).get("user", ""))' \
+  "$PY" -c 'import json, sys; print(json.load(open(sys.argv[1], encoding="utf-8")).get("user", ""))' \
     "$LOGIN_LIB/login.json" 2>/dev/null || true
 }
 mine() { [ -f "$LOGIN_LIB/login.json" ] && [ "$(login_user)" = "$(id -un)" ]; }
@@ -313,7 +356,7 @@ read_system_file() { if [ -r "$1" ]; then cat -- "$1"; elif [ -e "$1" ]; then as
 greetdconf() {
   local lib="$SRC"
   [ -f "$lib/syncrain/greetdconf.py" ] || lib="$APPDIR"
-  PYTHONPATH="$lib" PYTHONSAFEPATH=1 python3 -m syncrain.greetdconf "$@"
+  PYTHONPATH="$lib" PYTHONSAFEPATH=1 "$PY" -m syncrain.greetdconf "$@"
 }
 # The PAM file of the service greetd logs users in with ([general] service in its config), and of
 # the one it runs its greeter under ([default_session] service).
@@ -361,7 +404,7 @@ WALLET_LINES=("-auth       optional    pam_gnome_keyring.so" "-auth       option
 # A PAM file (stdin) without the lines --login-screen added: its mark, the wallet lines right after it,
 # and the blank line before it; nothing else.
 without_wallet() {
-  python3 -c 'import sys
+  "$PY" -c 'import sys
 mark, wallet = sys.argv[1], set(sys.argv[2:])
 lines, out, i = sys.stdin.buffer.read().decode("utf-8", "surrogateescape").split("\n"), [], 0
 while i < len(lines):
@@ -497,7 +540,7 @@ login_screen_on() {
     cp "$glyphs" "$tmp/glyphs.json"; rain+=(--glyphs "$LOGIN_LIB/glyphs.json")
   fi
   write_login_json() {
-    python3 -c 'import json, sys; json.dump({"user": sys.argv[2], "session": "plasma.desktop", "rain": sys.argv[3:]},
+    "$PY" -c 'import json, sys; json.dump({"user": sys.argv[2], "session": "plasma.desktop", "rain": sys.argv[3:]},
                 open(sys.argv[1], "w"), indent=1)' "$@"
   }
   write_login_json "$tmp/login.json" "$(id -un)" "${rain[@]}"
@@ -510,7 +553,7 @@ login_screen_on() {
       write_login_json "$tmp/draw.json" "$(id -un)" --config "$settings" "${ARGS[@]}"
     fi
     XDG_CACHE_HOME="$tmp/cache" SYNCRAIN_LOGIN_CONFIG="$tmp/draw.json" PYTHONPATH="$APPDIR" PYTHONSAFEPATH=1 \
-      python3 -m syncrain.greeter --draw-symbols || info "the symbols were not drawn now; the login screen draws them"
+      "$PY" -m syncrain.greeter --draw-symbols || info "the symbols were not drawn now; the login screen draws them"
   fi
   # Made beside the old copy and swapped in whole, so greetd never finds half of one. Root reads
   # nothing of this user's: the app comes as a stream (copy_app_to_root), every other file through
@@ -698,9 +741,30 @@ login_screen_refresh() {
     if [ -d "$LOGIN_STATE" ]; then as_root chmod 700 "$LOGIN_STATE"; fi
   fi
   info "the login screen: build $BUILD too"
+  # Options given now, or a new settings file, are the login screen's too, as they are the service's:
+  # its options from before would go over the new settings and draw another rain there.
+  if [ ${#ARGS[@]} -gt 0 ] || [ -n "$CONFIG" ]; then
+    local made
+    made="$(mktemp)"
+    if "$PY" -c 'import json, os, sys
+path, out, lib, args = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4:]
+login = json.load(open(path, encoding="utf-8"))
+glyphs = os.path.join(lib, "glyphs.json")
+try:
+    sets = isinstance(json.load(open(os.path.join(lib, "config.json"), encoding="utf-8")).get("glyphs"), dict)
+except (OSError, ValueError, AttributeError):
+    sets = False
+login["rain"] = args + (["--glyphs", glyphs] if os.path.isfile(glyphs) and not sets else [])
+json.dump(login, open(out, "w", encoding="utf-8"), indent=1)' "$LOGIN_LIB/login.json" "$made" "$LOGIN_LIB" "${ARGS[@]}"; then
+      copy_to_root "$made" "$LOGIN_LIB/login.json"
+      as_root chmod a+r "$LOGIN_LIB/login.json"
+      info "the login screen's options: as given now (${ARGS[*]:-none})"
+    fi
+    rm -f "$made"
+  fi
   local rain=()
   # the login screen's options without its copy of the symbols file (here syncrain reads yours)
-  mapfile -t rain < <(python3 -c '
+  mapfile -t rain < <("$PY" -c '
 import json, sys
 args = json.load(open(sys.argv[1])).get("rain", [])
 skip = {i + 1 for i, a in enumerate(args) if a == "--glyphs"} | {i for i, a in enumerate(args) if a == "--glyphs"}
@@ -834,20 +898,17 @@ lock_screen_off() {
   fi
 }
 
-if [ "$LOCK_OFF" = 1 ]; then
-  lock_screen_off
-  exit 0
-fi
-
-if [ "$LOGIN_OFF" = 1 ]; then
-  login_screen_off
-  exit 0
-fi
-
-if [ "$UNINSTALL" = 1 ]; then
+# The ways back, each asked for one runs, in this order, and nothing is installed after them.
+if [ "$LOCK_OFF" = 1 ] || [ "$LOGIN_OFF" = 1 ] || [ "$UNINSTALL" = 1 ]; then
+  # an uninstall that would refuse the app's folder refuses before anything else is taken away
+  if [ "$UNINSTALL" = 1 ]; then ours_to_replace "$APPDIR"; fi
+  if [ "$LOCK_OFF" = 1 ]; then lock_screen_off; fi
+  if [ "$LOGIN_OFF" = 1 ]; then login_screen_off; fi
+  [ "$UNINSTALL" = 1 ] || exit 0
   # syncrain's login screen goes too when this user set it up. Another user's stays, and without one
   # the login screen is not touched at all.
-  if mine; then login_screen_off
+  if [ "$LOGIN_OFF" = 1 ]; then :
+  elif mine; then login_screen_off
   else
     if [ -f "$LOGIN_LIB/login.json" ]; then info "the login screen stays as $(login_user) set it up (--login-screen-off takes it out)"; fi
     if [ -f "$HANDOVER_STATE" ]; then handover_off; fi
@@ -861,8 +922,21 @@ if [ "$UNINSTALL" = 1 ]; then
     if have_user_systemd; then systemctl --user daemon-reload || true; fi
     info "removed the autostart service"
   fi
-  rm -rf "$APPDIR" "$BINDIR/syncrain"
-  info "removed $APPDIR and $BINDIR/syncrain"
+  state="${XDG_STATE_HOME:-$HOME/.local/state}/syncrain"
+  gone=("$APPDIR" "$BINDIR/syncrain" "${XDG_CACHE_HOME:-$HOME/.cache}/syncrain")
+  # the records a way back kept because it could not finish (Plasma's shell did not answer, its
+  # config could not be written) are what running it again needs: the state folder stays with them
+  kept=""
+  for f in "$state/handover.json" "$state"/*.before-syncrain; do
+    if [ -e "$f" ]; then kept=1; fi
+  done
+  if [ -n "$kept" ]; then info "kept $state: it holds what --login-screen-off needs to put Plasma's wallpapers back"
+  else gone+=("$state"); fi
+  for f in "${gone[@]}"; do
+    if [ -e "$f" ] || [ -L "$f" ]; then rm -rf -- "$f"; info "removed $f"; fi
+  done
+  conf="${XDG_CONFIG_HOME:-$HOME/.config}/syncrain"
+  if [ -d "$conf" ]; then info "kept your settings: $conf (remove it yourself if you do not want them)"; fi
   info "the system's packages were left installed: ${PACKAGES[*]} ${LAYER_PACKAGES[*]} ${BUILD_PACKAGES[*]}"
   exit 0
 fi
@@ -897,7 +971,8 @@ if [ "$NODEPS" = 0 ]; then
 fi
 
 # ---- 2. sanity check: the Python bindings load
-python3 - <<'EOF' || die "the Python dependencies did not load (see above)"
+PY="$(pick_python)"                   # the packages may have just gone into the system's Python
+"$PY" - <<'EOF' || die "the Python dependencies did not load in $PY (see above; SYNCRAIN_PYTHON picks another)"
 import gi
 gi.require_version("Gtk", "4.0")
 from gi.repository import Gtk  # noqa: F401
@@ -915,6 +990,10 @@ except Exception:  # noqa: BLE001 - ValueError: none; GLib.Error: the typelib wi
 EOF
 
 # ---- 3. the app
+# Made beside the installed one (APPDIR.new) and swapped in whole: an upgrade that stops half way
+# leaves the installed app as it was. A folder is only ever replaced or removed when it is this
+# script's install, never a checkout that happens to be where the app goes.
+ours_to_replace "$APPDIR"
 if [ -f "$APPDIR/BUILD_NUMBER" ]; then
   OLD="$(tr -d '[:space:]' < "$APPDIR/BUILD_NUMBER")"
   if [ "$OLD" = "$BUILD" ]; then bold "Reinstalling syncrain build $BUILD into $APPDIR"
@@ -924,22 +1003,49 @@ elif [ -d "$APPDIR" ]; then
 else
   bold "Installing syncrain build $BUILD into $APPDIR"
 fi
-rm -rf "$APPDIR"
-mkdir -p "$APPDIR" "$BINDIR"
-cp -r "$SRC/syncrain" "$APPDIR/"
-find "$APPDIR" -name '__pycache__' -type d -prune -exec rm -rf {} +
-for f in BUILD_NUMBER README.md LICENSE; do [ -f "$SRC/$f" ] && cp "$SRC/$f" "$APPDIR/"; done
-if [ -f "$SRC/index.html" ]; then cp "$SRC/index.html" "$APPDIR/"; fi
+STAGE="$APPDIR.new"
+rm -rf "$STAGE"
+trap '[ -e "$APPDIR" ] || [ ! -e "$APPDIR.old" ] || mv "$APPDIR.old" "$APPDIR"; rm -rf "$STAGE"' EXIT
+mkdir -p "$STAGE" "$BINDIR"
+cp -r "$SRC/syncrain" "$STAGE/"
+find "$STAGE" -name '__pycache__' -type d -prune -exec rm -rf {} +
+for f in BUILD_NUMBER README.md LICENSE; do [ -f "$SRC/$f" ] && cp "$SRC/$f" "$STAGE/"; done
+if [ -f "$SRC/index.html" ]; then cp "$SRC/index.html" "$STAGE/"; fi
+: > "$STAGE/$MARKER"
 
 # The native wallpaper (syncrain/native/) draws on Wayland with neither Python nor GTK in memory.
-# Without it, the Python and GTK host draws the same frames, as before.
-NATIVE="$APPDIR/syncrain/native/syncrain-wallpaper"
-if log="$(sh "$APPDIR/syncrain/native/build.sh" "$NATIVE" 2>&1)"; then
+# Without it, the Python and GTK host draws the same frames, as before. One built in the source
+# folder by hand goes first: when this build fails, no other build's program stays behind.
+rm -f "$STAGE/syncrain/native/syncrain-wallpaper"
+if log="$(sh "$STAGE/syncrain/native/build.sh" "$STAGE/syncrain/native/syncrain-wallpaper" 2>&1)"; then
   info "native wallpaper: built"
 else
   printf '\033[33mnote:\033[0m the native wallpaper did not build, so the Python and GTK host draws instead (it is built with: %s):\n' "${BUILD_PACKAGES[*]}"
   printf '%s\n' "$log" | tail -n 6 | sed 's/^/    /'
 fi
+# The options for the service and the settings file are checked as the new app reads them, before
+# anything is swapped or kept: a misspelt preset in the service would only stop it at every login.
+ARGS=()
+# --option=value: a channel that starts with "-" is then no option
+[ -n "$THEME" ] && ARGS+=("--preset=$THEME")
+[ -n "$CHANNEL" ] && ARGS+=("--channel=$CHANNEL")
+[ -n "$RAINBOW" ] && ARGS+=("--rainbow=$RAINBOW")
+ARGS+=("${EXTRA[@]}")
+staged() { PYTHONPATH="$STAGE" PYTHONSAFEPATH=1 "$PY" -m syncrain "$@"; }
+staged --config none --build >/dev/null || die "the new app does not run in $PY (see above)"
+if [ -n "$CONFIG" ]; then
+  staged --config "$CONFIG" "${ARGS[@]}" --check-config >/dev/null \
+    || die "$CONFIG${ARGS[*]:+ or these options (${ARGS[*]})} cannot be used (see above)"
+elif [ ${#ARGS[@]} -gt 0 ]; then
+  staged "${ARGS[@]}" --check-config >/dev/null \
+    || die "these options (${ARGS[*]}) or your settings file (${XDG_CONFIG_HOME:-$HOME/.config}/syncrain/config.json) cannot be used (see above)"
+fi
+
+rm -rf "$APPDIR.old"
+if [ -d "$APPDIR" ]; then mv "$APPDIR" "$APPDIR.old"; fi
+mv "$STAGE" "$APPDIR"
+rm -rf "$APPDIR.old"
+trap - EXIT
 
 cat > "$BINDIR/syncrain" <<EOF
 #!/bin/sh
@@ -959,18 +1065,17 @@ PYTHONPATH="\$APPDIR\${PYTHONPATH:+:\$PYTHONPATH}"; export PYTHONPATH
 # python -m puts the current directory first on the module path; without this, running syncrain
 # from inside an unpacked release folder starts that folder's copy instead of the installed one
 PYTHONSAFEPATH=1; export PYTHONSAFEPATH
-exec "\${SYNCRAIN_PYTHON:-python3}" -m syncrain "\$@"
+exec "\${SYNCRAIN_PYTHON:-$PY}" -m syncrain "\$@"
 EOF
 chmod +x "$BINDIR/syncrain"
 "$BINDIR/syncrain" --config none --build >/dev/null || die "the launcher does not run"
 info "launcher: $BINDIR/syncrain ($("$BINDIR/syncrain" --config none --build))"
 
-# The settings file the web page exported: checked as the wallpaper reads it, then kept where it
+# The settings file the web page exported: checked above as the wallpaper reads it, then kept where it
 # looks. Options given to this installer still go over it; a service written by an earlier
 # install is written again, so options it kept from then do not.
 if [ -n "$CONFIG" ]; then
   settings="${XDG_CONFIG_HOME:-$HOME/.config}/syncrain/config.json"
-  "$BINDIR/syncrain" --config "$CONFIG" --check-config >/dev/null || die "$CONFIG cannot be used (see above)"
   mkdir -p "$(dirname "$settings")"
   # the file itself given again (edited where it is) is kept as it is; another one replaces it
   # whole, through a new file, so a link in its place (dotfiles) is replaced and not written through
@@ -980,24 +1085,11 @@ if [ -n "$CONFIG" ]; then
     mv -f "$settings.new" "$settings"
   fi
   info "settings: $settings (from $CONFIG)"
-  if [ -f "$UNIT" ]; then
-    AUTOSTART=1
-    was="$(sed -n 's/^ExecStart=//p' "$UNIT")"
-    case "$was" in
-      *" "*) info "the service's options from before go, so the settings file decides: $was (give them again with --arg to keep one)" ;;
-    esac
-  fi
 fi
 
 remove_plasma_wallpaper
 
 # ---- 4. autostart
-ARGS=()
-# --option=value: a channel that starts with "-" is then no option
-[ -n "$THEME" ] && ARGS+=("--preset=$THEME")
-[ -n "$CHANNEL" ] && ARGS+=("--channel=$CHANNEL")
-[ -n "$RAINBOW" ] && ARGS+=("--rainbow=$RAINBOW")
-ARGS+=("${EXTRA[@]}")
 # Shell words, for the compositor hints below.
 quote() { local out="" a; for a in "$@"; do out+=" '${a//\'/\'\\\'\'}'"; done; printf '%s' "$out"; }
 # Words for a systemd ExecStart line. systemd splits like a shell but reads backslashes as escapes
@@ -1016,19 +1108,45 @@ unit_words() {
 # screen's scene last, with the service's own options.
 if [ "$LOCK" = 1 ]; then lock_screen_on; else lock_screen_refresh; fi
 
-if [ "$AUTOSTART" = 1 ]; then
-  bold "Setting up autostart"
+# The service: written with --autostart, and again at every install where it is (a fix to it reaches
+# an upgrade). Its options are the ones given now; with none given (and no new settings file, which
+# decides instead), the ones it had.
+if [ "$AUTOSTART" = 1 ] || [ -f "$UNIT" ]; then
+  exec_line="$(unit_words "$BINDIR/syncrain" "${ARGS[@]}")"
+  was=""
+  if [ -f "$UNIT" ]; then was="$(sed -n 's/^ExecStart=//p' "$UNIT" | head -n 1)"; fi
+  if [ -n "$was" ] && [ ${#ARGS[@]} -eq 0 ] && [ -z "$CONFIG" ]; then
+    # the options it had, after this install's launcher: a service another prefix wrote would
+    # otherwise go on starting that install's build
+    launcher="$(printf '%s' "$was" | sed -E "s/^('[^']*'|\"[^\"]*\"|[^ '\"]+)( +|$).*/\1/")"
+    rest="${was#"$launcher"}"; rest="${rest# }"
+    exec_line="$(unit_words "$BINDIR/syncrain")${rest:+ $rest}"
+    if [ "$launcher" != "$(unit_words "$BINDIR/syncrain")" ]; then
+      info "the service started $launcher; it now starts $BINDIR/syncrain"
+    fi
+  elif [ -n "$was" ] && [ "$was" != "$exec_line" ]; then
+    case "$was" in
+      *" "*) info "the service's options from before go: $was (give them again to keep one)" ;;
+    esac
+  fi
+  if [ "$AUTOSTART" = 1 ]; then bold "Setting up autostart"; fi
   mkdir -p "$UNITDIR"
-  cat > "$UNIT" <<EOF
+  cat > "$UNIT.new" <<EOF
 [Unit]
 Description=syncrain live wallpaper
 PartOf=graphical-session.target
 After=graphical-session.target
+# a compositor or GPU that comes back after minutes still gets its wallpaper (the restarts slow
+# down to one in two minutes); a failure no restart mends ends after 30 tries in ten minutes
+StartLimitIntervalSec=600
+StartLimitBurst=30
 
 [Service]
-ExecStart=$(unit_words "$BINDIR/syncrain" "${ARGS[@]}")
+ExecStart=$exec_line
 Restart=on-failure
 RestartSec=3
+RestartSteps=10
+RestartMaxDelaySec=120
 # statuses a restart cannot change, so it would only start the same failure every 3 s: 69 no OpenGL here,
 # 2 no wallpaper layer (GNOME) or an option it cannot use, 70 a native wallpaper from another build,
 # 78 a picture or font it cannot use (syncrain --diagnose says why)
@@ -1037,17 +1155,33 @@ RestartPreventExitStatus=2 69 70 78
 [Install]
 WantedBy=graphical-session.target
 EOF
+  # lines added to it by hand (a key syncrain does not write) would be lost with each install: the
+  # file is kept beside it
+  own='^(\[(Unit|Service|Install)\]|(Description|PartOf|After|StartLimitIntervalSec|StartLimitBurst|ExecStart|Restart|RestartSec|RestartSteps|RestartMaxDelaySec|RestartPreventExitStatus|WantedBy)=.*|#.*|[[:space:]]*)$'
+  if [ -f "$UNIT" ] && grep -qvE "$own" "$UNIT"; then
+    cp "$UNIT" "$UNIT.before"
+    info "the service file had lines of its own, kept in $UNIT.before; lasting changes go in a drop-in: systemctl --user edit syncrain"
+  fi
+  mv -f "$UNIT.new" "$UNIT"
   if have_user_systemd; then
     systemctl --user daemon-reload
-    systemctl --user enable syncrain.service >/dev/null 2>&1 && info "enabled: starts with your next graphical login"
-    if systemctl --user is-active --quiet graphical-session.target; then
-      systemctl --user restart syncrain.service && info "started now"
+    if [ "$AUTOSTART" = 1 ]; then
+      systemctl --user enable syncrain.service >/dev/null 2>&1 && info "enabled: starts with your next graphical login"
     fi
-  else
+    # A running one restarts on the new build wherever it was started. A stopped one starts only in a
+    # graphical session, with --autostart, or after a failure (its cause may be mended) when it is
+    # still enabled: one turned off stays off.
+    if systemctl --user is-active --quiet syncrain.service; then
+      systemctl --user restart syncrain.service && info "restarted, on build $BUILD"
+    elif systemctl --user is-active --quiet graphical-session.target \
+        && { [ "$AUTOSTART" = 1 ] || { systemctl --user is-failed --quiet syncrain.service \
+             && systemctl --user is-enabled --quiet syncrain.service; }; }; then
+      systemctl --user reset-failed syncrain.service >/dev/null 2>&1 || true
+      systemctl --user restart syncrain.service && info "started now, on build $BUILD"
+    fi
+  elif [ "$AUTOSTART" = 1 ]; then
     info "wrote $UNIT; enable it from your desktop session with: systemctl --user enable --now syncrain.service"
   fi
-elif [ -f "$UNIT" ] && have_user_systemd && systemctl --user is-active --quiet syncrain.service; then
-  systemctl --user restart syncrain.service && info "restarted the running wallpaper on build $BUILD"
 fi
 
 if [ "$LOGIN" = 1 ]; then login_screen_on; else login_screen_refresh; fi

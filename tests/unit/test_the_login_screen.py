@@ -229,6 +229,12 @@ def test_install_makes_the_rain_the_login_screen_and_puts_sddm_back_after(tmp_pa
     again = login_install(tmp_path)                   # a newer build: the login screen's copy follows
     assert again.returncode == 0 and "the login screen: build" in again.stdout, again.stdout + again.stderr
     assert json.loads((lib / "login.json").read_text())["rain"][:1] == ["--preset=matrix"]
+    page = tmp_path / "page.json"                     # a settings file from the page: it decides there too
+    page.write_text(json.dumps({"contract": "syncrain-config-1", "preset": "nixos"}))
+    decided = login_install(tmp_path, "--config", str(page))
+    assert decided.returncode == 0, decided.stdout + decided.stderr
+    assert json.loads((lib / "login.json").read_text())["rain"] == ["--glyphs", f"{lib}/glyphs.json"]
+    assert json.loads((lib / "config.json").read_text())["preset"] == "nixos"
 
     off = login_install(tmp_path, "--login-screen-off")
     assert off.returncode == 0, off.stdout + off.stderr
