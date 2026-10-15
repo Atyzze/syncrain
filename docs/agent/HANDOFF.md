@@ -37,7 +37,8 @@ This page, `docs/agent/NEXT_BUILD.md`, `docs/agent/WORKING_WITH_THE_OPERATOR.md`
 * **The login and lock screens stay optional**: only `--login-screen` and `--lock-screen` touch
   them, and `-off` puts back what was there. `tests/unit/test_the_login_screen_is_optional.py` and
   `tests/unit/test_the_lock_screen_is_optional.py` hold every build to it. The lock screen is tested
-  in a real headless KWin, not yet seen on the operator's machine.
+  in a real headless KWin, and in use on the operator's desktop since build 26 (their request of
+  2026-10-15 10:45 came from using it); `syncrain/lockscreen/` is unchanged since build 27.
 * **Boot stays plain text** (the operator, 2026-10-15): never the bootloader, the initramfs or a
   boot splash.
 * **Stream**: `822ea58a` since build 29 (sentences' gaps and trails in `state.frag`); `85ace386` in
@@ -48,8 +49,6 @@ This page, `docs/agent/NEXT_BUILD.md`, `docs/agent/WORKING_WITH_THE_OPERATOR.md`
 
 ## Waits on the operator
 
-* Whether build 27's lock screen comes up and unlocks on their desktop (two screens, NVIDIA), and
-  how it looks.
 * Anyone booting Debian, Fedora or openSUSE with the login or lock screen (only the roots so far;
   Fedora's SELinux is untried).
 * A video's watts against the live rain's, measured there.

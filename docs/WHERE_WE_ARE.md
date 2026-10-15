@@ -25,7 +25,7 @@ plain text by design: the text means the machine is not up yet, the rain that it
   the rain and a box on every screen; `--login-screen-off` puts back what was there.
 * **The lock screen** (optional, build 27): `./install.sh --lock-screen`, then log out and in once;
   the rain stays live, your box comes up on a key or a moved mouse and is the same on every screen.
-  Not yet seen on your machine.
+  In use on your desktop since build 26; its code unchanged since build 27.
 * **Videos** (build 29): `syncrain --video rain.mp4` or the page's Video section, a seamless loop.
 * **Four families** (build 31): `./install.sh` on Arch, Debian, Fedora and openSUSE, each installed
   for real in a root of its own; anything else gets the packages named, or its AI agent.
@@ -39,7 +39,7 @@ plain text by design: the text means the machine is not up yet, the rain that it
 
 ## What comes next
 
-* **Next**: what you find when you try it (the lock screen on CachyOS, the flavour on NixOS); an
+* **Next**: what you find when you try the flavour on NixOS; an
   installer ISO if you want one.
 * **Build 40**: the next consolidation (every number ending in 0).
 

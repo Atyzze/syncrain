@@ -5,7 +5,7 @@ The first line is parsed: `# The next build is <N>`, exactly one above `BUILD_NU
 ## Build 34: what the operator asks next
 
 * Read what the operator sent last, and answer it in one plain sentence first.
-* Without a request: wait for what they find on the lock screen (CachyOS) and the flavour (NixOS);
+* Without a request: wait for what they find with the flavour on NixOS;
   an installer ISO only if they ask (`docs/ROADMAP.md`).
 * No boot splash: never touch the bootloader, initramfs or Plymouth.
 
