@@ -15,7 +15,7 @@ import tokenize
 
 import pytest
 
-from tests.conftest import ROOT
+from tests.conftest import ROOT, need
 
 #: f-strings, as source, and whether Python 3.10 and 3.11 refuse them (python3.11 agrees, below).
 SAMPLES = {
@@ -125,8 +125,7 @@ def test_the_app_has_no_f_string_only_newer_pythons_read():
 def test_an_older_python_here_compiles_the_app_and_refuses_what_the_check_finds():
     major, minor = oldest()
     older = [exe for exe in (shutil.which(f"python{major}.{m}") for m in range(minor, 12)) if exe]
-    if not older:
-        pytest.skip(f"no Python {major}.{minor} to 3.11 here; the tokenizer's check stands for it")
+    need(bool(older), f"no Python {major}.{minor} to 3.11 here; the tokenizer's check stands for it")
     for exe in older:
         done = subprocess.run([exe, "-I", "-c", COMPILE, *map(str, app_files())], capture_output=True, text=True,
                               timeout=120)

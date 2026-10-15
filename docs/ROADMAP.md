@@ -46,7 +46,7 @@ critical first, one area a build:
    stream change.
 2. **36** (done): the login screen (4 to 7, 23, 31 to 38).
 3. **37** (done): the installer (8 to 11, 39 to 46).
-4. **38**: Nix and the test harness (2, 12, 16 to 18, 20 to 22, 47).
+4. **38** (done): Nix and the test harness (2, 12, 16 to 18, 20 to 22, 47).
 5. **39**: the native host and the Python host (14, 15, 29, 48 to 55, 57 to 64, 67, 68).
 6. **40**: the consolidation.
 7. **41**: the page and the release tool (13, 19, 24 to 26, 70 to 75, 77 to 84).
@@ -62,7 +62,6 @@ What the documents and the review of build 17 leave to a build that changes code
 | L8: KDE's wallet does not open after greetd's text login | not known yet; the wallet lines are `install.sh`'s, in greetd's PAM service |
 | L11: `--scale` below about 0.4 changes the picture (the page as a wallpaper does the same, so the two agree) | the cell size in `syncrain/renderer.py` (`geometry`), `syncrain/native/timing.c` (`geometry_compute`), `index.html` |
 | L20: the stream id does not cover `renderer.py`'s geometry, `native/timing.c` or `index.html` | `syncrain/build.py` (`STREAM_FILES`) |
-| L21: no `flake.lock`, so a Nix build takes whatever nixpkgs is current | `flake.lock` |
 | An SVG as the logo: the page takes one, the desktop's `--logo` does not (Pillow draws no SVG) | `syncrain/logo.py`, with GTK's loader (librsvg) |
 | The lock screen draws at 30 fps on every screen while locked and lit (NVIDIA's explicit-sync growth is not turned off in KWin's greeter) | measure there; a lower rate after a while without input, `syncrain/lockscreen/rainitem.cpp` |
 | The lock screen shows no keyboard layout (Plasma's does) | `syncrain/lockscreen/package/` |

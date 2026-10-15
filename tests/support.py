@@ -22,6 +22,30 @@ GL_NONE = {"GDK_DEBUG": "gl-disable", "GDK_DISABLE": "gl"}
 MOMENT = 1791331207
 
 
+def said_when_stopped(proc: subprocess.Popen, timeout: float = 30) -> str:
+    """What a process said on stderr, once it is stopped: an assertion's message that reads the
+    stderr of a process still running waits for its end for good, so the lane hangs instead of
+    failing, and the finally that would stop it never runs."""
+    if proc.poll() is None:
+        proc.send_signal(signal.SIGTERM)
+    try:
+        _out, err = proc.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        # its whole group, when it leads one: a child still holding stderr open would keep the read
+        # below waiting as long as it lives
+        try:
+            os.killpg(proc.pid, signal.SIGKILL)
+        except (ProcessLookupError, PermissionError):
+            proc.kill()
+        try:
+            _out, err = proc.communicate(timeout=5)
+        except subprocess.TimeoutExpired as late:
+            err = late.stderr
+    if isinstance(err, bytes):
+        err = err.decode(errors="replace")
+    return err or ""
+
+
 def mean_abs_diff(a: Path, b: Path) -> float:
     from PIL import Image, ImageChops, ImageStat
     x, y = Image.open(a).convert("RGB"), Image.open(b).convert("RGB")
@@ -75,6 +99,22 @@ def headless_sway(run: Path, screen: str = "1280x720"):
 def grab(session: dict, path: Path) -> None:
     """What the Wayland session's screen shows, as a PNG (grim)."""
     subprocess.run(["grim", str(path)], env=dict(os.environ, **session), check=True, timeout=30)
+
+
+def grab_settled(session: dict, path: Path, unlike: Path | None = None, timeout: float = 30.0) -> None:
+    """A grab of a still picture (a frozen clock) once it stands: two grabs half a second apart that
+    are the same, and not `unlike` (the empty screen). A fixed wait raced a cold shader cache."""
+    previous = path.with_name(path.stem + ".before.png")
+    grab(session, previous)
+    deadline = time.monotonic() + timeout
+    while True:
+        time.sleep(0.5)
+        grab(session, path)
+        if mean_abs_diff(previous, path) == 0 and (unlike is None or mean_abs_diff(path, unlike) > 1.0):
+            return
+        if time.monotonic() > deadline:
+            return                                   # the comparison that follows says what it shows
+        previous.write_bytes(path.read_bytes())
 
 
 def stub(folder: Path, name: str, body: str) -> Path:

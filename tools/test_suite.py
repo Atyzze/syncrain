@@ -51,18 +51,50 @@ def main(argv: list[str] | None = None) -> int:
     if args.require_all:
         env["SYNCRAIN_REQUIRE_ALL"] = "1"
     command = [sys.executable, "-m", "pytest", "-vv" if args.verbose else "-q", "-rs", *LANES[args.lane]]
-    # The lane leads its own session, so a stopped run takes everything it started with it.
-    lane = subprocess.Popen(command, cwd=ROOT, env=env, start_new_session=True)
+    # The lane leads its own session, so a stopped run takes everything it started with it. Stopped,
+    # pytest is interrupted first (SIGINT: its teardowns run and stop what each test started, Xvfb,
+    # Sway and KWin in sessions of their own included), and only then, after a minute, the whole
+    # session is ended.
+    # A shell's `cmd &` (the release runs that way) starts it with SIGINT ignored, which pytest would
+    # inherit and then never be interrupted: the lane gets the default back.
+    lane = subprocess.Popen(command, cwd=ROOT, env=env, start_new_session=True,
+                            preexec_fn=lambda: signal.signal(signal.SIGINT, signal.SIG_DFL))
+
+    def signal_lane(sig) -> bool:
+        try:
+            if sig == signal.SIGINT:
+                lane.send_signal(sig)               # pytest alone: it tears down
+            else:
+                os.killpg(lane.pid, sig)
+        except ProcessLookupError:
+            return False
+        return True
 
     def stop(signum, _frame):
-        try:
-            os.killpg(lane.pid, signal.SIGTERM)
-        except ProcessLookupError:
-            pass
+        for sig, wait in ((signal.SIGINT, 60), (signal.SIGTERM, 10), (signal.SIGKILL, 5)):
+            if not signal_lane(sig):
+                break
+            try:
+                lane.wait(timeout=wait)
+            except subprocess.TimeoutExpired:
+                continue
+            signal_lane(signal.SIGTERM)             # whatever the teardowns left behind
+            break
         raise SystemExit(128 + signum)
     for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
         signal.signal(sig, stop)
-    return lane.wait()
+    # A test that hangs (a process that never says the line awaited) ends the lane, as a failure,
+    # rather than the release waiting for good: "all" takes about 20 minutes here.
+    limit = 3600 if args.lane == "all" else 1800
+    try:
+        return lane.wait(timeout=limit)
+    except subprocess.TimeoutExpired:
+        print(f"test_suite: the {args.lane} lane ran past {limit // 60} minutes; stopped", file=sys.stderr, flush=True)
+        try:
+            stop(signal.SIGALRM, None)
+        except SystemExit:
+            pass
+        return 124
 
 
 if __name__ == "__main__":

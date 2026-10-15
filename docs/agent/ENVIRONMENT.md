@@ -7,7 +7,7 @@ What every lane needs, how to bring a sandbox up, and its traps. `tools/prepare_
 
 | Lane | Needs |
 | --- | --- |
-| unit, contract | Python 3.11+ with PyGObject, Pillow, pycairo, pytest, pyflakes; shellcheck, zstd |
+| unit, contract | Python 3.11+ with PyGObject, Pillow, pycairo, pytest, pyflakes; shellcheck, zstd; ffmpeg; node; Python 3.10 or 3.11 beside it (the oldest-Python check) |
 | native | cc, pkg-config, wayland-scanner, libwayland-client/-egl and libdbus-1 headers |
 | render | GTK 4.14+ with typelibs, Mesa (llvmpipe is fine), Xvfb |
 | wayland | sway, grim, gtk4-layer-shell 1.x with its typelib on `GI_TYPELIB_PATH` |
@@ -28,7 +28,9 @@ The release runs every lane with `--require-all`: a missing environment fails it
 3. gtk4-layer-shell v1.3.0 from source (`meson setup build -Dintrospection=true`, `ninja -C build
    install`), then `export GI_TYPELIB_PATH=/usr/local/lib/x86_64-linux-gnu/girepository-1.0`.
 4. `npm i -g playwright`.
-5. Shallow clones of nixpkgs and home-manager; export their paths.
+5. nixpkgs at the revision `flake.lock` pins (`git init`, then `git fetch --depth 1
+   https://github.com/NixOS/nixpkgs <rev>` and check it out, or that revision's channel tarball) and
+   a shallow clone of home-manager; export their paths. The nix lane holds the two revisions equal.
 6. KWin 6: `nix build --no-link --print-out-paths -f "$SYNCRAIN_NIXPKGS" kdePackages.kwin`; export
    `SYNCRAIN_KWIN=<path>/bin/kwin_wayland`. It runs headless with software compositing; a 141 Hz
    screen comes from a `kwinoutputconfig.json` the lane writes (`FAST_SCREEN` in

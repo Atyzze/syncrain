@@ -37,7 +37,7 @@
       templates.default = {
         path = ./nix/template;
         description = "A NixOS desktop with syncrain backdrop: the rain as wallpaper, login screen and lock screen";
-        welcomeText = "Copy /etc/nixos/hardware-configuration.nix here, change the lines marked CHANGE in configuration.nix, git add, then: sudo nixos-rebuild switch --flake .#backdrop";
+        welcomeText = "cp -r /etc/nixos machine (your machine as it is), set your user name where configuration.nix says CHANGE, git init && git add ., then: sudo nixos-rebuild switch --flake .#backdrop (README.md says more)";
       };
 
       # `nix flake check` evaluates a NixOS system with the service enabled

@@ -24,7 +24,8 @@ import pytest
 
 from syncrain import build
 from tests.conftest import need
-from tests.support import GL_NONE, GL_ONLY_ES, MOMENT, brightness, grab, headless_sway, mean_abs_diff
+from tests.support import (GL_NONE, GL_ONLY_ES, MOMENT, brightness, grab, grab_settled, headless_sway,
+                           mean_abs_diff, said_when_stopped)
 
 
 @pytest.fixture(autouse=True, scope="module")
@@ -78,7 +79,7 @@ def test_the_wallpaper_is_on_screen_and_stops_cleanly(root, sway, tmp_path, extr
     session, empty = sway
     proc, line = start(root, wallpaper_env(root, session, **extra), *args)
     try:
-        assert line.startswith(build.describe() + ":") and "1 screen" in line, line + proc.stderr.read()
+        assert line.startswith(build.describe() + ":") and "1 screen" in line, line + said_when_stopped(proc)
         assert HOSTS[host] in line, line
         time.sleep(2.0)
         shot = tmp_path / "screen.png"
@@ -112,7 +113,7 @@ SYMBOLS = '{"balance": "glyphs", "sets": [{"name": "a", "chars": "Ж★ΩअД�
                          ids=["defaults", "every-option", "a-symbols-file", "a-look-of-one-s-own"])
 def test_the_native_wallpaper_draws_the_gtk_host_s_frame(root, sway, tmp_path, look):
     """The same moment, drawn by each host on the same screen, is the same picture to the pixel."""
-    session, _ = sway
+    session, empty = sway
     if look == ["--glyphs"]:
         (tmp_path / "glyphs.json").write_text(SYMBOLS, encoding="utf-8")
         look = ["--glyphs", str(tmp_path / "glyphs.json")]
@@ -130,10 +131,9 @@ def test_the_native_wallpaper_draws_the_gtk_host_s_frame(root, sway, tmp_path, l
         proc, line = start(root, wallpaper_env(root, session), "--time", str(MOMENT), "--host",
                            "auto" if host == "native" else "gtk", *look)
         try:
-            assert HOSTS[host] in line, line + proc.stderr.read()
-            time.sleep(2.0)
+            assert HOSTS[host] in line, line + said_when_stopped(proc)
             shots[host] = tmp_path / f"{host}.png"
-            grab(session, shots[host])
+            grab_settled(session, shots[host], unlike=empty)
         finally:
             proc.send_signal(signal.SIGTERM)
             proc.communicate(timeout=30)
@@ -146,7 +146,7 @@ def test_the_native_wallpaper_keeps_neither_python_nor_gtk(root, sway):
     session, _ = sway
     proc, line = start(root, wallpaper_env(root, session))
     try:
-        assert HOSTS["native"] in line, line + proc.stderr.read()
+        assert HOSTS["native"] in line, line + said_when_stopped(proc)
         exe = os.path.basename(os.readlink(f"/proc/{proc.pid}/exe"))
         maps = open(f"/proc/{proc.pid}/maps", encoding="utf-8", errors="replace").read()
         assert exe == "syncrain-wallpaper", exe
@@ -175,7 +175,7 @@ def test_screens_that_come_and_go_leave_nothing_behind(root, tmp_path, host):
     with headless_sway(tmp_path / "run", screen="320x180") as session:
         proc, line = start(root, wallpaper_env(root, session), "--host", "auto" if host == "native" else "gtk")
         try:
-            assert line.startswith(build.describe() + ":") and HOSTS[host] in line, line + proc.stderr.read()
+            assert line.startswith(build.describe() + ":") and HOSTS[host] in line, line + said_when_stopped(proc)
 
             def plug_and_unplug(n):
                 subprocess.run(["swaymsg", "-q", "create_output"], env=dict(os.environ, **session), check=True)
@@ -205,7 +205,7 @@ def test_when_the_compositor_goes_the_wallpaper_stops_with_an_error(root, tmp_pa
     with headless_sway(tmp_path / "run", screen="320x180") as session:
         proc, line = start(root, wallpaper_env(root, session), "--host", "auto" if host == "native" else "gtk")
         try:
-            assert HOSTS[host] in line, line + proc.stderr.read()
+            assert HOSTS[host] in line, line + said_when_stopped(proc)
             time.sleep(1.0)
             session.compositor.kill()
             session.compositor.wait(timeout=10)
@@ -224,7 +224,7 @@ def native_with_failing_swaps(root, tmp_path, failures, seconds):
         env = wallpaper_env(root, session, SYNCRAIN_TEST_SWAP_FAILURES=failures, SYNCRAIN_DEBUG_FPS="1")
         proc, line = start(root, env)
         try:
-            assert HOSTS["native"] in line, line + proc.stderr.read()
+            assert HOSTS["native"] in line, line + said_when_stopped(proc)
             try:
                 proc.wait(timeout=seconds)
             except subprocess.TimeoutExpired:
@@ -290,7 +290,7 @@ def test_memory_is_handed_back_after_the_first_frames_and_after_a_screen_change(
             return sum(settled in text for text in lines)
 
         try:
-            assert HOSTS[host] in line, line + proc.stderr.read()
+            assert HOSTS[host] in line, line + said_when_stopped(proc)
             assert wait_for_settles(1) == 1, "".join(lines)
             subprocess.run(["swaymsg", "-q", "create_output"], env=dict(os.environ, **session), check=True)
             assert wait_for_settles(2) == 2, "".join(lines)
@@ -311,7 +311,7 @@ def test_the_native_wallpaper_keeps_a_memory_record_and_trims_as_it_goes(root, t
         proc, line = start(root, env)
         record = state / "syncrain" / "memory.log"
         try:
-            assert HOSTS["native"] in line, line + proc.stderr.read()
+            assert HOSTS["native"] in line, line + said_when_stopped(proc)
             deadline = time.monotonic() + 40
             while time.monotonic() < deadline and len(record.read_text().splitlines() if record.exists() else []) < 2:
                 time.sleep(0.5)
@@ -347,7 +347,7 @@ def test_a_screen_that_never_draws_holds_no_memory_back(root, tmp_path):
         proc, line = start(root, env)
         record = state / "syncrain" / "memory.log"
         try:
-            assert HOSTS["native"] in line and "2 screens" in line, line + proc.stderr.read()
+            assert HOSTS["native"] in line and "2 screens" in line, line + said_when_stopped(proc)
             deadline = time.monotonic() + 40
             while time.monotonic() < deadline and len(record.read_text().splitlines() if record.exists() else []) < 2:
                 time.sleep(0.5)

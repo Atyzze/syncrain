@@ -29,6 +29,16 @@ os.environ["SYNCRAIN_LOCK_SCENE"] = os.path.join(__import__("tempfile").mkdtemp(
                                                  "lock-screen.scene")
 
 
+def _interrupted(_signum, _frame):
+    raise KeyboardInterrupt
+
+
+# A run ended with SIGTERM (by test_suite.py after its SIGINT, or by anything else) is interrupted
+# as Ctrl+C would be, so the teardowns still stop Xvfb, Sway and KWin, which run in sessions of
+# their own and would otherwise be left running.
+signal.signal(signal.SIGTERM, _interrupted)
+
+
 def need(ok: bool, what: str) -> None:
     """Skip without `what`, or fail when the release requires every lane."""
     if ok:

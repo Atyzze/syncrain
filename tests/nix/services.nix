@@ -70,6 +70,13 @@ in
       services.displayManager.sddm.enable = true;
       services.syncrain = { enable = true; loginScreen.enable = true; };
     }).config.assertions);
+    # LightDM, which the Xfce, MATE and Cinnamon installers turn on, beside the rain's login screen
+    lightdm = map (a: a.message) (builtins.filter (a: !a.assertion) (system {
+      services.desktopManager.plasma6.enable = true;
+      services.xserver.enable = true;
+      services.xserver.displayManager.lightdm.enable = true;
+      services.syncrain = { enable = true; loginScreen.enable = true; };
+    }).config.assertions);
     noWallpaper = map (a: a.message) (builtins.filter (a: !a.assertion) (system {
       services.desktopManager.plasma6.enable = true;
       services.syncrain.lockScreen.enable = true;

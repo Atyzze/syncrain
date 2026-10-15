@@ -239,15 +239,20 @@ def test_the_new_look_settings_draw_the_same_frame_on_the_page_and_the_desktop(p
         assert mean_abs_diff(web, native) < 1.0, layout
 
 
-def test_one_flavour_and_no_cycle_is_the_picture_as_it_was(page, tmp_path):
-    """The default stays: flavours 1 draws what a page without flavours drew."""
-    plain, one = tmp_path / "plain.png", tmp_path / "one.png"
-    page("shot", plain, 640, 360, f"t={MOMENT}&hud=0&preset=nixos")
-    page("shot", one, 640, 360, f"t={MOMENT}&hud=0&preset=nixos&flavours=1&cycle=0")
-    assert mean_abs_diff(plain, one) == 0
-    many = tmp_path / "many.png"
-    page("shot", many, 640, 360, f"t={MOMENT}&hud=0&preset=nixos&flavours=12")
-    assert mean_abs_diff(plain, many) > 1.0, "twelve flavours are another picture"
+def test_one_flavour_and_no_cycle_draws_as_the_desktop_does(page, app, tmp_path):
+    """Over the syncrain preset (64 flavours in a wave, turning every 440 s), flavours 1 and cycle 0
+    are a picture of their own: the page draws it as the desktop does with the same two options.
+    (Over nixos, whose own values they are, the two pages could not differ.)"""
+    one, native, preset = tmp_path / "one.png", tmp_path / "native.png", tmp_path / "preset.png"
+    # the bloom at 0.25, as the frames above are compared (EVEN_BLOOM: the preset's gain multiplies
+    # the last bit the two rasterizers round apart)
+    page("shot", one, 640, 360, f"t={MOMENT}&hud=0&preset=syncrain&flavours=1&cycle=0&bloom=0.25")
+    done = app(["--window", "--size", "640x360", "--time", str(MOMENT), "--screenshot", str(native),
+                "--config", "none", "--preset", "syncrain", "--flavours", "1", "--cycle", "0", "--bloom", "0.25"])
+    assert done.returncode == 0, done.stderr
+    assert mean_abs_diff(one, native) < 1.0
+    page("shot", preset, 640, 360, f"t={MOMENT}&hud=0&preset=syncrain&bloom=0.25")
+    assert mean_abs_diff(one, preset) > 1.0, "one flavour is another picture than 64"
 
 
 def test_a_picture_picked_as_the_logo_goes_into_the_settings_file(page, tmp_path):

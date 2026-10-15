@@ -165,11 +165,13 @@ def test_greetdconf_reads_the_user():
     assert greetdconf.user('[general]\nuser = "x"\n') is None
 
 
-@pytest.mark.skipif(os.path.exists("/usr/bin/agreety") or os.path.exists("/usr/sbin/agreety"),
-                    reason="this machine has its own agreety, which comes first")
 def test_greetd_s_text_login_on_path_counts_only_if_it_is_root_s_and_outside_the_home(tmp_path):
     """greetd runs it as its own user, reading passwords: /usr/bin and /usr/sbin (Debian's) first;
     one on PATH only if root's, not in this user's home and safe inside greetd's sh -c '...'."""
+    if os.path.exists("/usr/bin/agreety") or os.path.exists("/usr/sbin/agreety"):
+        # not a missing environment: on such a machine the case does not arise, so even the release
+        # run skips it
+        pytest.skip("this machine has its own agreety, which comes first")
     script = f'eval "$(sed -n "/^agreety_path() {{/,/^}}/p" {ROOT}/install.sh)"; agreety_path'
 
     def found(folder, home="/nonexistent-home"):

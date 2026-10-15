@@ -12,9 +12,13 @@ stdenv.mkDerivation {
   pname = "syncrain-lockscreen";
   version = lib.fileContents ../BUILD_NUMBER;
 
+  # what is under ../syncrain, by its path from there: a checkout kept under any folder named "data"
+  # would otherwise build from nothing
   src = lib.cleanSourceWith {
     src = ../syncrain;
-    filter = path: _type: !(lib.hasSuffix ".py" path) && !(lib.hasInfix "/data" path);
+    filter = path: _type:
+      let rel = lib.removePrefix (toString ../syncrain + "/") (toString path);
+      in !(lib.hasSuffix ".py" path) && rel != "data" && !(lib.hasPrefix "data/" rel);
   };
 
   nativeBuildInputs = [ cmake ];

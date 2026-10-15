@@ -16,7 +16,8 @@ import pytest
 
 from syncrain import build
 from tests.conftest import app_env
-from tests.support import GL_NONE, GL_ONLY_DESKTOP, GL_ONLY_ES, MOMENT, brightness, mean_abs_diff
+from tests.support import (GL_NONE, GL_ONLY_DESKTOP, GL_ONLY_ES, MOMENT, brightness, mean_abs_diff,
+                           said_when_stopped)
 
 CASES = {"whatever GTK prefers": ({}, None), "OpenGL ES only": (GL_ONLY_ES, "OpenGL ES "),
          "desktop OpenGL only": (GL_ONLY_DESKTOP, "OpenGL ")}
@@ -81,7 +82,7 @@ def test_ctrl_c_and_a_service_stop_end_it_cleanly(x_display, root, sig):
         line = proc.stdout.readline()
         if not line and proc.poll() is not None:
             break
-    assert line.startswith("syncrain build"), proc.stderr.read()
+    assert line.startswith("syncrain build"), said_when_stopped(proc)
     time.sleep(1.0)
     os.kill(proc.pid, sig)
     out, err = proc.communicate(timeout=30)

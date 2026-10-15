@@ -232,27 +232,34 @@ def test_without_the_rain_s_module_the_box_still_unlocks(greeter, tmp_path):
 
 @pytest.fixture
 def pam(tmp_path):
-    """Plasma's locker asks PAM's service `kde`: here one that accepts "right" and records every try."""
-    need(os.geteuid() == 0, "giving PAM a test service needs root")
-    need(not PAM_SERVICE.exists() or PAM_SERVICE.read_text().startswith(PAM_MARK),
-         f"{PAM_SERVICE} is this machine's own; the real lock is tested where it is not")
+    """Plasma's locker asks PAM's service `kde`: here one that accepts "right" and records every try.
+    It is in a copy of /etc/pam.d that KWin (and the locker it starts) sees in a mount namespace of
+    its own: the machine's PAM is never changed, so a stopped lane leaves nothing that unlocks."""
+    need(os.geteuid() == 0, "a mount namespace for PAM's test service needs root")
+    need(shutil.which("unshare") is not None, "no unshare (util-linux)")
+    # an earlier build's run wrote its test service into the machine's /etc/pam.d, and one stopped
+    # half way left it there, unlocking with "right": it goes, and nothing else of PAM's is touched
+    if PAM_SERVICE.is_file() and PAM_SERVICE.read_text(errors="replace").startswith(PAM_MARK):
+        PAM_SERVICE.unlink()
     tries = tmp_path / "tries.log"
     check = tmp_path / "check-password.sh"
     check.write_text(f'#!/bin/sh\nIFS= read -r pw\necho "$pw" >> "{tries}"\n[ "$pw" = "right" ]\n')
     check.chmod(0o755)
+    pam_dir = tmp_path / "pam.d"
+    shutil.copytree(PAM_SERVICE.parent, pam_dir, symlinks=True)
+    (pam_dir / PAM_SERVICE.name).unlink(missing_ok=True)
     # pam_faildelay: a refusal asks for 2 s, as Arch's pam_unix does
-    PAM_SERVICE.write_text(f"{PAM_MARK}\nauth optional pam_faildelay.so delay=2000000\n"
-                           f"auth required pam_exec.so expose_authtok quiet {check}\n"
-                           "account required pam_permit.so\n")
-    yield tries
-    PAM_SERVICE.unlink()
+    (pam_dir / PAM_SERVICE.name).write_text(f"{PAM_MARK}\nauth optional pam_faildelay.so delay=2000000\n"
+                                            f"auth required pam_exec.so expose_authtok quiet {check}\n"
+                                            "account required pam_permit.so\n")
+    return tries, pam_dir
 
 
 class Kwin:
     """A private session bus and a headless KWin with its lock screen, given what install.sh's
     drop-in gives KWin's unit."""
 
-    def __init__(self, tmp, env_extra):
+    def __init__(self, tmp, env_extra, pam_dir=None):
         run = Path(f"/tmp/syncrain-lock-{os.getpid()}")      # a socket path stays under 108 bytes
         shutil.rmtree(run, ignore_errors=True)
         run.mkdir(mode=0o700)
@@ -268,9 +275,13 @@ class Kwin:
                              XDG_CACHE_HOME=str(tmp / "cache"), QT_FORCE_STDERR_LOGGING="1", **env_extra)
         self.log_path = tmp / "kwin.log"
         self.log = open(self.log_path, "w")
-        self.kwin = subprocess.Popen([os.environ["SYNCRAIN_KWIN"], "--virtual", "--width", "640", "--height", "360",
-                                      "--output-count", "2", "--no-global-shortcuts", "--no-kactivities",
-                                      "--socket", "wayland-kwin"],
+        # with pam_dir: KWin, and the locker it starts, in a mount namespace where it is /etc/pam.d
+        private = [] if pam_dir is None else [
+            "unshare", "--mount", "--propagation", "private", "--", "sh", "-c",
+            'mount --bind "$0" /etc/pam.d && exec "$@"', str(pam_dir)]
+        self.kwin = subprocess.Popen([*private, os.environ["SYNCRAIN_KWIN"], "--virtual", "--width", "640",
+                                      "--height", "360", "--output-count", "2", "--no-global-shortcuts",
+                                      "--no-kactivities", "--socket", "wayland-kwin"],
                                      env=self.env, stdout=self.log, stderr=subprocess.STDOUT, start_new_session=True)
         self.wait(lambda: (run / "wayland-kwin").exists() and self.screensaver() is not None, 40, "KWin did not start")
 
@@ -344,7 +355,7 @@ def test_kwin_locks_with_syncrain_s_lock_screen_and_pam_unlocks_it(built, scene,
                            "QML_IMPORT_PATH": f"{built['lockscreen'] / 'lib/qt-6/qml'}:{plasma / 'lib/qt-6/qml'}",
                            "SYNCRAIN_LOCK_SCENE": str(scene),
                            "XDG_DATA_DIRS": f"{built['lockscreen'] / 'share'}:{plasma / 'share'}",
-                           "QT_PLUGIN_PATH": str(plasma / "lib/qt-6/plugins")})
+                           "QT_PLUGIN_PATH": str(plasma / "lib/qt-6/plugins")}, pam_dir=pam[1])
     try:
         assert kwin.screensaver() is False
         done = kwin.send("--dest=org.freedesktop.ScreenSaver", "/ScreenSaver", "org.freedesktop.ScreenSaver.Lock")
@@ -362,7 +373,7 @@ def test_kwin_locks_with_syncrain_s_lock_screen_and_pam_unlocks_it(built, scene,
         # the right one a second after a wrong one, inside PAM's 2 s delay: kept, not lost
         kwin.type(built, tmp_path, "wrong", "right")
         kwin.wait(lambda: kwin.screensaver() is False, 20, "the right password did not unlock it")
-        assert pam.read_text().splitlines() == ["wrong", "wrong", "right"]
+        assert pam[0].read_text().splitlines() == ["wrong", "wrong", "right"]
         assert "Authentication attempt too soon" not in kwin.said(), "PAM restarted inside its delay"
     finally:
         kwin.stop()

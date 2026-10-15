@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import os
+import pathlib
 import shutil
 import signal
 import subprocess
@@ -21,7 +22,7 @@ import pytest
 from syncrain import build
 from syncrain.app import NO_RESTART
 from tests.conftest import need
-from tests.support import MOMENT, grab, headless_sway, mean_abs_diff, systemd_exec_words
+from tests.support import MOMENT, grab, headless_sway, mean_abs_diff, said_when_stopped, systemd_exec_words
 
 CHANNEL = "it's 100% $HOME \\ \"quoted\" %h"
 
@@ -119,7 +120,7 @@ def test_the_built_package_draws_the_wallpaper_natively_on_wayland(root, built, 
                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             try:
                 line = proc.stdout.readline()
-                assert ", native wallpaper, " in line, line + proc.stderr.read()
+                assert ", native wallpaper, " in line, line + said_when_stopped(proc)
                 time.sleep(2.0)
                 shots[name] = tmp_path / f"{name}.png"
                 grab(session, shots[name])
@@ -192,13 +193,16 @@ def test_the_nixos_module_sets_up_the_login_and_lock_screens(evaluated):
     assert s["pre"].split("lock-screen.scene", 1)[1].strip() == s["exec"].split("/bin/syncrain", 1)[1].strip()
     assert evaluated["nixos"]["pre"] is None, "no lock screen asked for, no scene written"
     assert any("sddm.enable = false" in m for m in s["sddm"])
+    assert any("services.xserver.displayManager.lightdm.enable = false" in m for m in s["lightdm"])
     assert any("services.syncrain.enable = true" in m for m in s["noWallpaper"])
 
 
 def test_the_flake_template_is_a_whole_backdrop_system(root, checkouts):
     """`nix flake init -t github:Atyzze/syncrain`: the template's configuration with
-    syncrain.nixosModules.backdrop evaluates to a NixOS system (tests/nix/template.nix, a stand-in
-    for the machine's hardware): Plasma 6, the rain's login and lock screens, no SDDM, no Plymouth."""
+    syncrain.nixosModules.backdrop and the machine's own configuration (machine.nix) evaluates to a
+    NixOS system (tests/nix/template.nix, stand-ins for the machine): Plasma 6, the rain's login and
+    lock screens, no SDDM, no Plymouth; the machine's boot loader, keyboard, users and release as
+    they were (the template once replaced the whole configuration.nix)."""
     nixpkgs, _ = checkouts
     done = subprocess.run(["nix-instantiate", "--eval", "--strict", "--json", str(root / "tests/nix/template.nix"),
                            "--arg", "src", str(root), "--arg", "nixpkgs", nixpkgs],
@@ -208,7 +212,10 @@ def test_the_flake_template_is_a_whole_backdrop_system(root, checkouts):
     assert t["failed"] == [] and "-nixos-system-backdrop-" in t["toplevel"], t
     assert (t["plasma"], t["sddm"], t["greetd"], t["login"], t["lock"], t["plymouth"]) == \
         (True, False, True, True, True, False)
-    assert t["loginUser"] == "alice" and "PLASMA_DEFAULT_SHELL=org.syncrain.lockscreen" in t["kwinDropin"]
+    assert t["loginUser"] == "" and "PLASMA_DEFAULT_SHELL=org.syncrain.lockscreen" in t["kwinDropin"]
+    assert (t["keyboard"], t["grub"], t["systemdBoot"], t["stateVersion"], t["alice"], t["swap"]) == \
+        ("de", True, False, "24.11", True, True), "the machine's own, as it was, with what it imports"
+    assert t["lightdm"] is False and t["git"], "the installer's other login screen off; git for the flake"
     flake = (root / "flake.nix").read_text()
     assert "templates.default" in flake and "path = ./nix/template;" in flake
     assert 'key = "syncrain"' in flake and "nixosModules.backdrop" in flake
@@ -216,4 +223,73 @@ def test_the_flake_template_is_a_whole_backdrop_system(root, checkouts):
     assert sorted(p.name for p in template.iterdir()) == ["README.md", "configuration.nix", "flake.nix"]
     assert "syncrain.nixosModules.backdrop" in (template / "flake.nix").read_text()
     assert 'inputs.nixpkgs.follows = "nixpkgs"' in (template / "flake.nix").read_text()
-    assert (template / "configuration.nix").read_text().count("CHANGE") >= 4
+    configuration = (template / "configuration.nix").read_text()
+    assert "CHANGE" in configuration and "./machine/configuration.nix" in (template / "flake.nix").read_text()
+    for theirs in ("boot.loader", "users.users", "stateVersion", "xkb", "initialPassword"):
+        assert theirs not in configuration, f"{theirs}: the machine's, in machine/"
+    # what `nix flake init` prints first and the README both say to copy the machine's folder whole
+    assert "cp -r /etc/nixos machine" in (template / "README.md").read_text()
+    assert "cp -r /etc/nixos machine" in flake.split("welcomeText", 1)[1].split(";", 1)[0]
+
+
+def test_the_flake_pins_the_nixpkgs_this_lane_tests(root, checkouts):
+    """flake.lock holds nixpkgs to one revision, so `nix run github:Atyzze/syncrain` builds against
+    what was tested here, until the lock is updated on purpose; this lane's checkout is that one."""
+    lock = json.loads((root / "flake.lock").read_text())
+    pinned = lock["nodes"]["nixpkgs"]
+    assert pinned["original"] == {"owner": "NixOS", "ref": "nixos-unstable", "repo": "nixpkgs", "type": "github"}
+    assert pinned["locked"]["type"] == "github" and pinned["locked"]["narHash"].startswith("sha256-")
+    nixpkgs, _ = checkouts
+    revision = pathlib.Path(nixpkgs) / ".git-revision"             # a channel's tarball says it here
+    if revision.is_file():
+        here = revision.read_text().strip()
+    else:                                                          # a git checkout
+        done = subprocess.run(["git", "-C", nixpkgs, "rev-parse", "HEAD"], capture_output=True, text=True)
+        need(done.returncode == 0, f"{nixpkgs} does not say its revision")
+        here = done.stdout.strip()
+    assert here == pinned["locked"]["rev"], \
+        "the lane tests another nixpkgs than the lock pins: update one of them (docs/agent/ENVIRONMENT.md)"
+    if revision.is_file():
+        # the revision alone passes a lock whose hash is wrong, which `nix run` then refuses: the
+        # tree GitHub serves for it is this one without what the channel adds
+        assert nar_hash(pathlib.Path(nixpkgs), CHANNEL_ONLY) == pinned["locked"]["narHash"]
+
+
+#: What a nixpkgs channel adds to the tree of its git revision.
+CHANNEL_ONLY = {".git-revision", ".version-suffix", "nixpkgs", "programs.sqlite", "svn-revision"}
+
+
+def nar_hash(top: pathlib.Path, leave_out=frozenset()) -> str:
+    """Nix's hash of a folder: SHA-256 over its NAR serialisation, in SRI form; `leave_out` names
+    entries of the top folder that are not part of it."""
+    import base64
+    import hashlib
+    import stat
+    h = hashlib.sha256()
+
+    def put(b: bytes) -> None:
+        h.update(len(b).to_bytes(8, "little") + b + b"\0" * (-len(b) % 8))
+
+    def node(path: pathlib.Path, skip=frozenset()) -> None:
+        put(b"(")
+        put(b"type")
+        st = path.lstat()
+        if stat.S_ISLNK(st.st_mode):
+            put(b"symlink"); put(b"target"); put(os.fsencode(os.readlink(path)))
+        elif stat.S_ISDIR(st.st_mode):
+            put(b"directory")
+            for name in sorted(os.fsencode(n) for n in os.listdir(path) if n not in skip):
+                put(b"entry"); put(b"("); put(b"name"); put(name); put(b"node")
+                node(path / os.fsdecode(name))
+                put(b")")
+        else:
+            put(b"regular")
+            if st.st_mode & 0o100:
+                put(b"executable"); put(b"")
+            data = path.read_bytes()
+            put(b"contents"); put(data)
+        put(b")")
+
+    put(b"nix-archive-1")
+    node(top, leave_out)
+    return "sha256-" + base64.b64encode(h.digest()).decode()

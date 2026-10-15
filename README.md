@@ -102,9 +102,10 @@ flake's template:
 ```sh
 mkdir ~/backdrop && cd ~/backdrop
 nix flake init -t github:Atyzze/syncrain
-cp /etc/nixos/hardware-configuration.nix .
-$EDITOR configuration.nix            # your boot loader, name and user: the lines marked CHANGE
-git init && git add . && sudo nixos-rebuild switch --flake .#backdrop
+cp -r /etc/nixos machine            # your machine as it is, kept whole
+$EDITOR configuration.nix            # your user name: the line marked CHANGE
+nix-shell -p git --run 'git init && git add .'
+sudo nixos-rebuild switch --flake .#backdrop
 ```
 
 Or in a configuration of your own: `syncrain.nixosModules.backdrop` (the whole flavour), or

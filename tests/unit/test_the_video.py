@@ -5,6 +5,7 @@ import pytest
 
 from syncrain import video
 from syncrain.app import parse_args
+from tests.conftest import need
 
 
 def test_a_looping_video_ends_where_it_begins():
@@ -95,9 +96,9 @@ def test_without_ffmpeg_it_says_what_to_install(monkeypatch):
         video.ffmpeg_command("a.mp4", 640, 360, 30)
 
 
-@pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="no ffmpeg")
 def test_a_video_is_made_from_the_frames_drawn(tmp_path):
     """With a stand-in for the drawing: every frame reaches ffmpeg, and the fade's draws the end too."""
+    need(shutil.which("ffmpeg") is not None, "no ffmpeg")
     import subprocess
     drawn = []
 
@@ -114,9 +115,9 @@ def test_a_video_is_made_from_the_frames_drawn(tmp_path):
     assert probe.stdout.strip() == "10"
 
 
-@pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="no ffmpeg")
 def test_what_ffmpeg_refuses_is_said_and_leaves_what_was_there(tmp_path):
     """An odd size H.264 takes not: the failure in ffmpeg's words, the earlier video kept, no half one."""
+    need(shutil.which("ffmpeg") is not None, "no ffmpeg")
     path = tmp_path / "a.mp4"
     path.write_bytes(b"the earlier one")
     with pytest.raises(RuntimeError, match="ffmpeg could not make"):
@@ -124,8 +125,8 @@ def test_what_ffmpeg_refuses_is_said_and_leaves_what_was_there(tmp_path):
     assert path.read_bytes() == b"the earlier one" and sorted(p.name for p in tmp_path.iterdir()) == ["a.mp4"]
 
 
-@pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="no ffmpeg")
 def test_a_video_stopped_halfway_leaves_nothing(tmp_path):
+    need(shutil.which("ffmpeg") is not None, "no ffmpeg")
     path = tmp_path / "a.mp4"
     writer = video.Writer(str(path), 32, 18, 10, video.plan(2, 10, False, 0), lambda t: bytes(32 * 18 * 4))
     for _ in range(5):

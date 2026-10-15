@@ -112,8 +112,18 @@ in
       assertions = [
         { assertion = !config.services.displayManager.sddm.enable;
           message = "services.syncrain.loginScreen takes the place of SDDM: set services.displayManager.sddm.enable = false"; }
-        { assertion = !(config.services.displayManager.plasma-login-manager.enable or false);
-          message = "services.syncrain.loginScreen takes the place of Plasma Login: set services.displayManager.plasma-login-manager.enable = false"; }
+      ] ++ map (dm: {
+        # two greeters would take one terminal (and display-manager.service) between them
+        assertion = !(lib.attrByPath (dm ++ [ "enable" ]) false config);
+        message = "services.syncrain.loginScreen takes the place of every other login screen: set ${lib.concatStringsSep "." dm}.enable = false";
+      }) [
+        [ "services" "displayManager" "plasma-login-manager" ]
+        [ "services" "displayManager" "gdm" ]
+        [ "services" "xserver" "displayManager" "lightdm" ]
+        [ "services" "displayManager" "ly" ]
+        [ "services" "displayManager" "lemurs" ]
+        [ "services" "displayManager" "cosmic-greeter" ]
+      ] ++ [
         { assertion = !config.services.displayManager.autoLogin.enable;
           message = "services.syncrain.loginScreen has no automatic login: set services.displayManager.autoLogin.enable = false, or leave the login screen off"; }
         { assertion = lib.elem login.session config.services.displayManager.sessionData.sessionNames;

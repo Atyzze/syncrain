@@ -14,7 +14,7 @@
     nixosConfigurations.backdrop = nixpkgs.lib.nixosSystem {
       modules = [
         syncrain.nixosModules.backdrop
-        ./hardware-configuration.nix
+        ./machine/configuration.nix             # your /etc/nixos, as it was (its hardware file with it)
         ./configuration.nix
       ];
     };

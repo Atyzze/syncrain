@@ -94,12 +94,18 @@ git clone https://github.com/Atyzze/syncrain && cd syncrain   # or unpack SYNCRA
 `syncrain.nixosModules.default` (or `homeManagerModules.default`): the wallpaper as a user service.
 `settings` takes the page's `config.json`; every other option, with its range, is in
 `nix/options.nix` (some ranges are narrower than the command line's: `scale` up to 1, `fps` up to
-240). Without installing: `nix run github:Atyzze/syncrain -- --window`.
+240). Without installing: `nix run github:Atyzze/syncrain -- --window`. `flake.lock` pins nixpkgs
+to the revision the nix lane tested; a configuration that follows its own nixpkgs
+(`inputs.nixpkgs.follows`) builds against that one instead. Updating the pin is a build of its own
+(`nix flake update`, the nix lane on that revision).
 
 **The flavour**: `nix flake init -t github:Atyzze/syncrain` makes a flake for a whole NixOS
-desktop (`nix/template/`: its README says the five steps): `syncrain.nixosModules.backdrop`
+desktop (`nix/template/`: its README says the six steps): `syncrain.nixosModules.backdrop`
 (`nix/backdrop.nix`: Plasma 6, the rain as wallpaper, login screen and lock screen, SDDM off, a
-network, sound, the clock in sync; every one a default) with your hardware and boot loader.
+network, sound, the clock in sync; every one a default) over your machine's own configuration,
+copied whole as `machine/` with every file it imports (boot loader, users, keyboard, release:
+nothing of it is lost). The rain's login screen refuses another one beside it (SDDM, LightDM, GDM,
+ly, lemurs, COSMIC's): the template turns SDDM, LightDM and GDM off.
 
 On a Plasma 6 system (`services.desktopManager.plasma6.enable`), the NixOS module also gives the
 login and lock screens:
