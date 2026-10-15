@@ -12,6 +12,9 @@ Open questions, planned builds, the cadence and the constraints. What shipped: `
 
 ## Decisions answered
 
+* **2026-10-15 10:45**: on the lock screen, the box hidden until "recent key input or mouse
+  movement", gone again "after a minute of inactivity", and typing in any box updates all of them,
+  "so it never matters which screen is visible". Build 27.
 * **2026-10-15 10:16**: no boot splash: "I think I want to keep it out of boot then. Current boot is
   raw text, I disabled Plymouth since I wanted to be able to see everything". syncrain starts at the
   login screen; nothing touches the bootloader, the initramfs or Plymouth.
@@ -60,7 +63,7 @@ What the documents and the review of build 17 leave to a build that changes code
 | L21: no `flake.lock`, so a Nix build takes whatever nixpkgs is current | `flake.lock` |
 | An SVG as the logo: the page takes one, the desktop's `--logo` does not (Pillow draws no SVG) | `syncrain/logo.py`, with GTK's loader (librsvg) |
 | The lock screen draws at 30 fps on every screen while locked and lit (NVIDIA's explicit-sync growth is not turned off in KWin's greeter) | measure there; a lower rate after a while without input, `syncrain/lockscreen/rainitem.cpp` |
-| The lock screen shows no keyboard layout, and each screen's box keeps its own text (Plasma's shows the layout and syncs them) | `syncrain/lockscreen/package/` |
+| The lock screen shows no keyboard layout (Plasma's does) | `syncrain/lockscreen/package/` |
 | Plasma still loads its lock-screen wallpaper under syncrain's, unseen | `kscreenlockerrc`, only with `--lock-screen` |
 | The lock screen on NixOS: `nix/lockscreen.nix` builds it; nothing points KWin at it yet | `nix/nixos-module.nix` |
 | The settings file holds no `background`, `mask`, `scale` or `layer` (the page cannot preview a picture file) | `syncrain/app.py` (`CONFIG_KEYS`) and the page, if wanted |

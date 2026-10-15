@@ -1,11 +1,12 @@
-# The next build is 27
+# The next build is 28
 
 The first line is parsed: `# The next build is <N>`, exactly one above `BUILD_NUMBER`.
 
-## Build 27: what the operator asks next
+## Build 28: what the operator asks next
 
 * Read what the operator sent last, and answer it in one plain sentence first.
-* Build 26 is the first lock screen they get (25 was not delivered); fix first what they find there.
+* Build 27's lock screen (the box on input, the same on every screen) is what they try; fix first
+  what they find there.
 * With nothing asked: an open item, or the NixOS image (`docs/ROADMAP.md`). No boot splash: the
   operator keeps the boot plain text (2026-10-15); never touch the bootloader, initramfs or Plymouth.
 

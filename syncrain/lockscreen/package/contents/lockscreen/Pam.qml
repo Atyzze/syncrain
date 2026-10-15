@@ -27,6 +27,7 @@ QtObject {
 
     signal refused()                         // each screen's box shakes
     signal asked()                           // each screen's box takes the keyboard
+    signal notice()                          // worth showing the box for: a reader's words, no password needed
 
     readonly property bool paused: auth !== null && auth.pamTimeout === true   // Plasma 6.8 and later
 
@@ -53,6 +54,12 @@ QtObject {
             pam.pending = password;
             pam.start();
         }
+    }
+
+    // the box sent away (Escape, a minute idle, a suspend): a password typed but not yet sent goes
+    // with it, so it is not tried later behind the person's back
+    function forget() {
+        pam.pending = "";
     }
 
     function question() {
@@ -98,6 +105,7 @@ QtObject {
             } else {                           // no password asked (none set, or a reader): a click
                 pam.passwordless = true;
                 pam.say(qsTr("Unlock: no password is needed"), false);
+                pam.notice();
             }
         }
         function onInfoMessageChanged() { pam.say(pam.auth.infoMessage, false); }
@@ -116,7 +124,7 @@ QtObject {
             if (!pam.paused && pam.waiting && pam.pending.length > 0)
                 pam.question();
         }
-        function onNoninteractiveInfo(kind, who) { if (who) pam.say(who.infoMessage, false); }
-        function onNoninteractiveError(kind, who) { if (who) pam.say(who.errorMessage, true); }
+        function onNoninteractiveInfo(kind, who) { if (who) { pam.say(who.infoMessage, false); pam.notice(); } }
+        function onNoninteractiveError(kind, who) { if (who) { pam.say(who.errorMessage, true); pam.notice(); } }
     }
 }

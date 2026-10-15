@@ -154,6 +154,19 @@ def test_a_question_whose_answer_shows_is_answered(greeter):
     assert steps(said) == ["responded right", "stopped"], said
 
 
+def test_two_screens_show_one_box_that_comes_and_goes_with_the_person(built):
+    """tests/lockscreen/tst_two_screens.qml, real key and pointer events on two screens: the box is
+    away until a key or a moved pointer (KWin's first placing of the pointer not counted), goes after
+    the idle time and forgets what was typed, and every screen shows the same text and eye."""
+    qd = built["qtdeclarative"]
+    done = subprocess.run([str(qd / "bin/qmltestrunner"), "-input", str(HERE / "tst_two_screens.qml")],
+                          env=clean_env(QT_QPA_PLATFORM="offscreen", QML_IMPORT_PATH=str(qd / "lib/qt-6/qml")),
+                          capture_output=True, text=True, timeout=180)
+    said = done.stdout + done.stderr
+    assert done.returncode == 0 and "0 failed" in said, said[-4000:]
+    assert said.count("PASS   : qmltestrunner::TwoScreens::test_") == 11, said[-4000:]
+
+
 def test_without_the_rain_s_module_the_box_still_unlocks(greeter, tmp_path):
     code, said = greeter("flow", module=False)
     assert code == 0 and "responded right" in said, said

@@ -45,7 +45,9 @@ git clone https://github.com/Atyzze/syncrain && cd syncrain   # or unpack SYNCRA
   --force` and its unit, then `sudo reboot`. `--diagnose` shows the record and the last starts.
 * The lock screen is optional too, and KDE Plasma 6 on Wayland only. `--lock-screen` gives Plasma's
   own locker syncrain's screen: the rain, live, and syncrain's box (your name, the password, Unlock,
-  PAM's words) on every screen. It builds a QML module (`cmake qt6-base qt6-declarative`) into
+  PAM's words) on every screen. The box comes up on a key or a moved pointer, goes after a minute
+  without either and forgets what was typed (Escape sends it away at once); every screen shows the
+  same box, so it never matters which one you type on. It builds a QML module (`cmake qt6-base qt6-declarative`) into
   `~/.local/lib/syncrain/`, puts the shell package `org.syncrain.lockscreen` in
   `~/.local/share/plasma/shells/`, writes the scene to `~/.local/state/syncrain/lock-screen.scene`
   (each start of the wallpaper keeps it current), and gives KWin's unit alone a drop-in

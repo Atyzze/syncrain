@@ -110,7 +110,9 @@ GTK draws more pixels and scales them down), the page within texture filtering.
 * The package `org.syncrain.lockscreen` (falling back to `org.kde.plasma.desktop`) is QML only: one
   conversation with the `authenticator` the locker gives it for all screens (`Pam.qml`, a singleton
   on the locker's one engine), by Plasma 6.7's rules (PAM restarted only after a refusal's delay),
-  and on each screen the box (`Box.qml`, the login box's look); PAM decides. The rain and the Caps Lock note come through Loaders, so the box works
+  and on each screen the box (`Box.qml`, the login box's look), showing what `Shared.qml` (another
+  singleton) holds for all of them: what is typed, the eye, and whether the box is up (a key or a
+  moved pointer, then a minute); PAM decides. The rain and the Caps Lock note come through Loaders, so the box works
   without them.
 * The rain is `SyncRain` (`rainitem.cpp`, the QML module `org.syncrain`): the native passes into a
   framebuffer on Qt Quick's OpenGL context, from the scene file `syncrain --write-scene` writes; the

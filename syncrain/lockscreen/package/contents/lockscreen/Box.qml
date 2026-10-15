@@ -1,6 +1,8 @@
 /*
     syncrain's box on the lock screen: the login screen's box (syncrain/greeter.py, its CSS) in QML.
-    The user's name, the password, Unlock, and what PAM or the lock screen says.
+    The user's name, the password, Unlock, and what PAM or the lock screen says. What is typed and
+    whether it shows come from outside (`shared`, `peeking`: Shared.qml, the same on every screen);
+    the box says what the person did (`typed`, `peekSet`, `activity`, `dismissed`, `submitted`).
 */
 import QtQuick
 import QtQuick.Controls.Basic
@@ -13,11 +15,23 @@ Rectangle {
     property string message: ""
     property bool failing: false
     property bool allowEmpty: false          // PAM needs no password: Unlock with an empty field
+    property string shared: ""               // what is typed, on every screen
+    property bool peeking: false             // the password shown, on every screen
     signal submitted(string password)
-    signal edited()
+    signal typed(string text)                // the person changed what is typed
+    signal peekSet(bool on)
+    signal activity()                        // any key
+    signal dismissed()                       // Escape
 
-    function clear() { password.text = ""; focusPassword(); }
     function focusPassword() { password.forceActiveFocus(); }
+
+    // another screen's typing (or the box going away) comes in here; the cursor goes to the end
+    onSharedChanged: {
+        if (password.text !== box.shared) {
+            password.text = box.shared;
+            password.cursorPosition = box.shared.length;
+        }
+    }
 
     readonly property color ink: "#e8f1ff"
     readonly property color edge: Qt.rgba(126 / 255, 182 / 255, 1, 0.30)
@@ -32,9 +46,10 @@ Rectangle {
     function send() {
         if (password.text.length === 0 && !box.allowEmpty)
             return;
-        const typed = password.text;
+        const sent = password.text;
         password.text = "";
-        box.submitted(typed);
+        box.typed("");
+        box.submitted(sent);
     }
 
     ColumnLayout {
@@ -55,7 +70,7 @@ Rectangle {
             id: password
             objectName: "password"
             Layout.preferredWidth: 260
-            echoMode: peek.checked ? TextInput.Normal : TextInput.Password
+            echoMode: box.peeking ? TextInput.Normal : TextInput.Password
             placeholderText: qsTr("Password")
             placeholderTextColor: Qt.rgba(232 / 255, 241 / 255, 1, 0.45)
             color: box.ink
@@ -69,21 +84,29 @@ Rectangle {
                 border.color: password.activeFocus ? Qt.rgba(126 / 255, 182 / 255, 1, 0.85) : box.edge
             }
             onAccepted: box.send()
-            onTextEdited: box.edited()
-            Keys.onEscapePressed: text = ""
+            onTextEdited: box.typed(text)
+            Keys.onPressed: event => {
+                if (event.key === Qt.Key_Escape) {
+                    box.dismissed();
+                    event.accepted = true;
+                    return;
+                }
+                box.activity();                  // and the field still gets the key
+                event.accepted = false;
+            }
 
             AbstractButton {
                 id: peek
                 objectName: "peek"
-                checkable: true
                 focusPolicy: Qt.NoFocus
+                onClicked: box.peekSet(!box.peeking)
                 anchors.right: parent.right
                 anchors.rightMargin: 6
                 anchors.verticalCenter: parent.verticalCenter
                 width: 24
                 height: 24
                 contentItem: Text {
-                    text: peek.checked ? "◉" : "◎"       // an eye, open or shut
+                    text: box.peeking ? "◉" : "◎"       // an eye, open or shut
                     color: Qt.rgba(232 / 255, 241 / 255, 1, peek.hovered ? 0.95 : 0.6)
                     font.pixelSize: 16
                     horizontalAlignment: Text.AlignHCenter

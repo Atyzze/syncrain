@@ -1,2 +1,3 @@
-# the conversation with PAM, one for every screen
+# one for every screen: the conversation with PAM, and what the boxes show
 singleton Pam 1.0 Pam.qml
+singleton Shared 1.0 Shared.qml
