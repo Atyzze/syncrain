@@ -22,10 +22,16 @@ LOG="$STATE/login.log"
 # writable; /var/lib/greetd elsewhere, which what ignores the XDG folders could still write to).
 # Its settings, data and state start afresh at every start, from what is installed: anything left
 # there since (by build 17's root copies, or by whoever got to run as greeter: a KWin input method
-# would see every password typed) goes. The cache stays: compiled shaders, kept, save seconds.
+# would see every password typed) goes. The cache stays while the build does: compiled shaders and
+# QML, kept, save seconds; made by another build, they go with it.
 export XDG_CONFIG_HOME="$STATE/config" XDG_CACHE_HOME="$STATE/cache" XDG_STATE_HOME="$STATE/state" \
        XDG_DATA_HOME="$STATE/data"
 rm -rf "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" "$XDG_STATE_HOME"
+BUILD="$(cat "$LIB/BUILD_NUMBER" 2>/dev/null)"
+if [ "$(cat "$XDG_CACHE_HOME/build" 2>/dev/null)" != "$BUILD" ]; then
+  rm -rf "$XDG_CACHE_HOME"
+  mkdir -p "$XDG_CACHE_HOME" && printf '%s\n' "$BUILD" > "$XDG_CACHE_HOME/build"
+fi
 mkdir -p "$XDG_CONFIG_HOME" "$XDG_CACHE_HOME" "$XDG_STATE_HOME" "$XDG_DATA_HOME"
 # The operator's screen and keyboard settings, and the symbols drawn at install (drawing takes seconds).
 [ -d "$LIB/kde" ] && cp -f "$LIB/kde/"* "$XDG_CONFIG_HOME/" 2>/dev/null
@@ -37,7 +43,7 @@ export SYNCRAIN_LOGIN_STATE="$STATE" SYNCRAIN_LOGIN_MARKER="$STATE/logged-in"
 export PYTHONPATH="$LIB" PYTHONSAFEPATH=1 PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 rm -f "$SYNCRAIN_LOGIN_MARKER"
 
-{ echo "syncrain-login: $(date '+%F %T') build $(cat "$LIB/BUILD_NUMBER" 2>/dev/null), user $(id -un)"; } > "$LOG"
+{ echo "syncrain-login: $(date '+%F %T') build $BUILD, user $(id -un)"; } > "$LOG"
 # In a process group of its own, so the watchdog below can stop all of it.
 # shellcheck disable=SC2086 # the arguments are words on purpose
 setsid -w dbus-run-session -- "${SYNCRAIN_LOGIN_KWIN:-kwin_wayland}" \

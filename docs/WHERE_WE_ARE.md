@@ -1,4 +1,4 @@
-# Where we are, at build 35
+# Where we are, at build 36
 
 The project on one page. Detail: `docs/agent/HANDOFF.md`.
 
@@ -23,7 +23,7 @@ plain text by design: the text means the machine is not up yet, the rain that it
   logo with one colour over it, glow, bloom, speed, density, snow, your own symbol sets, hidden
   words and sentences (up to 30 characters).
 * **The login screen** (optional, working on your desktop): `./install.sh --login-screen`; greetd,
-  the rain and a box on every screen; `--login-screen-off` puts back what was there.
+  the rain and a box on every screen; `--login-screen-off` takes out only what it put in (build 36).
 * **The lock screen** (optional, build 27): `./install.sh --lock-screen`, then log out and in once;
   the rain stays live, your box comes up on a key or a moved mouse and is the same on every screen.
   In use on your desktop since build 26. Build 34 fixed what the review found: a screen coming
@@ -37,12 +37,12 @@ plain text by design: the text means the machine is not up yet, the rain that it
 * **Your NixOS flavour** (build 33): `nix flake init -t github:Atyzze/syncrain`, your hardware and
   boot loader, `nixos-rebuild switch`: Plasma 6 with the rain as wallpaper, login and lock screen.
   The whole system builds here; no machine has booted it yet.
-* **On GitHub**: github.com/Atyzze/syncrain, every build up to 35.
+* **On GitHub**: github.com/Atyzze/syncrain, every build up to 36.
 
 ## What comes next
 
-* **Next**: the rest of the review of build 33, the most critical first: the login screen (36),
-  the installer (37), Nix and the tests (38), the hosts (39), the page (41).
+* **Next**: the rest of the review of build 33, the most critical first: the installer (37), Nix
+  and the tests (38), the hosts (39), the page (41).
 * **Build 40**: the next consolidation (every number ending in 0).
 
 ## The decision in front of you

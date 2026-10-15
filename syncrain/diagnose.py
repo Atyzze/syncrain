@@ -141,6 +141,9 @@ def login_lines(log_lines=8) -> list[str]:
     elif before:
         lines.append(f"before syncrain's login screen: {before} (--login-screen-off goes back to it)")
     state = env("SYNCRAIN_LOGIN_STATE") or "/var/lib/syncrain-login"
+    if os.path.isdir(state) and not os.access(state, os.R_OK | os.X_OK):
+        # greetd's user's own (it says who logged in, and when)
+        lines.append(f"the login screen's log is greetd's user's alone: sudo cat {state}/login.log")
     for name in ("login.log", "login.log.1"):
         said = [line for line in (_read(os.path.join(state, name)) or "").splitlines()
                 if line.startswith(("syncrain-login:", "syncrain build", "syncrain:"))

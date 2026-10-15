@@ -192,22 +192,46 @@ def on(rain: list[str], shell=plasma_script) -> list[str]:
     except (OSError, ValueError):
         before = {}
     rc = config_home() / "ksplashrc"
+    # Run again (an upgrade, other options), what was chosen since the first run stays: only what
+    # still shows syncrain's still, or was never recorded, becomes it.
     if "splash" not in before:
         # syncrain's own splash, left by a run that broke off, is not what to go back to: Plasma's is
         ours = read_ini(rc, "KSplash", "Theme") == SPLASH
         before["splash"] = {k: None if ours else read_ini(rc, "KSplash", k) for k in ("Engine", "Theme")}
         state.parent.mkdir(parents=True, exist_ok=True)
         state.write_text(json.dumps(before, indent=1), encoding="utf-8")     # kept before anything changes
-    write_ini(rc, "KSplash", "Engine", "KSplashQML")
-    write_ini(rc, "KSplash", "Theme", SPLASH)
-    said.append("splash after login: the still frame")
+        again = False
+    else:
+        again = True
+    if not again or read_ini(rc, "KSplash", "Theme") == SPLASH:
+        write_ini(rc, "KSplash", "Engine", "KSplashQML")
+        write_ini(rc, "KSplash", "Theme", SPLASH)
+        said.append("splash after login: the still frame")
+    else:
+        said.append("splash after login: the one chosen since stays")
     try:
+        uri = still.as_uri()
+        now = json.loads(shell(READ_WALLPAPERS) or "[]")
         if "wallpapers" not in before:
             # our own still, left by an earlier build, is not worth going back to: Plasma's default is
-            before["wallpapers"] = [[e[0], "" if e[1] == still.as_uri() else e[1], *e[2:]]
-                                    for e in json.loads(shell(READ_WALLPAPERS) or "[]")]
-        shell(set_wallpapers_script([["org.kde.image", still.as_uri()]]))
-        said.append("Plasma's wallpaper: the same still frame, under the rain")
+            before["wallpapers"] = [[e[0], "" if e[1] == uri else e[1], *e[2:]] for e in now]
+            want, kept = [["org.kde.image", uri]], 0
+        else:
+            known = {e[2] for e in before["wallpapers"] if len(e) > 2}
+            want, kept = [], 0
+            for e in now:
+                if len(e) > 2 and e[2] not in known:             # a desktop new since: recorded too
+                    before["wallpapers"].append([e[0], "" if e[1] == uri else e[1], *e[2:]])
+                    want.append(["org.kde.image", uri, e[2]])
+                elif e[0] == "org.kde.image" and e[1] == uri:
+                    want.append(["org.kde.image", uri, *e[2:]])
+                else:
+                    want.append(list(e))
+                    kept += 1
+        if want:
+            shell(set_wallpapers_script(want))
+        said.append("Plasma's wallpaper: the same still frame, under the rain" if not kept else
+                    f"Plasma's wallpaper: the still frame where it was; {kept} chosen since stay")
     except Exception as e:  # noqa: BLE001 - no Plasma shell answering is said, not fatal
         said.append(f"Plasma's wallpaper not changed (its shell did not answer: {getattr(e, 'message', e)})")
     state.parent.mkdir(parents=True, exist_ok=True)

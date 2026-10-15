@@ -231,7 +231,8 @@ def test_greetd_s_own_settings_stay_and_the_wallet_goes_to_the_service_it_names(
     greeter itself runs without them (greetd-greeter, the service greetd runs its greeter under)."""
     base = another_user.base
     machine(base, "plasmalogin.service")
-    own = ('[terminal]\nvt = 2\n\n[general]\nservice = "greetd-otp"  # with a second factor\n\n'
+    # (a comment on its own line: greetd keeps one after a value as part of the value, and stops)
+    own = ('[terminal]\nvt = 2\n\n[general]\n# with a second factor\nservice = "greetd-otp"\n\n'
            '[default_session]\ncommand = "agreety --cmd /bin/sh"\nuser = "greeter"\n\n'
            '[initial_session]\ncommand = "startplasma-wayland"\nuser = "op"\n')
     (base / "etc/greetd/config.toml").write_text(own)

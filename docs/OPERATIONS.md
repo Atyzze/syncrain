@@ -56,7 +56,9 @@ git clone https://github.com/Atyzze/syncrain && cd syncrain   # or unpack SYNCRA
   boot before is kept in `/etc/greetd/display-manager.before-syncrain`. The installs of the user
   who set it up keep it current, and their `--uninstall` takes it out; other users' leave it alone.
 * Back: `./install.sh --login-screen-off` puts back what started at boot before (SDDM, Plasma Login,
-  greetd's own login, or none) and greetd's config and PAM file. A display manager picked since
+  greetd's own login, or none), greetd's `[default_session]` as it was, and takes the wallet lines
+  out of greetd's PAM file; anything else changed in either since stays (a second factor, say). On
+  Debian and Ubuntu, `/etc/X11/default-display-manager` goes with the switch and back. A display manager picked since
   stays; one removed since leaves greetd with its own config; if systemctl fails otherwise, running
   it again finishes. Where syncrain's login screen is not installed, it changes nothing.
 * From a text console (Ctrl+Alt+F3), with SDDM or Plasma Login recorded: `sudo systemctl enable

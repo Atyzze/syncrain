@@ -243,6 +243,11 @@ DM_LINK="${SYNCRAIN_DM_LINK:-/etc/systemd/system/display-manager.service}"
 # beside greetd's config rather than in the app copy, so removing the copy never loses it;
 # --login-screen-off deletes it last.
 LOGIN_BEFORE="${SYNCRAIN_LOGIN_BEFORE:-$(dirname "$GREETD_CONFIG")/display-manager.before-syncrain}"
+# Debian's and Ubuntu's display managers agree through this file: greetd's package points what starts
+# at boot back at the one it names on every upgrade, and Ubuntu's SDDM will not start unless it names
+# SDDM. Where it exists it changes with the switch, and goes back with it (the record beside it).
+DDM_FILE="${SYNCRAIN_DDM_FILE:-/etc/X11/default-display-manager}"
+DDM_BEFORE="$(dirname "$LOGIN_BEFORE")/default-display-manager.before-syncrain"
 as_root() { if [ "$(id -u)" = 0 ]; then "$@"; else sudo "$@"; fi; }
 # One of this user's files, copied to where root keeps the login screen: the user reads it, root only
 # writes. root opening a path the user controls would follow a link there to root's own files and
@@ -253,11 +258,12 @@ copy_to_root() {
 }
 # The app, into the folder root made, $1: this user reads it into a stream and root unpacks that, so
 # root never walks this user's folder, where a folder swapped for a link mid-copy would lead it
-# elsewhere. GNU tar does not follow a link from the stream out of the folder, and the files are root's.
+# elsewhere. A link is followed on this user's side (-h): the copy holds what it pointed at, as root's
+# files, never a link back to something this user can still change and greetd's user would run.
 copy_app_to_root() {
-  tar -C "$APPDIR" -cf - syncrain | as_root tar -C "$1" -xf - --no-same-owner --no-same-permissions
-  # the app is files, folders and links; a stream could make devices and pipes, which go
-  as_root find "$1" ! -type f ! -type d ! -type l -delete
+  tar -C "$APPDIR" -chf - syncrain | as_root tar -C "$1" -xf - --no-same-owner --no-same-permissions
+  # only files and folders: a link a stream could still hold, devices and pipes go
+  as_root find "$1" ! -type f ! -type d -delete
 }
 # KWin on the login screen reads this user's screen layout, keyboard layout and Num Lock (kcminputrc)
 # from copies, made into the folder root made, $1.
@@ -349,6 +355,27 @@ greeter_user() {
   done
 }
 PAM_MARK="written by syncrain's install.sh --login-screen"
+WALLET_MARK="# added by syncrain's install.sh --login-screen"
+WALLET_LINES=("-auth       optional    pam_gnome_keyring.so" "-auth       optional    pam_kwallet5.so"
+              "-session    optional    pam_gnome_keyring.so    auto_start" "-session    optional    pam_kwallet5.so         auto_start")
+# A PAM file (stdin) without the lines --login-screen added: its mark, the wallet lines right after it,
+# and the blank line before it; nothing else.
+without_wallet() {
+  python3 -c 'import sys
+mark, wallet = sys.argv[1], set(sys.argv[2:])
+lines, out, i = sys.stdin.buffer.read().decode("utf-8", "surrogateescape").split("\n"), [], 0
+while i < len(lines):
+    if lines[i].startswith(mark):
+        if out and not out[-1].strip():
+            out.pop()
+        i += 1
+        while i < len(lines) and lines[i] in wallet:
+            i += 1
+        continue
+    out.append(lines[i])
+    i += 1
+sys.stdout.buffer.write("\n".join(out).encode("utf-8", "surrogateescape"))' "$WALLET_MARK" "${WALLET_LINES[@]}"
+}
 CONFIG_MARK="set by syncrain's install.sh --login-screen"
 
 unit_name() { case "$1" in *[!A-Za-z0-9@._-]*|"") return 1 ;; *.service) return 0 ;; *) return 1 ;; esac; }
@@ -386,7 +413,9 @@ apply_greetd() {
   # Only [default_session] changes; the rest of greetd's config stays as the operator has it: a PAM
   # service, an automatic login, the terminal. A whole config written by builds 16 to 18 starts again
   # from greetd's own. If the login screen's files ever go missing, greetd's text login asks
-  # instead of a black screen.
+  # instead of a black screen. login.sh is read by sh, not run itself, and read once first (sh -n
+  # parses without running), so a policy that refuses to run or to read it (SELinux, fapolicyd)
+  # leaves the text login, not a shell that ended at a failed exec.
   local login="$LOGIN_LIB/syncrain/login/login.sh" base="$GREETD_CONFIG" edited pam greeter_pam agreety user
   agreety="$(agreety_path)" user="$(greeter_user)"
   if [ -z "$agreety" ] || [ -z "$user" ]; then
@@ -398,7 +427,7 @@ apply_greetd() {
   fi
   edited="$(mktemp)"
   if ! read_system_file "$base" | greetdconf config \
-      "sh -c 'test -x $login && SYNCRAIN_LOGIN_TEXT=$agreety exec $login; exec $agreety --cmd startplasma-wayland'" "$user" > "$edited"; then
+      "sh -c '/bin/sh -n $login 2>/dev/null && SYNCRAIN_LOGIN_TEXT=$agreety exec /bin/sh $login; exec $agreety --cmd startplasma-wayland'" "$user" > "$edited"; then
     rm -f "$edited"
     die "greetd's config ($base) could not be changed, so it stays as it is"
   fi
@@ -408,18 +437,28 @@ apply_greetd() {
   greeter_pam="$(greeter_pam_file)"
   # SDDM's PAM opens KDE's wallet (and GNOME's keyring) with the password typed at login; greetd's
   # does not, so without these the wallet would ask again. "-" skips a module that is not installed.
+  # The lines are marked, and --login-screen-off takes out those lines alone: whatever else is
+  # changed in the file meanwhile (a second factor, faillock) stays.
   if [ -f "$pam" ] && ! grep -q pam_kwallet5 "$pam"; then
-    [ -f "$pam.before-syncrain" ] || as_root cp "$pam" "$pam.before-syncrain"
-    printf '%s\n' "" "# added by syncrain's install.sh --login-screen: the wallet opens with the login, as under SDDM" \
-      "-auth       optional    pam_gnome_keyring.so" "-auth       optional    pam_kwallet5.so" \
-      "-session    optional    pam_gnome_keyring.so    auto_start" "-session    optional    pam_kwallet5.so         auto_start" \
+    printf '%s\n' "" "$WALLET_MARK: the wallet opens with the login, as under SDDM" "${WALLET_LINES[@]}" \
       | as_root tee -a "$pam" >/dev/null
   fi
   # greetd runs its greeter under its own PAM service where that file exists, else under the users'
   # one: a file without the wallet lines keeps a wallet starting for the user greeter at every boot.
-  if [ -f "$pam.before-syncrain" ] && [ ! -e "$greeter_pam" ] && [ "$greeter_pam" != "$pam" ]; then
-    { printf '# %s: greetd'"'"'s greeter, without the wallet lines\n' "$PAM_MARK"; read_system_file "$pam.before-syncrain"; } \
-      | as_root tee "$greeter_pam" >/dev/null
+  # It is greetd's own file without them, made again at each install, so the file's changes reach it.
+  if grep -qsF "$WALLET_MARK" "$pam" && [ "$greeter_pam" != "$pam" ] \
+      && { [ ! -e "$greeter_pam" ] || head -n 1 "$greeter_pam" | grep -qF "$PAM_MARK"; }; then
+    # made whole beside, and put there only when it holds more than its first line: a file of no
+    # rules would leave greetd no greeter
+    local made
+    made="$(mktemp)"
+    if { printf '# %s: greetd'"'"'s greeter, greetd'"'"'s own file without the wallet lines (made again at each install)\n' "$PAM_MARK"
+         read_system_file "$pam" | without_wallet; } > "$made" && grep -qv '^[[:space:]]*\(#.*\)\?$' "$made"; then
+      copy_to_root "$made" "$greeter_pam"
+    else
+      info "greetd's greeter keeps its PAM file as it was: greetd's own could not be read"
+    fi
+    rm -f "$made"
   fi
 }
 
@@ -438,6 +477,9 @@ login_screen_on() {
     before=greetd.service
     if grep -qs syncrain "$GREETD_CONFIG"; then before=unknown; fi
   fi
+  # Debian's file too, before greetd's package (whose question may make it name greetd) is in
+  local ddm_was=""
+  if [ "$now" != greetd.service ] && [ -f "$DDM_FILE" ]; then ddm_was="$(read_system_file "$DDM_FILE")"; fi
   if [ "$NODEPS" = 0 ] && [ -n "$PKG_TOOL" ]; then
     pkg_missing "${LOGIN_PACKAGES[@]}"
     if [ ${#MISSING[@]} -gt 0 ]; then pkg_install_checked "greetd" "${MISSING[@]}"; fi
@@ -445,6 +487,7 @@ login_screen_on() {
   [ -n "$(agreety_path)" ] || die "greetd's text login (agreety, in ${LOGIN_PACKAGES[*]}) is missing; the login screen falls back to it"
   [ -n "$(greeter_user)" ] || die "greetd's user was not found (greetd's config names none that exists): is greetd installed?"
   record_before "$before"
+  ddm_record "$ddm_was"
   tmp="$(mktemp -d)"
   # login.json: who logs in by default, and the rain's options as given to this installer
   glyphs="$conf/syncrain/glyphs.json" settings="$conf/syncrain/config.json"
@@ -487,13 +530,15 @@ login_screen_on() {
   as_root rm -rf "$LOGIN_LIB"
   as_root mv "$new" "$LOGIN_LIB"
   local owner="${SYNCRAIN_LOGIN_OWNER:-$(greeter_user)}"
-  as_root install -d -m 755 -o "$owner" -g "$(id -gn "$owner")" "$LOGIN_STATE"
+  # greetd's user's alone, as on NixOS: its log and last.json say who logged in, and when
+  as_root install -d -m 700 -o "$owner" -g "$(id -gn "$owner")" "$LOGIN_STATE"
   clear_state_copies
   rm -rf "$tmp"
   info "the app: $LOGIN_LIB (user $(id -un), Plasma, the rain's options given to this installer)"
 
   apply_greetd
   as_root systemctl enable --force greetd.service >/dev/null || die "systemctl could not enable greetd"
+  ddm_set
   if in_plasma; then
     info "after a login, Plasma's splash and wallpaper show a still frame of the rain (a window opens for a moment):"
     handover "$APPDIR" on "${ARGS[@]}" || info "the still frame was not made; Plasma's splash and wallpaper stay as they were"
@@ -504,7 +549,11 @@ login_screen_on() {
   info "if it ever fails, greetd's text login asks instead, and Plasma starts as usual"
   info "back: ./install.sh --login-screen-off"
   if unit_name "$before" && [ "$before" != greetd.service ]; then
-    info "  or from a text console (Ctrl+Alt+F3): sudo systemctl enable --force $before && sudo reboot"
+    if [ -f "$DDM_BEFORE" ]; then
+      info "  or from a text console (Ctrl+Alt+F3): sudo systemctl enable --force $before && sudo cp $DDM_BEFORE $DDM_FILE && sudo reboot"
+    else
+      info "  or from a text console (Ctrl+Alt+F3): sudo systemctl enable --force $before && sudo reboot"
+    fi
   fi
 }
 
@@ -513,6 +562,51 @@ login_screen_on() {
 # What starts at boot changes only while greetd still does: a display manager picked since stays,
 # and one that is gone leaves greetd with its own config rather than no way to log in. Run again
 # (for the hand-over, from Plasma), it finds nothing more of the login screen to put back.
+# greetd's [default_session] as it was before --login-screen (its command and user, as they were
+# written); every other change to the config since stays. If greetd would not read the result as
+# meant, the config stays: its command finds no login.sh and runs greetd's text login.
+greetd_back() {
+  local back was
+  if [ -f "$GREETD_CONFIG.before-syncrain" ] && grep -qs syncrain "$GREETD_CONFIG"; then
+    back="$(mktemp)" was="$(mktemp)"
+    read_system_file "$GREETD_CONFIG.before-syncrain" > "$was"
+    if read_system_file "$GREETD_CONFIG" | greetdconf restore "$was" > "$back"; then
+      copy_to_root "$back" "$GREETD_CONFIG"
+      as_root rm -f "$GREETD_CONFIG.before-syncrain"
+    else
+      info "greetd's config keeps syncrain's login command (above); with the login screen gone it runs greetd's text login"
+    fi
+    rm -f "$back" "$was"
+  fi
+}
+# Debian's default-display-manager names greetd while the login screen is on (see DDM_FILE).
+greetd_daemon() { command -v greetd 2>/dev/null || printf '/usr/sbin/greetd\n'; }
+# What the file named before: $1, as read before greetd's package could change it, recorded whenever
+# something other than greetd starts at boot (a display manager picked since is what comes before).
+ddm_record() {
+  if [ -n "$1" ]; then printf '%s\n' "$1" | as_root tee "$DDM_BEFORE" >/dev/null; fi
+}
+ddm_set() {
+  [ -f "$DDM_FILE" ] || return 0
+  greetd_daemon | as_root tee "$DDM_FILE" >/dev/null
+}
+# ... and names what it named before, back with the switch: when greetd starts at boot and is
+# switched away from here, or when the file still names greetd as this script wrote it (the
+# operator switched back by hand, as the hint said). A file someone changed since stays theirs.
+ddm_back() {
+  if [ ! -f "$DDM_BEFORE" ] || [ ! -f "$DDM_FILE" ]; then
+    if [ -z "$again" ]; then as_root rm -f "$DDM_BEFORE"; fi
+    return 0
+  fi
+  local names
+  names="$(read_system_file "$DDM_FILE")"
+  if { [ "$1" = greetd.service ] && [ -z "$keep$again" ]; } \
+      || { [ "$1" != greetd.service ] && [ "$names" = "$(greetd_daemon)" ]; }; then
+    read_system_file "$DDM_BEFORE" | as_root tee "$DDM_FILE" >/dev/null
+  fi
+  if [ -z "$again" ]; then as_root rm -f "$DDM_BEFORE"; fi
+}
+
 login_screen_off() {
   local before now keep="" again="" pam greeter_pam
   before="$(recorded_before)"
@@ -536,14 +630,20 @@ login_screen_off() {
            fi ;;
       esac
     fi
+    ddm_back "$now"                             # first: what a stop half way leaves is then right
     pam="$(pam_file)"                           # the config before syncrain names the same services
     greeter_pam="$(greeter_pam_file)"
-    if [ -f "$GREETD_CONFIG.before-syncrain" ] && grep -qs syncrain "$GREETD_CONFIG"; then
-      as_root mv -f "$GREETD_CONFIG.before-syncrain" "$GREETD_CONFIG"
+    greetd_back
+    # Only the lines --login-screen added go: a second factor or faillock added since stays. (Builds
+    # up to 35 kept a whole copy of the file beside it; the copy goes, unused.)
+    if grep -qsF "$WALLET_MARK" "$pam"; then
+      local cleaned
+      cleaned="$(mktemp)"
+      read_system_file "$pam" | without_wallet > "$cleaned"
+      copy_to_root "$cleaned" "$pam"
+      rm -f "$cleaned"
     fi
-    if [ -f "$pam.before-syncrain" ] && grep -qs "added by syncrain" "$pam"; then
-      as_root mv -f "$pam.before-syncrain" "$pam"
-    fi
+    as_root rm -f "$pam.before-syncrain"
     if head -n 1 "$greeter_pam" 2>/dev/null | grep -qF "$PAM_MARK"; then as_root rm -f "$greeter_pam"; fi
     as_root rm -rf "$LOGIN_LIB" "$LOGIN_STATE"
     # The record goes once what it names is back; a run that could not do that leaves it for the next.
@@ -589,6 +689,14 @@ login_screen_refresh() {
   copy_to_root "$APPDIR/BUILD_NUMBER" "$LOGIN_LIB/BUILD_NUMBER"
   as_root chmod a+r "$LOGIN_LIB/BUILD_NUMBER"
   if grep -qs syncrain "$GREETD_CONFIG"; then apply_greetd; fi
+  # what --login-screen does since build 36, for a login screen set up before it
+  if [ "$(display_manager)" = greetd.service ] && grep -qsF "$CONFIG_MARK" "$GREETD_CONFIG"; then
+    if [ -f "$DDM_FILE" ] && [ ! -f "$DDM_BEFORE" ] && [ "$(read_system_file "$DDM_FILE")" != "$(greetd_daemon)" ]; then
+      ddm_record "$(read_system_file "$DDM_FILE")"
+      ddm_set
+    fi
+    if [ -d "$LOGIN_STATE" ]; then as_root chmod 700 "$LOGIN_STATE"; fi
+  fi
   info "the login screen: build $BUILD too"
   local rain=()
   # the login screen's options without its copy of the symbols file (here syncrain reads yours)

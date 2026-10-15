@@ -82,6 +82,13 @@ def test_a_login_through_the_box_starts_plasma(tmp_path, native_wallpaper):
     assert (tmp_path / "state" / "logged-in").read_text() == "plasma.desktop\n"
 
 
+def test_a_refused_password_does_not_come_back_with_ctrl_z(tmp_path, native_wallpaper):
+    """With the eye on, a cleared refused password came back in clear with Ctrl+Z."""
+    log, _greetd = run_login(tmp_path, [{"password": "wrong", "peek": True, "wait": 4}, {"undo": True, "wait": 1},
+                                        {"password": "right"}])
+    assert re.search(r"after undo: the field hidden, 0 characters", log), log[-4000:]
+
+
 def test_text_login_in_the_box_hands_over_to_greetd_s_own(tmp_path, native_wallpaper):
     log, greetd = run_login(tmp_path, [{"text": True, "wait": 1}])
     assert re.search(r"syncrain-login: [0-9:.]+ text login asked for", log), log[-4000:]

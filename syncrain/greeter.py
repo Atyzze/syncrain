@@ -422,6 +422,7 @@ def run_box(config: dict, client: Greetd) -> int:
             text_login()
             return False
         password_text.set_text("", -1)
+        peek(False)                       # a refused password is not shown again on the way back
         for b in boxes:
             b["password"].grab_focus()
         later(next_test)
@@ -461,6 +462,8 @@ def run_box(config: dict, client: Greetd) -> int:
                              input_purpose=Gtk.InputPurpose.PASSWORD)
         password.set_icon_from_icon_name(Gtk.EntryIconPosition.SECONDARY,
                                          "view-conceal-symbolic" if shared["peek"] else "view-reveal-symbolic")
+        # Ctrl+Z would bring a cleared password back, in clear with the eye on
+        password.set_enable_undo(False)
         password.connect("icon-press", lambda *_: peek(not shared["peek"]))
         chooser = Gtk.DropDown(model=names)
         if found:
@@ -541,6 +544,15 @@ def run_box(config: dict, client: Greetd) -> int:
         if t.get("text"):
             text_login()
             return False
+        if t.get("undo"):                 # Ctrl+Z in the field: what comes back, and how it shows
+            for b in boxes:
+                b["password"].get_delegate().activate_action("text.undo", None)
+            say(f"after undo: the field {'shown' if shared['peek'] else 'hidden'}, "
+                f"{len(password_text.get_text())} characters")
+            later(next_test)
+            return False
+        if "peek" in t:
+            peek(bool(t["peek"]))
         if "answer" in t:
             password_text.set_text(t["answer"], -1)
             attempt()
@@ -569,6 +581,10 @@ def main(argv: list[str] | None = None) -> int:
     argv = sys.argv[1:] if argv is None else argv
     config = read_config()
     if argv[:1] == ["--fallback-command"]:
+        # login.sh, as greetd's text login takes over: a conversation the box began and never
+        # finished (it died in the middle) is still greetd's, and would refuse the text login's
+        # first try ("a session is already being configured")
+        Greetd().cancel_anew()
         print(fallback_command(config))
         return 0
     if argv[:1] == ["--draw-symbols"]:

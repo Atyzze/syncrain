@@ -93,9 +93,12 @@ GTK draws more pixels and scales them down), the page within texture filtering.
 * The box speaks greetd's IPC (JSON over its socket): the password to PAM's first prompt, further
   prompts shown in the box. greetd checks it and starts the session once KWin is gone.
 * No login (no marker file): `login.sh` hands over to greetd's text login.
-* Installed to `/usr/local/lib/syncrain` (root's files), state and logs in `/var/lib/syncrain-login`,
-  the greeter's settings fresh at every start. Only greetd's `[default_session]` changes
-  (`syncrain/greetdconf.py`).
+* Installed to `/usr/local/lib/syncrain` (root's files, links followed), state and logs in
+  `/var/lib/syncrain-login` (greetd's user's alone), the greeter's settings fresh at every start, its
+  cache kept while the build stays. Only greetd's `[default_session]` changes
+  (`syncrain/greetdconf.py`, which reads the config line by line as greetd does, not as TOML, and
+  reads its edit back before writing it); greetd's command reads `login.sh` with `sh`, so a policy
+  that refuses to run it leaves greetd's text login.
 * After the login, Plasma's splash and wallpaper show a still frame of the rain (`syncrain/handover.py`).
 * Only `install.sh --login-screen` puts any of it there, with a record of what started at boot
   before (`/etc/greetd/display-manager.before-syncrain`) that `--login-screen-off` goes back to.

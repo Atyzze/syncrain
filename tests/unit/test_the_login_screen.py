@@ -49,6 +49,59 @@ def test_without_greetd_it_says_so(tmp_path):
     assert not ok and said.startswith("greetd: ")
 
 
+def test_the_text_login_after_a_box_that_died_mid_conversation_is_not_refused(tmp_path, monkeypatch, capsys):
+    """greetd keeps the conversation a greeter began after the greeter is gone: login.sh's way out
+    drops it before greetd's text login asks, or that login's first try is refused."""
+    import socket
+    import struct
+    fake = FakeGreetd(tmp_path / "sock")
+
+    def request(message):
+        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
+            s.connect(fake.path)
+            data = json.dumps(message).encode()
+            s.sendall(struct.pack("=I", len(data)) + data)
+            (size,) = struct.unpack("=I", s.recv(4))
+            return json.loads(s.recv(size))
+
+    assert request({"type": "create_session", "username": "op"})["type"] == "auth_message"   # the box, then gone
+    assert request({"type": "create_session", "username": "op"})["description"] == \
+        "a session is already being configured", "what greetd's text login would meet"
+    monkeypatch.setenv("GREETD_SOCK", fake.path)
+    monkeypatch.setenv("SYNCRAIN_LOGIN_CONFIG", str(tmp_path / "none.json"))
+    assert greeter.main(["--fallback-command"]) == 0
+    assert capsys.readouterr().out.strip()
+    assert fake.requests[-1] == {"type": "cancel_session"}
+    assert request({"type": "create_session", "username": "op"})["type"] == "auth_message", "the text login asks"
+    fake.close()
+
+
+def test_a_greetd_that_stops_answering_is_given_up_on_and_the_conversation_dropped(tmp_path):
+    """The box's socket has a timeout: a greetd that never answers ends the try (said), and the
+    half-made conversation is cancelled over a new connection."""
+    import socket
+    import threading
+    server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    server.bind(str(tmp_path / "sock"))
+    server.listen(4)
+    seen = []
+
+    def serve():
+        while True:
+            try:
+                conn, _ = server.accept()
+            except OSError:
+                return
+            seen.append(conn.recv(4096))              # read, never answered
+    threading.Thread(target=serve, daemon=True).start()
+    started = time.monotonic()
+    ok, said = Greetd(str(tmp_path / "sock"), timeout=0.5).login("op", "right", ["x"], [])
+    assert not ok and said.startswith("greetd: ") and time.monotonic() - started < 10, said
+    time.sleep(0.2)
+    assert any(b"cancel_session" in s for s in seen), seen
+    server.close()
+
+
 def write_sessions(share):
     folder = share / "wayland-sessions"
     folder.mkdir(parents=True)
@@ -159,11 +212,11 @@ def test_install_makes_the_rain_the_login_screen_and_puts_sddm_back_after(tmp_pa
     assert list((lib / "cache").glob("glyphs-*.png")), "the big symbols were drawn at install"
     config = (tmp_path / "etc/greetd/config.toml").read_text()
     login = f"{lib}/syncrain/login/login.sh"
-    assert f"command = \"sh -c 'test -x {login} && SYNCRAIN_LOGIN_TEXT={tmp_path}/bin/agreety exec {login}; exec {tmp_path}/bin/agreety --cmd startplasma-wayland'\"" in config
+    assert f"command = \"sh -c '/bin/sh -n {login} 2>/dev/null && SYNCRAIN_LOGIN_TEXT={tmp_path}/bin/agreety exec /bin/sh {login}; exec {tmp_path}/bin/agreety --cmd startplasma-wayland'\"" in config
     assert 'user = "greeter"' in config
     import tomllib
     command = tomllib.loads(config)["default_session"]["command"]
-    assert command == f"sh -c 'test -x {login} && SYNCRAIN_LOGIN_TEXT={tmp_path}/bin/agreety exec {login}; exec {tmp_path}/bin/agreety --cmd startplasma-wayland'"
+    assert command == f"sh -c '/bin/sh -n {login} 2>/dev/null && SYNCRAIN_LOGIN_TEXT={tmp_path}/bin/agreety exec /bin/sh {login}; exec {tmp_path}/bin/agreety --cmd startplasma-wayland'"
     assert "agreety --cmd /bin/sh" in (tmp_path / "etc/greetd/config.toml.before-syncrain").read_text()
     record = tmp_path / "etc/greetd/display-manager.before-syncrain"
     assert record.read_text() == "sddm.service\n" and not (lib / "previous-display-manager").exists()
@@ -171,6 +224,7 @@ def test_install_makes_the_rain_the_login_screen_and_puts_sddm_back_after(tmp_pa
     assert added.startswith(pam) and "-auth       optional    pam_kwallet5.so" in added
     assert "-session    optional    pam_kwallet5.so         auto_start" in added
     assert "sudo systemctl enable --force sddm.service && sudo reboot" in done.stdout
+    assert (tmp_path / "state").stat().st_mode & 0o777 == 0o700, "who logged in, and when, is greetd's user's alone"
 
     again = login_install(tmp_path)                   # a newer build: the login screen's copy follows
     assert again.returncode == 0 and "the login screen: build" in again.stdout, again.stdout + again.stderr
@@ -183,6 +237,91 @@ def test_install_makes_the_rain_the_login_screen_and_puts_sddm_back_after(tmp_pa
     assert "agreety --cmd /bin/sh" in (tmp_path / "etc/greetd/config.toml").read_text()
     assert (tmp_path / "etc/pam.d/greetd").read_text() == pam
     assert not lib.exists() and not (tmp_path / "state").exists() and not record.exists()
+
+
+def test_the_way_back_keeps_what_was_changed_meanwhile(tmp_path):
+    """--login-screen-off takes out what --login-screen put in, and only that: a second factor added
+    to greetd's PAM file and a section added to its config while the login screen was on stay."""
+    (tmp_path / "etc/greetd").mkdir(parents=True)
+    config = '[terminal]\nvt = 1\n\n[default_session]\ncommand = "agreety --cmd /bin/sh"\nuser = "greeter"\n'
+    (tmp_path / "etc/greetd/config.toml").write_text(config)
+    (tmp_path / "etc/pam.d").mkdir(parents=True)
+    pam = "#%PAM-1.0\nauth       include      system-local-login\nsession    include      system-local-login\n"
+    (tmp_path / "etc/pam.d/greetd").write_text(pam)
+    (tmp_path / "display-manager.service").symlink_to("/usr/lib/systemd/system/sddm.service")
+    assert login_install(tmp_path, "--login-screen").returncode == 0
+    greeter_pam = (tmp_path / "etc/pam.d/greetd-greeter").read_text()
+    assert "pam_kwallet5" not in greeter_pam and "system-local-login" in greeter_pam
+    totp = "auth       required     pam_google_authenticator.so\n"
+    added = (tmp_path / "etc/pam.d/greetd").read_text().replace("auth       include      system-local-login\n",
+                                                                 "auth       include      system-local-login\n" + totp)
+    (tmp_path / "etc/pam.d/greetd").write_text(added)
+    (tmp_path / "etc/greetd/config.toml").write_text(
+        (tmp_path / "etc/greetd/config.toml").read_text() + '\n[initial_session]\ncommand = "sway"\nuser = "op"\n')
+    again = login_install(tmp_path)                    # an upgrade: the greeter's file follows greetd's
+    assert again.returncode == 0, again.stdout + again.stderr
+    assert "pam_google_authenticator" in (tmp_path / "etc/pam.d/greetd-greeter").read_text()
+    off = login_install(tmp_path, "--login-screen-off")
+    assert off.returncode == 0, off.stdout + off.stderr
+    assert (tmp_path / "etc/pam.d/greetd").read_text() == pam.replace(
+        "auth       include      system-local-login\n", "auth       include      system-local-login\n" + totp)
+    assert (tmp_path / "etc/greetd/config.toml").read_text() == \
+        config + '\n[initial_session]\ncommand = "sway"\nuser = "op"\n'
+    assert not (tmp_path / "etc/pam.d/greetd-greeter").exists()
+    assert not list((tmp_path / "etc").rglob("*.before-syncrain"))
+
+
+def test_debian_s_default_display_manager_file_goes_with_the_switch_and_back(tmp_path):
+    """Debian's greetd package points what starts at boot at the display manager this file names, at
+    every upgrade; Ubuntu's SDDM does not start unless it names SDDM."""
+    (tmp_path / "etc/greetd").mkdir(parents=True)
+    (tmp_path / "etc/greetd/config.toml").write_text('[terminal]\nvt = 7\n\n[default_session]\ncommand = "agreety"\n')
+    (tmp_path / "etc/X11").mkdir(parents=True)
+    ddm = tmp_path / "etc/X11/default-display-manager"
+    ddm.write_text("/usr/bin/sddm\n")
+    (tmp_path / "display-manager.service").symlink_to("/usr/lib/systemd/system/sddm.service")
+    assert login_install(tmp_path, "--login-screen").returncode == 0
+    assert ddm.read_text().strip().endswith("greetd")
+    off = login_install(tmp_path, "--login-screen-off")
+    assert off.returncode == 0, off.stdout + off.stderr
+    assert ddm.read_text() == "/usr/bin/sddm\n" and not list((tmp_path / "etc").rglob("*.before-syncrain"))
+
+
+def test_switched_back_by_hand_the_way_back_still_puts_debian_s_file_back(tmp_path):
+    """The hint said `systemctl enable --force sddm.service`; --login-screen-off after it puts the
+    file back too (it named greetd for good, and Ubuntu's SDDM would not start)."""
+    (tmp_path / "etc/greetd").mkdir(parents=True)
+    (tmp_path / "etc/greetd/config.toml").write_text('[terminal]\nvt = 7\n\n[default_session]\ncommand = "agreety"\n')
+    (tmp_path / "etc/X11").mkdir(parents=True)
+    ddm = tmp_path / "etc/X11/default-display-manager"
+    ddm.write_text("/usr/bin/sddm\n")
+    (tmp_path / "display-manager.service").symlink_to("/usr/lib/systemd/system/sddm.service")
+    assert login_install(tmp_path, "--login-screen").returncode == 0
+    (tmp_path / "display-manager.service").unlink()                     # by hand, as the hint says
+    (tmp_path / "display-manager.service").symlink_to("/usr/lib/systemd/system/sddm.service")
+    off = login_install(tmp_path, "--login-screen-off")
+    assert off.returncode == 0, off.stdout + off.stderr
+    assert ddm.read_text() == "/usr/bin/sddm\n" and not list((tmp_path / "etc").rglob("*.before-syncrain"))
+
+
+def test_greetd_s_command_reads_login_sh_rather_than_running_it(tmp_path):
+    """A policy that refuses to run the file (SELinux, fapolicyd) cannot stop sh reading it; and
+    without it, greetd's text login asks. (A failed exec ended the shell before the text login.)"""
+    (tmp_path / "etc/greetd").mkdir(parents=True)
+    (tmp_path / "etc/greetd/config.toml").write_text('[terminal]\nvt = 1\n\n[default_session]\ncommand = "agreety"\n')
+    assert login_install(tmp_path, "--login-screen").returncode == 0
+    from syncrain import greetdconf
+    command = greetdconf.unquote(greetdconf.read((tmp_path / "etc/greetd/config.toml").read_text())
+                                 ["default_session"]["command"])
+    import shlex
+    login = tmp_path / "lib/syncrain/login/login.sh"
+    login.write_text('echo "login.sh read"\n')
+    login.chmod(0o644)                                 # not to be run: read
+    assert subprocess.run(shlex.split(command), capture_output=True, text=True).stdout == "login.sh read\n"
+    stub(tmp_path / "bin", "agreety", 'echo "text login $*"')
+    login.unlink()
+    said = subprocess.run(shlex.split(command), capture_output=True, text=True).stdout
+    assert said == "text login --cmd startplasma-wayland\n"
 
 
 def test_a_link_among_the_operator_s_files_brings_nothing_of_root_s_into_the_login_screen(another_user):
@@ -212,10 +351,10 @@ def test_a_link_among_the_operator_s_files_brings_nothing_of_root_s_into_the_log
     assert not [c for c in user.calls("sudo") if str(config) in c]
 
 
-def test_a_link_in_place_of_the_app_is_copied_as_a_link_and_nothing_it_points_at_changes(another_user):
-    """The app the login screen copies is a folder the operator can change. Were it a link, it is copied
-    as a link, and chmod -R, which follows a link it is given by name, is given only the folder root
-    made around the copy: what the link points at keeps its permissions."""
+def test_a_link_in_place_of_the_app_is_copied_as_what_it_points_at_and_that_does_not_change(another_user):
+    """The app the login screen copies is a folder the operator can change. Were it a link, root's copy
+    holds what it points at, as root's files: greetd's user never runs code through a link the
+    operator can still change. What the link points at keeps its permissions."""
     user = another_user
     elsewhere = user.base / "elsewhere"
     shutil.copytree(user.src / "syncrain", elsewhere / "syncrain", ignore=shutil.ignore_patterns("__pycache__"))
@@ -231,7 +370,9 @@ def test_a_link_in_place_of_the_app_is_copied_as_a_link_and_nothing_it_points_at
     (elsewhere / "syncrain/app.py").chmod(0o600)
     again = user.install(src=release)                  # a newer build: the login screen's copy follows
     assert again.returncode == 0 and "the login screen: build" in again.stdout, again.stdout + again.stderr
-    assert (user.base / "lib/syncrain").is_symlink()
+    copy = user.base / "lib/syncrain"
+    assert copy.is_dir() and not copy.is_symlink() and (copy / "app.py").is_file()
+    assert not [p for p in copy.rglob("*") if p.is_symlink()]
     assert [oct(p.stat().st_mode & 0o777) for p in (elsewhere / "syncrain", elsewhere / "syncrain/app.py")] == [
         "0o700", "0o600"]
 
@@ -253,6 +394,29 @@ def test_each_start_takes_the_settings_as_installed_now(tmp_path):
     assert done.returncode == 0, done.stdout + done.stderr
     assert not [p for p in (tmp_path / "state/config").rglob("*") if p.name in ("kxkbrc", "kwinrc")]
     assert not (tmp_path / "state/data/left.txt").exists()
+
+
+def test_the_cache_stays_while_the_build_does(tmp_path):
+    """Compiled shaders and QML save seconds at each start; made by another build, they go."""
+    write_sessions(tmp_path / "share")
+    cache = tmp_path / "state/cache"
+    (cache / "qmlcache").mkdir(parents=True)
+    (cache / "qmlcache/old.qmlc").write_text("another build's")
+    (cache / "build").write_text("1\n")
+    env = dict(os.environ, XDG_DATA_DIRS=str(tmp_path / "share"), SYNCRAIN_LOGIN_STATE=str(tmp_path / "state"),
+               SYNCRAIN_LOGIN_KWIN="false", SYNCRAIN_LOGIN_TEXT=str(stub(tmp_path / "bin", "agreety", "exit 0")),
+               SYNCRAIN_PYTHON=sys.executable, SYNCRAIN_LOGIN_CONFIG=str(tmp_path / "none.json"))
+
+    def start():
+        done = subprocess.run(["sh", str(ROOT / "syncrain/login/login.sh")], env=env, capture_output=True,
+                              text=True, timeout=60)
+        assert done.returncode == 0, done.stdout + done.stderr
+    start()
+    assert not (cache / "qmlcache").exists() and (cache / "build").read_text() == f"{build.BUILD_NUMBER}\n"
+    (cache / "qmlcache").mkdir()
+    (cache / "qmlcache/this.qmlc").write_text("this build's")
+    start()
+    assert (cache / "qmlcache/this.qmlc").exists()
 
 
 def test_the_diagnosis_says_which_login_screen_starts_and_what_it_said(tmp_path, monkeypatch):

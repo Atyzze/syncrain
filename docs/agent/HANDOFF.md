@@ -1,4 +1,4 @@
-# Handoff: the state of syncrain at build 35
+# Handoff: the state of syncrain at build 36
 
 What is true now, for a context that has just opened this tree. Where this page and the code
 disagree, the code is right; fix the page in the same build. Each fact has one home; this page
@@ -48,7 +48,7 @@ This page, `docs/agent/NEXT_BUILD.md`, `docs/agent/WORKING_WITH_THE_OPERATOR.md`
   colours and periods); `822ea58a` 29 to 34 (sentences' gaps and trails in `state.frag`); `85ace386` in
   28; `a9c058f3` 24 to 27; `f98ef1ca` in 23; `25b02556` in 22; `def5684f` 15 to 21; `c18f8be2` in 12
   to 14; `48e6bf9c` 3 to 11.
-* **GitHub**: `main` holds builds 7 to 35, a commit `syncrain build <N>` each, and a few
+* **GitHub**: `main` holds builds 7 to 36, a commit `syncrain build <N>` each, and a few
   documents-only commits between them.
 
 ## Under way
@@ -56,7 +56,9 @@ This page, `docs/agent/NEXT_BUILD.md`, `docs/agent/WORKING_WITH_THE_OPERATOR.md`
 The review of build 33 (84 numbered items, in the operator's review document) is being fixed one
 area a build, the most critical first: `docs/ROADMAP.md`, "Planned builds". Build 34 did the lock
 screen (1, 3, 27, 28, 30, 56); build 35 the operator's new default with every stream-file fix (69,
-65, 66, 76), so the builds after it leave the stream alone.
+65, 66, 76), so the builds after it leave the stream alone. Build 36 did the login screen (4 to 7,
+23, 31 to 38): `--login-screen-off` takes out only what it put in, and greetd's config is read as
+greetd reads it (line by line, the last of a section named twice).
 
 ## Waits on the operator
 

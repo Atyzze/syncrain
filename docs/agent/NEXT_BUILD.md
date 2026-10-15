@@ -1,13 +1,12 @@
-# The next build is 36
+# The next build is 37
 
 The first line is parsed: `# The next build is <N>`, exactly one above `BUILD_NUMBER`.
 
-## Build 36: the login screen's items of the review of build 33
+## Build 37: the installer's items of the review of build 33
 
 * Read what the operator sent last, and answer it in one plain sentence first.
-* Then the review of build 33, in order (`docs/ROADMAP.md`, "Planned builds"): the login screen
-  (36), the installer (37), Nix and the harness (38), the native and Python hosts (39), the
-  consolidation (40), the page and the release tool (41). None of them changes the stream.
+* Then the review of build 33, in order (`docs/ROADMAP.md`, "Planned builds"). None of the builds
+  after 35 changes the stream.
 * No boot splash: never touch the bootloader, initramfs or Plymouth.
 
 **Known blockers**: watts, NVIDIA's driver and Plasma's shell exist only on the operator's machine;

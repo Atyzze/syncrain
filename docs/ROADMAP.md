@@ -44,7 +44,7 @@ critical first, one area a build:
 1. **35** (done): the operator's new default, `composite.frag` to its spec (69), and the values
    that passed and then broke the picture (65, 66, 76, on the desktop and the page alike): the one
    stream change.
-2. **36**: the login screen (4 to 7, 23, 31 to 38).
+2. **36** (done): the login screen (4 to 7, 23, 31 to 38).
 3. **37**: the installer (8 to 11, 39 to 46).
 4. **38**: Nix and the test harness (2, 12, 16 to 18, 20 to 22, 47).
 5. **39**: the native host and the Python host (14, 15, 29, 48 to 55, 57 to 64, 67, 68).

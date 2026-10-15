@@ -81,10 +81,10 @@ class Greetd:
                     return False, self._said(reply, notes, asked)
                 return True, "\n".join(n for n in notes if n)
         except (OSError, ValueError, GreetdError) as e:
-            self._cancel_anew()
+            self.cancel_anew()
             return False, f"greetd: {e}"
 
-    def _cancel_anew(self):
+    def cancel_anew(self):
         """After a conversation that broke off (a timeout), greetd may still hold the half-made
         session; dropping it over a new connection lets the next try start clean."""
         try:

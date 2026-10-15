@@ -146,3 +146,22 @@ def test_a_run_that_broke_off_does_not_make_syncrain_s_splash_the_one_to_go_back
     assert json.loads(handover.state_path().read_text())["splash"] == {"Engine": None, "Theme": None}
     handover.off(shell=shell)
     assert handover.read_ini(rc, "KSplash", "Theme") is None, "Plasma's own splash"
+
+
+def test_login_screen_again_leaves_a_splash_and_wallpaper_chosen_since(tmp_path, monkeypatch):
+    """./install.sh --login-screen run again (other options, a newer build): only what still shows
+    the still frame, or a desktop new since, becomes it."""
+    rc = _homes(tmp_path, monkeypatch)
+    shell = Shell()
+    handover.on([], shell=shell)
+    handover.write_ini(rc, "KSplash", "Theme", "org.kde.breeze.desktop")        # chosen since, in Plasma
+    shell.desktops[1] = ["org.kde.image", "file:///home/op/beach.png", shell.desktops[1][2]]
+    shell.desktops.append(["org.kde.color", "", "4"])                          # a desktop new since
+    said = handover.on(["--theme", "matrix"], shell=shell)
+    assert said == ["splash after login: the one chosen since stays",
+                    "Plasma's wallpaper: the still frame where it was; 1 chosen since stay"]
+    assert handover.read_ini(rc, "KSplash", "Theme") == "org.kde.breeze.desktop"
+    uri = handover.still_path().as_uri()
+    assert [d[1] for d in shell.desktops] == [uri, "file:///home/op/beach.png", uri, uri]
+    handover.off(shell=shell)
+    assert shell.desktops[1][1] == "file:///home/op/beach.png" and shell.desktops[3][0] == "org.kde.color"
