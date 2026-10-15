@@ -5,6 +5,7 @@ an [initial_session] that logs in automatically, the terminal, source_profile).
     python -m syncrain.greetdconf config COMMAND USER < config.toml > new.toml
     python -m syncrain.greetdconf service < config.toml      # the PAM service greetd logs users in with
     python -m syncrain.greetdconf greeter-service < config.toml   # the one its greeter runs under
+    python -m syncrain.greetdconf user < config.toml         # the user it runs its greeter as
 """
 from __future__ import annotations
 
@@ -109,6 +110,12 @@ def greeter_service(text: str) -> str:
     return _value(text, "default_session", "service") or "greetd-greeter"
 
 
+def user(text: str) -> str | None:
+    """The user greetd runs its greeter as ([default_session] user), which each family names its
+    own way (greeter, _greetd, greetd); None if it names none."""
+    return _value(text, "default_session", "user")
+
+
 def parses(text: str) -> bool | None:
     """Whether strict TOML reads it (tomllib, where this Python has it; None without)."""
     try:
@@ -140,6 +147,11 @@ def main(argv: list[str] | None = None) -> int:
     if argv[:1] == ["greeter-service"]:
         print(greeter_service(text))
         return 0
+    if argv[:1] == ["user"]:
+        found = user(text)
+        if found:
+            print(found)
+        return 0 if found else 1
     print(__doc__, file=sys.stderr)
     return 2
 

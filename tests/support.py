@@ -93,14 +93,15 @@ LOGIN_PATHS = {"SYNCRAIN_LOGIN_LIB": "lib", "SYNCRAIN_LOGIN_STATE": "state",
 
 
 def login_install(base: Path, *args: str, src: Path = ROOT, prefix: tuple = (), user: str | None = None,
-                  timeout: float = 180) -> subprocess.CompletedProcess:
+                  timeout: float = 180, deps: bool = False, env_extra: dict | None = None) -> subprocess.CompletedProcess:
     """install.sh --no-deps run for real from `src`, with home, config and cache under `base` and the
     system's side of the login screen there too (LOGIN_PATHS; the record of what started at boot
     lands beside greetd's config). sudo, KWin, greetd's text login and systemctl are stubs: sudo
     writes each command it runs to base/sudo.calls; systemctl says there is no user session, writes
     every other call to base/systemctl.calls and moves the display-manager link as systemd does (a
     unit named gone*.service is not installed; a file base/systemctl.refuse fails the next call).
-    `prefix` runs it as `user` (setpriv)."""
+    `prefix` runs it as `user` (setpriv). `deps` leaves --no-deps out (with stubs of a family's
+    package tools in base/bin), `env_extra` adds to its environment."""
     bins = base / "bin"
     link = base / LOGIN_PATHS["SYNCRAIN_DM_LINK"]
     stub(bins, "sudo", f'echo "$@" >> {base}/sudo.calls; exec "$@"')
@@ -120,12 +121,15 @@ exit 0''')
            "XDG_CACHE_HOME": str(base / "cache"), "TMPDIR": str(base), "PYTHONDONTWRITEBYTECODE": "1",
            "PATH": f"{bins}:{os.path.dirname(sys.executable)}:/usr/bin:/bin", "CC": "no-compiler-here",
            "SYNCRAIN_LOGIN_OWNER": user or getpass.getuser(),
+           # greetd's user as Arch names it; which one each family has is tests/unit/test_the_families.py's
+           "SYNCRAIN_GREETER_USER": "greeter", "SYNCRAIN_AGREETY": str(bins / "agreety"),
            **{key: str(base / path) for key, path in LOGIN_PATHS.items()}}
     for key in ("GI_TYPELIB_PATH", "LD_LIBRARY_PATH"):
         if key in os.environ:
             env[key] = os.environ[key]
-    return subprocess.run([*prefix, "bash", str(src / "install.sh"), "--no-deps", *args], cwd=src, env=env,
-                          capture_output=True, text=True, timeout=timeout)
+    env.update(env_extra or {})
+    return subprocess.run([*prefix, "bash", str(src / "install.sh"), *([] if deps else ["--no-deps"]), *args],
+                          cwd=src, env=env, capture_output=True, text=True, timeout=timeout)
 
 
 #: The user root runs install.sh as here (setpriv), as no user of the operator's is root.

@@ -15,7 +15,7 @@ Open questions, planned builds, the cadence and the constraints. What shipped: `
 * **2026-10-15 13:37**: the name: "syncrain backdrop", "since ye its more than jsut a wallapepr, its
   also a lockscreen, a screensaver". NixOS is "the 5th paradigm of course, the default/base"; they
   run CachyOS now and will move to NixOS, where syncrain should come along as it is. Build 30
-  (the README) and 31 (the installer).
+  (the README) and 31 (the installer); the NixOS image next.
 * **2026-10-15 13:30**: the installer for "the top 4": Arch, Debian, Fedora and openSUSE, and for
   the rest the invitation to "copy/hand this repo to your ai-agent and let it build/adapt the script
   for your specific environment"; no boot splash as a design choice: boot stays "pure text based"
@@ -33,12 +33,8 @@ Open questions, planned builds, the cadence and the constraints. What shipped: `
 
 ## Planned builds
 
-1. **The installer for four families** (31): `install.sh` with apt (Debian, Ubuntu, Mint), dnf
-   (Fedora) and zypper (openSUSE) beside pacman; Debian tested in the sandbox, the others against
-   stand-ins and said to be untested until someone runs them. The README invites anyone else to
-   hand the repository to their AI agent to adapt.
-2. **A NixOS image** (32 or later) with syncrain as its wallpaper, login screen and lock screen,
-   the base the others are written against.
+1. **A NixOS image** (32 or later) with syncrain as its wallpaper, login screen and lock screen,
+   the base the others are written against: the modules' login and lock screens first (open item).
 
 ## Open items
 
@@ -55,6 +51,8 @@ What the documents and the review of build 17 leave to a build that changes code
 | The lock screen shows no keyboard layout (Plasma's does) | `syncrain/lockscreen/package/` |
 | Plasma still loads its lock-screen wallpaper under syncrain's, unseen | `kscreenlockerrc`, only with `--lock-screen` |
 | The login and lock screens on NixOS: the module starts the wallpaper only; `nix/lockscreen.nix` builds the lock screen, nothing points KWin at it, and no option sets greetd up | `nix/nixos-module.nix` (the NixOS image's work) |
+| Debian, Fedora and openSUSE: installed in roots, never booted; Fedora's SELinux may stop greetd running the login screen from `/usr/local/lib` | someone booting one; `restorecon` or a policy note in `install.sh` |
+| Ubuntu 24.04 and openSUSE Leap 16.0: no gtk4-layer-shell (the native wallpaper draws), Qt below 6.5 (no lock screen) | nothing to do until they update |
 | A video's watts against the live rain's: not measured (no graphics card in the sandbox) | measure on their machine before claiming it uses less |
 | The page's Video needs WebCodecs with a VP9 or VP8 encoder (Chrome, Edge, Firefox); Safari may say it cannot | `syncrain --video` instead |
 | The page's WebM has no SeekHead: playing and looping are unaffected, seeking finds the cues later | `index.html` (`webm`) |
@@ -66,7 +64,7 @@ Consolidation builds: every build number ending in 0, and no other build. Fixed:
 rule, adopted at build 3. A consolidation changes no behaviour: it folds older notes into the
 history, makes every document true and short again, and writes down what it finds as open items.
 
-Next consolidation: 30
+Next consolidation: 40
 
 `tests/contract/test_the_working_documents_are_current.py` reads the two lines above.
 

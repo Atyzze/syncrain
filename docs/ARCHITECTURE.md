@@ -159,7 +159,7 @@ which screens a maximized or full-screen window covers; those stop drawing until
 
 ## Packaging and release
 
-* `install.sh` (the Arch family): pacman packages, the app in `~/.local`, the native wallpaper built with gcc, an
+* `install.sh` (Arch, Debian, Fedora, openSUSE: `set_packages`): the family's packages, the app in `~/.local`, the native wallpaper built with gcc, an
   optional systemd user service.
 * `nix/package.nix`: the package (the native wallpaper in `libexec/`), with NixOS and home-manager
   modules beside it.

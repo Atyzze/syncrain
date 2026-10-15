@@ -89,6 +89,10 @@ Rules learned by shipping their opposite, one line each. When and how: `docs/HIS
 * **Two trees under one name is what build numbers prevent.**
 * **A reviewer who didn't write the build finds what the gate can't.**
 * **Generated files go stale silently**: the release regenerates them and the gate compares.
+* **Run an installer where it will run**: a minimal Arch has no `make`, Debian's and openSUSE's Qt
+  bring no C++ compiler, Debian's gtk4-layer-shell typelib comes without its library, and each
+  family names greetd's user its own way. Roots found most of it; a reviewer found the library,
+  which a frame drawn under Xvfb never asks for: test the code path the user will take.
 * **The lanes run a newer Python than pyproject.toml promises**: f-strings changed in 3.12, so a
   test reads the app as 3.10 and 3.11 do.
 

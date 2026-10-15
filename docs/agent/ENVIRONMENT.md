@@ -41,9 +41,26 @@ The release runs every lane with `--require-all`: a missing environment fails it
    (about ten minutes on two cores). Keep `<dir>` and the log outside the tree.
 
 Before a build that changes `install.sh`, run it once in a real Arch root (the bootstrap tarball,
-pacman with the proxy's CA and `CheckSpace` off, a user with sudo, headless Sway inside). A
+pacman with the proxy's CA and `CheckSpace` off, `pacman -Syu` before anything else (a partial
+upgrade breaks GTK), a user with sudo whose sudoers keeps `HTTPS_PROXY`, headless Sway inside). A
 Plasma session there: `plasma-workspace kwin`, then in `dbus-run-session`: `kwin_wayland --virtual`,
 `/usr/lib/kactivitymanagerd`, `plasmashell`.
+
+The other three families the same way, each in a root of its own (build 31 did all four, Arch too):
+
+* **Debian 13**: `debootstrap --variant=minbase trixie <root> http://deb.debian.org/debian`; apt's
+  proxy and CA in `/etc/apt/apt.conf.d/` (`Acquire::https::Proxy`, `Acquire::https::CaInfo`).
+* **Fedora**: the `Fedora-Container-Base-Generic` OCI image from dl.fedoraproject.org, its one layer
+  unpacked; `proxy=` and `sslcacert=` in `/etc/dnf/dnf.conf`; disable `fedora-cisco-openh264`
+  (its host is not reachable from here).
+* **openSUSE Tumbleweed**: `opensuse-tumbleweed-image.x86_64-lxc.tar.xz` from
+  download.opensuse.org/tumbleweed/appliances; the CA in `/etc/pki/trust/anchors/` then
+  `update-ca-certificates`, the proxy in `/etc/sysconfig/proxy` (zypper under sudo reads it there);
+  replace its `busybox-diffutils` with `diffutils` first, or Qt's packages conflict.
+* In each: `/proc`, `/sys`, `/dev` bound in, a user with sudo, the tree copied in, `./install.sh
+  --yes` as that user; then Xvfb and a `--screenshot` against this machine's, `cmake` of
+  `syncrain/lockscreen/`, and `--login-screen` then `--login-screen-off` over a fake `sddm.service`
+  (KWin installed for its check). Add `127.0.0.1 <hostname>` to the root's `/etc/hosts` for sudo.
 
 ## Traps
 

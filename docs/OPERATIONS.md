@@ -7,21 +7,38 @@ Every option and recipe. How it works: `docs/ARCHITECTURE.md`.
 Needs Linux with GTK 4.14+, OpenGL 3.3 or OpenGL ES 3.0, Python 3.10+ and a synced clock (NTP). On
 Wayland, a compositor with layer-shell (not GNOME: use `--window` or the web page there).
 
-**Arch, CachyOS, EndeavourOS, Manjaro, Garuda**
+**Arch, Debian, Fedora and openSUSE** (and their relatives: what os-release says, else the package
+tool there is; `SYNCRAIN_FAMILY=arch|debian|fedora|suse` overrides it)
 
 ```sh
 git clone https://github.com/Atyzze/syncrain && cd syncrain   # or unpack SYNCRAIN<N>.tar.zst
-./install.sh                  # pacman packages (sudo once), then everything in ~/.local
+./install.sh                  # the system's packages (sudo once), then everything in ~/.local
 ./install.sh --autostart      # also a systemd user service
 ./install.sh --login-screen   # optional: also the login screen, from the next boot (greetd)
 ./install.sh --lock-screen    # optional, KDE Plasma 6: also the lock screen, from the next login
 ./install.sh --config config.json   # the settings the web page saved (see below)
-./install.sh --uninstall      # remove it (the pacman packages stay)
+./install.sh --uninstall      # remove it (the system's packages stay)
 ```
 
-* Packages: `python python-gobject python-cairo python-pillow gtk4 gtk4-layer-shell`, plus
-  `gcc pkgconf wayland dbus` to build the native wallpaper. If that build fails, the installer says
-  why and Python and GTK draw instead.
+* Packages, by family (`set_packages` in `install.sh`):
+
+  | Family | The app | The native wallpaper's build | `--lock-screen` | `--login-screen` |
+  | --- | --- | --- | --- | --- |
+  | Arch | `python python-gobject python-cairo python-pillow gtk4 gtk4-layer-shell` | `gcc pkgconf wayland dbus` | `cmake make qt6-base qt6-declarative` | `greetd greetd-agreety` |
+  | Debian | `python3 python3-gi python3-gi-cairo python3-cairo python3-pil gir1.2-gtk-4.0 gir1.2-gtk4layershell-1.0` | `gcc pkgconf libwayland-dev libdbus-1-dev` | `cmake make g++ qt6-base-dev qt6-declarative-dev` | `greetd` |
+  | Fedora | `python3 python3-gobject python3-cairo python3-pillow gtk4 gtk4-layer-shell` | `gcc pkgconf-pkg-config wayland-devel dbus-devel` | `cmake make gcc-c++ qt6-qtbase-devel qt6-qtdeclarative-devel` | `greetd` |
+  | openSUSE | `python3 python3-gobject python3-gobject-cairo python3-cairo python3-Pillow typelib-1_0-Gtk-4_0 typelib-1_0-Gtk4LayerShell-1_0` | `gcc pkgconf-pkg-config wayland-devel dbus-1-devel` | `cmake make gcc-c++ qt6-base-devel qt6-declarative-devel` | `greetd greetd-agreety` |
+
+  gtk4-layer-shell is asked for on its own: where a release lacks it (Ubuntu 24.04, openSUSE Leap
+  16.0) the install goes on, and on Wayland the native wallpaper draws. If the native wallpaper
+  does not build, the installer says why and Python and GTK draw instead. A tool that cannot
+  install says what to try (its index is often old on a fresh system: update it first).
+* greetd's user is the one its family's package names (`greeter` on Arch and openSUSE, `_greetd` on
+  Debian, `greetd` on Fedora), its text login wherever it is (`/usr/sbin/agreety` on Debian). What
+  starts at boot is seen before greetd is installed (Debian's package makes itself what starts at
+  boot where nothing did) and recorded once greetd is in, so a run that stops leaves no record.
+* Elsewhere: `./install.sh` names what to install by hand, then `./install.sh --no-deps`; or hand
+  the repository to an AI agent to adapt `install.sh`.
 * `--preset`, `--channel`, `--rainbow` and `--arg ...` (repeatable) go into the autostart service, the
   lock screen's scene and, on a run with `--login-screen`, the login screen's rain. Also `--prefix
   DIR`, `--no-deps`, `--yes`; `./install.sh --help`.
@@ -48,7 +65,7 @@ git clone https://github.com/Atyzze/syncrain && cd syncrain   # or unpack SYNCRA
   own locker syncrain's screen: the rain, live, and syncrain's box (your name, the password, Unlock,
   PAM's words) on every screen. The box comes up on a key or a moved pointer, goes after a minute
   without either and forgets what was typed (Escape sends it away at once); every screen shows the
-  same box, so it never matters which one you type on. It builds a QML module (`cmake qt6-base qt6-declarative`) into
+  same box, so it never matters which one you type on. It builds a QML module (with the lock screen's packages above) into
   `~/.local/lib/syncrain/`, puts the shell package `org.syncrain.lockscreen` in
   `~/.local/share/plasma/shells/`, writes the scene to `~/.local/state/syncrain/lock-screen.scene`
   (each start of the native wallpaper keeps it current), and gives KWin's unit alone a drop-in

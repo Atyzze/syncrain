@@ -1,5 +1,6 @@
 #!/bin/sh
-# syncrain's login screen, as greetd runs it (/etc/greetd/config.toml; user greeter).
+# syncrain's login screen, as greetd runs it (/etc/greetd/config.toml; as greetd's own user: greeter,
+# _greetd or greetd, as the family names it).
 # KWin takes the screens and runs session.sh: the rain and the login box (syncrain/greeter.py).
 # The box hands the login to greetd, which starts the session once KWin is gone. If nobody got
 # logged in that way (KWin or the box failed), greetd's own text login takes over, so a broken
@@ -17,7 +18,8 @@ if ! { mkdir -p "$STATE" && [ -w "$STATE" ]; } 2>/dev/null; then
 fi
 LOG="$STATE/login.log"
 [ -f "$LOG" ] && mv -f "$LOG" "$LOG.1"
-# The greeter user's home is / (not writable): KWin's and syncrain's files live in the state folder.
+# KWin's and syncrain's files live in the state folder, not the greeter user's home (/ on Arch, not
+# writable; /var/lib/greetd elsewhere, which what ignores the XDG folders could still write to).
 # Its settings, data and state start afresh at every start, from what is installed: anything left
 # there since (by build 17's root copies, or by whoever got to run as greeter: a KWin input method
 # would see every password typed) goes. The cache stays: compiled shaders, kept, save seconds.

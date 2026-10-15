@@ -1,4 +1,4 @@
-# Where we are, at build 30
+# Where we are, at build 31
 
 The project on one page. Detail: `docs/agent/HANDOFF.md`.
 
@@ -27,14 +27,14 @@ plain text by design: the text means the machine is not up yet, the rain that it
   the rain stays live, your box comes up on a key or a moved mouse and is the same on every screen.
   Not yet seen on your machine.
 * **Videos** (build 29): `syncrain --video rain.mp4` or the page's Video section, a seamless loop.
-* **On GitHub**: github.com/Atyzze/syncrain, every build up to 30.
+* **Four families** (build 31): `./install.sh` on Arch, Debian, Fedora and openSUSE, each installed
+  for real in a root of its own; anything else gets the packages named, or its AI agent.
+* **On GitHub**: github.com/Atyzze/syncrain, every build up to 31.
 
 ## What comes next
 
-* **Build 31**: the installer for Debian, Fedora and openSUSE beside Arch, and an invitation for
-  everyone else to hand the repository to their AI agent.
-* **Then**: a NixOS image with the wallpaper, login screen and lock screen, the base the others
-  follow.
+* **Next**: a NixOS image with the wallpaper, login screen and lock screen, the base the others
+  follow; or what you find on the lock screen.
 * **Build 40**: the next consolidation (every number ending in 0).
 
 ## The decision in front of you

@@ -7,7 +7,7 @@ channel sees the same rain at the same moment. Every colour, symbol, word and mo
 tune, from a page that shows the result as you go.
 
 It runs on Wayland and X11, KDE Plasma included (GNOME only in a window or the page). NixOS is the
-base it is built for; the installer covers the Arch family today.
+base it is built for; the installer covers the four big families: Arch, Debian, Fedora and openSUSE.
 
 <p align="center">
   <img src="docs/images/syncrain.jpg" width="49%" alt="The default look: katakana, digits and Egyptian hieroglyphs falling in columns over black with snow, the columns in a rainbow wave across the screen, the NixOS snowflake in rainbow colours in the middle">
@@ -37,14 +37,33 @@ base it is built for; the installer covers the Arch family today.
   the live rain is not measured yet). The live rain stays the default: it never repeats and stays
   in sync, which a video cannot.
 
-## Install (Arch, CachyOS, EndeavourOS, Manjaro)
+## Install
 
 ```sh
 git clone https://github.com/Atyzze/syncrain && cd syncrain
-./install.sh                 # pacman packages (asks for sudo once), then everything in ~/.local
+./install.sh                 # the system's packages (asks for sudo once), then everything in ~/.local
 syncrain --window            # try it in a window
 ./install.sh --autostart     # the wallpaper, started with every login
 ```
+
+`install.sh` knows its family and asks its package tool:
+
+| Family | Releases | Tested |
+| --- | --- | --- |
+| Arch (pacman) | Arch, CachyOS, EndeavourOS, Manjaro, Garuda | the operator's CachyOS desktop (every build up to 30), and an Arch root |
+| Debian (apt) | Debian 13, Ubuntu 26.04, Mint, Pop!_OS | installed in a Debian 13 root: the same frame, to the pixel |
+| Fedora (dnf) | Fedora 43, 44 | installed in a Fedora 44 root |
+| openSUSE (zypper) | Tumbleweed | installed in a Tumbleweed root |
+
+Each root ran the installer for real, drew the same frame as the others, built the lock screen,
+and set up and undid the login screen. Only CachyOS has booted into them so far: on the others,
+tell us how it goes. Ubuntu 24.04 and openSUSE
+Leap 16.0 have no gtk4-layer-shell (the native wallpaper draws anyway) and no Qt new enough for the
+lock screen.
+
+**Any other Linux**: `./install.sh` names the packages to install by hand, then `./install.sh
+--no-deps`. Or hand this repository to your AI agent and let it adapt `install.sh` to your system:
+everything it needs to know is in these documents.
 
 A release archive (`SYNCRAIN<N>.tar.zst`) works the same: unpack it and run `./install.sh` from the
 folder. Running a newer build's `./install.sh` upgrades in place and restarts the wallpaper.
@@ -65,15 +84,15 @@ Ctrl+Alt+F3, log in, `loginctl unlock-sessions`, then `./install.sh --lock-scree
 
 **Make a video**: `syncrain --video rain.mp4` (30 s at 1920x1080 with your settings, ending
 where it begins; needs ffmpeg). `--seconds 60 --size 3840x2160 --video-fps 60` for more, `rain.gif`
-for a GIF (10 s at 640x360 and 15 fps: a GIF of rain is large), `--loop off` for one that does not loop. In the browser, the page's Settings has a
-**Video** section that saves the same as WebM.
+for a GIF (10 s at 640x360 and 15 fps: a GIF of rain is large), `--loop off` for one that does not
+loop. In the browser, the page's Settings has a **Video** section that saves the same as WebM.
 
 **Why boot stays plain text**: syncrain never touches the bootloader, the initramfs or a boot
 splash. The plain text while the machine starts says it is not up yet; the moment the rain appears,
 on the login screen or the desktop, it is. That clear cut is by design.
 
 **When it does not draw**: `syncrain --diagnose` says what this machine offers and why.
-**Remove it**: `./install.sh --uninstall` (the pacman packages stay).
+**Remove it**: `./install.sh --uninstall` (the system's packages stay).
 
 **Elsewhere**: on NixOS, `nix run github:Atyzze/syncrain -- --window`, and the flake has NixOS and
 home-manager modules for the wallpaper (the login and lock screens there are the next steps, see
@@ -130,7 +149,7 @@ browser (Chromium), nix, lockscreen (Plasma's locker in a headless KWin). What e
                        prepare_environment.sh
     tests/             one folder per lane; fixtures/stream_freeze.json
     index.html         the web page: open it, try every setting, save them (its data filled in by tools/build_web.py)
-    install.sh         the Arch-family installer
+    install.sh         the installer: Arch, Debian, Fedora and openSUSE
 
 ## Licence
 

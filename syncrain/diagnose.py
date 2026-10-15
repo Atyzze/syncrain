@@ -190,6 +190,8 @@ def library_lines(Gtk) -> tuple[list[str], bool | None]:
             "yes" if layer else "no"))
     except (ValueError, ImportError):
         lines.append("gtk4-layer-shell: not installed")
+    except Exception as e:  # noqa: BLE001 - GLib.Error: its typelib without its library (Debian's)
+        lines.append(f"gtk4-layer-shell: installed but cannot load ({e})")
     return lines, layer
 
 

@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# syncrain installer for Arch-based systems (Arch, CachyOS, EndeavourOS, Manjaro, Garuda, ...)
+# syncrain installer for four families of Linux: Arch (CachyOS, EndeavourOS, Manjaro, Garuda),
+# Debian (Ubuntu, Mint, Pop!_OS), Fedora and openSUSE. Elsewhere: --no-deps, with the packages it names.
 #
-#   ./install.sh                     install this build for your user (asks for sudo once, for pacman packages)
+#   ./install.sh                     install this build for your user (asks for sudo once, for the system's packages)
 #   ./install.sh --autostart         ...and start it with every graphical login
 #   ./install.sh --preset matrix --channel friends --autostart
 #   ./install.sh --config config.json  ...and draw what the web page showed (the settings it exported)
@@ -9,7 +10,7 @@
 #   ./install.sh --login-screen-off  back to the login screen you had (undoes only what --login-screen did)
 #   ./install.sh --lock-screen       ...and the rain with syncrain's box as KDE Plasma's lock screen (optional)
 #   ./install.sh --lock-screen-off   back to Plasma's own lock screen (undoes only what --lock-screen did)
-#   ./install.sh --uninstall         remove it again (pacman packages are left installed)
+#   ./install.sh --uninstall         remove it again (the system's packages are left installed)
 #
 # Run from a newer build's folder, it upgrades in place and restarts a running wallpaper.
 # Everything goes into your home directory (only --login-screen writes outside it: /usr/local/lib/syncrain,
@@ -20,11 +21,46 @@
 #   ~/.local/share/plasma/shells/org.syncrain.lockscreen/, ~/.local/lib/syncrain/  only with --lock-screen
 set -euo pipefail
 
-PACKAGES=(python python-gobject python-cairo python-pillow gtk4 gtk4-layer-shell)
-# what the native wallpaper is built with (syncrain/native/build.sh); wayland and dbus are on every Plasma desktop
-BUILD_PACKAGES=(gcc pkgconf wayland dbus)
-# what the lock screen's QML module is built with (syncrain/lockscreen/); only with --lock-screen
-LOCK_PACKAGES=(cmake qt6-base qt6-declarative)
+# The system's packages, by family (detect_family below). PACKAGES: Python, GTK 4 and their
+# introspection data. LAYER_PACKAGES: gtk4-layer-shell, which only the GTK host needs on Wayland (the
+# native wallpaper speaks layer-shell itself), so a release without it (Ubuntu 24.04, openSUSE Leap
+# 16.0) still installs. BUILD_PACKAGES: what the native wallpaper is built with
+# (syncrain/native/build.sh). LOCK_PACKAGES: the lock screen's QML module (syncrain/lockscreen/),
+# only with --lock-screen. LOGIN_PACKAGES: greetd and its text login, only with --login-screen.
+set_packages() {
+  case "$1" in
+    arch)
+      PACKAGES=(python python-gobject python-cairo python-pillow gtk4)
+      LAYER_PACKAGES=(gtk4-layer-shell)
+      BUILD_PACKAGES=(gcc pkgconf wayland dbus)
+      LOCK_PACKAGES=(cmake make qt6-base qt6-declarative)
+      LOGIN_PACKAGES=(greetd greetd-agreety) ;;
+    debian)
+      PACKAGES=(python3 python3-gi python3-gi-cairo python3-cairo python3-pil gir1.2-gtk-4.0)
+      LAYER_PACKAGES=(libgtk4-layer-shell0 gir1.2-gtk4layershell-1.0)   # the typelib does not bring the library
+      BUILD_PACKAGES=(gcc pkgconf libwayland-dev libdbus-1-dev)
+      LOCK_PACKAGES=(cmake make g++ qt6-base-dev qt6-declarative-dev)
+      LOGIN_PACKAGES=(greetd) ;;
+    fedora)
+      PACKAGES=(python3 python3-gobject python3-cairo python3-pillow gtk4)
+      LAYER_PACKAGES=(gtk4-layer-shell)
+      BUILD_PACKAGES=(gcc pkgconf-pkg-config wayland-devel dbus-devel)
+      LOCK_PACKAGES=(cmake make gcc-c++ qt6-qtbase-devel qt6-qtdeclarative-devel)
+      LOGIN_PACKAGES=(greetd) ;;
+    suse)
+      PACKAGES=(python3 python3-gobject python3-gobject-cairo python3-cairo python3-Pillow typelib-1_0-Gtk-4_0)
+      LAYER_PACKAGES=(typelib-1_0-Gtk4LayerShell-1_0)
+      BUILD_PACKAGES=(gcc pkgconf-pkg-config wayland-devel dbus-1-devel)
+      LOCK_PACKAGES=(cmake make gcc-c++ qt6-base-devel qt6-declarative-devel)
+      LOGIN_PACKAGES=(greetd greetd-agreety) ;;
+    *)  # named for the message only: what to install by hand, by what it is
+      PACKAGES=(python3 PyGObject pycairo Pillow "GTK 4 and its typelib")
+      LAYER_PACKAGES=("gtk4-layer-shell and its typelib")
+      BUILD_PACKAGES=(gcc pkg-config wayland-scanner "wayland and dbus headers")
+      LOCK_PACKAGES=(cmake "Qt 6.5+ base and declarative headers")
+      LOGIN_PACKAGES=("greetd and agreety") ;;
+  esac
+}
 PREFIX="${PREFIX:-$HOME/.local}"
 SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 AUTOSTART=0 UNINSTALL=0 NODEPS=0 YES=0 LOGIN=0 LOGIN_OFF=0 LOCK=0 LOCK_OFF=0
@@ -34,8 +70,86 @@ bold() { printf '\033[1m%s\033[0m\n' "$*"; }
 info() { printf '  %s\n' "$*"; }
 die()  { printf '\033[31merror:\033[0m %s\n' "$*" >&2; exit 1; }
 
+# The family of Linux, from os-release (ID, then the words of ID_LIKE), else from the package manager
+# there is: arch, debian, fedora, suse, or unknown. SYNCRAIN_FAMILY overrides it.
+OS_RELEASE="${SYNCRAIN_OS_RELEASE:-/etc/os-release}"
+detect_family() {
+  if [ -n "${SYNCRAIN_FAMILY:-}" ]; then printf '%s\n' "$SYNCRAIN_FAMILY"; return; fi
+  local words="" w
+  if [ -r "$OS_RELEASE" ]; then
+    # shellcheck disable=SC1090 # the system's own description, read in a subshell
+    words="$( . "$OS_RELEASE" >/dev/null 2>&1; printf '%s %s' "${ID:-}" "${ID_LIKE:-}" )" || words=""
+  fi
+  for w in $words; do
+    case "$w" in
+      arch|archarm|cachyos|endeavouros|manjaro|garuda) printf 'arch\n'; return ;;
+      debian|ubuntu) printf 'debian\n'; return ;;
+      fedora|rhel) printf 'fedora\n'; return ;;
+      suse|opensuse|opensuse-*|sles) printf 'suse\n'; return ;;
+    esac
+  done
+  if command -v pacman >/dev/null; then printf 'arch\n'
+  elif command -v apt-get >/dev/null; then printf 'debian\n'
+  elif command -v dnf >/dev/null; then printf 'fedora\n'
+  elif command -v zypper >/dev/null; then printf 'suse\n'
+  else printf 'unknown\n'; fi
+}
+FAMILY="$(detect_family)"
+set_packages "$FAMILY"
+case "$FAMILY" in
+  arch) PKG_TOOL=pacman ;; debian) PKG_TOOL=apt ;; fedora) PKG_TOOL=dnf ;; suse) PKG_TOOL=zypper ;; *) PKG_TOOL="" ;;
+esac
+# Whether a package (on openSUSE also a capability it provides, as python3-gobject) is installed.
+pkg_installed() {
+  case "$FAMILY" in
+    arch) pacman -Qq "$1" >/dev/null 2>&1 ;;
+    debian) dpkg-query -W -f='${Status}' "$1" 2>/dev/null | grep -q 'ok installed' ;;
+    fedora|suse) rpm -q --whatprovides "$1" >/dev/null 2>&1 ;;
+    *) return 1 ;;
+  esac
+}
+# Install packages with the family's tool, as root; --yes answers its questions.
+pkg_install() {
+  local yes=()
+  case "$FAMILY" in
+    arch) [ "$YES" = 1 ] && yes=(--noconfirm); as_root pacman -S --needed "${yes[@]}" "$@" ;;
+    debian) [ "$YES" = 1 ] && yes=(-y); as_root apt-get install "${yes[@]}" "$@" ;;
+    fedora) [ "$YES" = 1 ] && yes=(-y); as_root dnf install "${yes[@]}" "$@" ;;
+    suse) [ "$YES" = 1 ] && yes=(--non-interactive); as_root zypper "${yes[@]}" install "$@" ;;
+    *) return 1 ;;
+  esac
+}
+# What to try when the tool could not install: its index is often old on a fresh system.
+pkg_hint() {
+  case "$FAMILY" in
+    arch) printf "If it reported missing files (404), update first with 'sudo pacman -Syu' and run this again." ;;
+    debian) printf "If it could not find a package, 'sudo apt-get update' first and run this again." ;;
+    fedora) printf "If it could not find a package, 'sudo dnf upgrade --refresh' first and run this again (on RHEL and its rebuilds, enable EPEL)." ;;
+    suse) printf "If it could not find a package, 'sudo zypper refresh' first and run this again." ;;
+  esac
+}
+# Install, and stop only if something is still missing after: a tool's exit code can also mean
+# a warning (zypper's 107, a script that failed after the packages went in). $1 names them.
+pkg_install_checked() {
+  local what="$1"; shift
+  if ! pkg_install "$@"; then
+    pkg_missing "$@"
+    [ ${#MISSING[@]} -eq 0 ] || die "$PKG_TOOL could not install $what (${MISSING[*]}). $(pkg_hint)"
+  fi
+}
+# An image-based system (Fedora Atomic, Bazzite, openSUSE Aeon and MicroOS) adds packages its own way.
+immutable_hint() {
+  if [ -e /run/ostree-booted ]; then
+    printf 'this system is image-based (rpm-ostree): add the packages with sudo rpm-ostree install %s, reboot, then ./install.sh --no-deps' "$*"
+  elif command -v transactional-update >/dev/null && findmnt -no OPTIONS / 2>/dev/null | grep -qw ro; then
+    printf 'this system is image-based (transactional-update): add the packages with sudo transactional-update pkg install %s, reboot, then ./install.sh --no-deps' "$*"
+  fi
+}
+# Only the packages not yet installed, into MISSING.
+pkg_missing() { MISSING=(); local p; for p in "$@"; do pkg_installed "$p" || MISSING+=("$p"); done; }
+
 usage() {
-  sed -n '2,19p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+  sed -n '2,/^set -euo/p' "${BASH_SOURCE[0]}" | sed '$d; s/^# \{0,1\}//'
   cat <<'EOF'
 
 Options:
@@ -53,8 +167,8 @@ Options:
   --rainbow MODE        logo (default), all or off
   --arg ARG             extra argument for syncrain, repeatable (e.g. --arg --fps --arg 24)
   --prefix DIR          install under DIR instead of ~/.local
-  --no-deps             skip the pacman step
-  --yes                 do not ask pacman for confirmation
+  --no-deps             skip the system's packages (installed by hand: see the error without it)
+  --yes                 do not ask the package manager for confirmation
   --uninstall           remove syncrain
   -h, --help            this help
 EOF
@@ -207,6 +321,33 @@ greeter_pam_file() {
   s="$(read_system_file "$GREETD_CONFIG" | greetdconf greeter-service 2>/dev/null)" || s=greetd-greeter
   printf '%s/%s\n' "$PAM_DIR" "${s:-greetd-greeter}"
 }
+# greetd's text login: on PATH, or where Debian keeps it (/usr/sbin, not on a user's PATH there).
+# The system's own first: greetd runs it as its user, reading passwords, so one on PATH counts only
+# if it is root's, outside this user's home, and safe inside the sh -c '...' of greetd's config.
+agreety_path() {
+  local a
+  if [ -n "${SYNCRAIN_AGREETY:-}" ]; then printf '%s\n' "$SYNCRAIN_AGREETY"; return; fi
+  for a in /usr/bin/agreety /usr/sbin/agreety; do
+    if [ -x "$a" ]; then printf '%s\n' "$a"; return; fi
+  done
+  a="$(command -v agreety 2>/dev/null || true)"
+  case "$a" in ""|"$HOME"/*|*[!A-Za-z0-9/._-]*) return 0 ;; esac
+  if [ -x "$a" ] && [ "$(stat -c %u "$a" 2>/dev/null)" = 0 ]; then printf '%s\n' "$a"; fi
+}
+# The user greetd runs its greeter as, which each family names its own way (greeter on Arch and
+# openSUSE, _greetd on Debian, greetd on Fedora): the one greetd's packaged config names, else the
+# first of those that exists. SYNCRAIN_GREETER_USER overrides it.
+greeter_user() {
+  local u="" f
+  if [ -n "${SYNCRAIN_GREETER_USER:-}" ]; then printf '%s\n' "$SYNCRAIN_GREETER_USER"; return; fi
+  for f in "$GREETD_CONFIG.before-syncrain" "$GREETD_CONFIG"; do
+    if [ -e "$f" ]; then u="$(read_system_file "$f" | greetdconf user 2>/dev/null || true)"; fi
+    if [ -n "$u" ]; then break; fi
+  done
+  for u in $u greeter _greetd greetd; do
+    if getent passwd "$u" >/dev/null 2>&1; then printf '%s\n' "$u"; return; fi
+  done
+}
 PAM_MARK="written by syncrain's install.sh --login-screen"
 CONFIG_MARK="set by syncrain's install.sh --login-screen"
 
@@ -246,13 +387,18 @@ apply_greetd() {
   # service, an automatic login, the terminal. A whole config written by builds 16 to 18 starts again
   # from greetd's own. If the login screen's files ever go missing, greetd's text login asks
   # instead of a black screen.
-  local login="$LOGIN_LIB/syncrain/login/login.sh" base="$GREETD_CONFIG" edited pam greeter_pam
+  local login="$LOGIN_LIB/syncrain/login/login.sh" base="$GREETD_CONFIG" edited pam greeter_pam agreety user
+  agreety="$(agreety_path)" user="$(greeter_user)"
+  if [ -z "$agreety" ] || [ -z "$user" ]; then
+    info "greetd's config stays as it is: its text login or its user was not found"
+    return 0
+  fi
   if grep -qs syncrain "$GREETD_CONFIG" && ! grep -qsF "$CONFIG_MARK" "$GREETD_CONFIG"; then
     base="$GREETD_CONFIG.before-syncrain"
   fi
   edited="$(mktemp)"
   if ! read_system_file "$base" | greetdconf config \
-      "sh -c 'test -x $login && exec $login; exec agreety --cmd startplasma-wayland'" greeter > "$edited"; then
+      "sh -c 'test -x $login && SYNCRAIN_LOGIN_TEXT=$agreety exec $login; exec $agreety --cmd startplasma-wayland'" "$user" > "$edited"; then
     rm -f "$edited"
     die "greetd's config ($base) could not be changed, so it stays as it is"
   fi
@@ -279,16 +425,12 @@ apply_greetd() {
 
 login_screen_on() {
   bold "Making the rain your login screen (greetd)"
-  if [ "$NODEPS" = 0 ]; then
-    local confirm=(); [ "$YES" = 1 ] && confirm=(--noconfirm)
-    pacman -Qq greetd greetd-agreety >/dev/null 2>&1 \
-      || as_root pacman -S --needed "${confirm[@]}" greetd greetd-agreety || die "pacman could not install greetd"
-  fi
   command -v kwin_wayland >/dev/null || die "the login screen runs in KWin (Plasma's compositor), which is not installed"
-  command -v agreety >/dev/null || die "greetd's text login (agreety, pacman: greetd-agreety) is missing; the login screen falls back to it"
   local tmp glyphs settings rain=("${ARGS[@]}") before now new="$LOGIN_LIB.new" f conf="${XDG_CONFIG_HOME:-$HOME/.config}"
   # A record counts while greetd starts at boot. Once something else does (picked since), that is
   # what comes before; with greetd running syncrain's config and no record, it is not known.
+  # Seen before greetd is installed, as Debian's package makes itself what starts at boot where
+  # nothing did; written once greetd is there, so a run that stops leaves no record behind.
   before="$(recorded_before)"
   now="$(display_manager)"
   if [ "$now" != greetd.service ]; then before="$now"
@@ -296,6 +438,12 @@ login_screen_on() {
     before=greetd.service
     if grep -qs syncrain "$GREETD_CONFIG"; then before=unknown; fi
   fi
+  if [ "$NODEPS" = 0 ] && [ -n "$PKG_TOOL" ]; then
+    pkg_missing "${LOGIN_PACKAGES[@]}"
+    if [ ${#MISSING[@]} -gt 0 ]; then pkg_install_checked "greetd" "${MISSING[@]}"; fi
+  fi
+  [ -n "$(agreety_path)" ] || die "greetd's text login (agreety, in ${LOGIN_PACKAGES[*]}) is missing; the login screen falls back to it"
+  [ -n "$(greeter_user)" ] || die "greetd's user was not found (greetd's config names none that exists): is greetd installed?"
   record_before "$before"
   tmp="$(mktemp -d)"
   # login.json: who logs in by default, and the rain's options as given to this installer
@@ -338,7 +486,7 @@ login_screen_on() {
   as_root chmod -R a+rX,go-w,ug-s "$new"
   as_root rm -rf "$LOGIN_LIB"
   as_root mv "$new" "$LOGIN_LIB"
-  local owner="${SYNCRAIN_LOGIN_OWNER:-greeter}"
+  local owner="${SYNCRAIN_LOGIN_OWNER:-$(greeter_user)}"
   as_root install -d -m 755 -o "$owner" -g "$(id -gn "$owner")" "$LOGIN_STATE"
   clear_state_copies
   rm -rf "$tmp"
@@ -607,7 +755,7 @@ if [ "$UNINSTALL" = 1 ]; then
   fi
   rm -rf "$APPDIR" "$BINDIR/syncrain"
   info "removed $APPDIR and $BINDIR/syncrain"
-  info "pacman packages were left installed: ${PACKAGES[*]} ${BUILD_PACKAGES[*]}"
+  info "the system's packages were left installed: ${PACKAGES[*]} ${LAYER_PACKAGES[*]} ${BUILD_PACKAGES[*]}"
   exit 0
 fi
 
@@ -618,20 +766,25 @@ BUILD="$(tr -d '[:space:]' < "$SRC/BUILD_NUMBER")"
 
 # ---- 1. system packages
 if [ "$NODEPS" = 0 ]; then
-  command -v pacman >/dev/null || die "pacman not found: this script is for Arch-based systems (use --no-deps if you installed the dependencies yourself: ${PACKAGES[*]} ${BUILD_PACKAGES[*]})"
-  missing=()
+  if [ -z "$PKG_TOOL" ] || ! command -v "${PKG_TOOL/apt/apt-get}" >/dev/null; then
+    die "this system is none of the four families install.sh knows (Arch, Debian, Fedora, openSUSE). Install these yourself, then run ./install.sh --no-deps: ${PACKAGES[*]}; ${LAYER_PACKAGES[*]}; to build the native wallpaper ${BUILD_PACKAGES[*]}. Or hand this folder to your AI agent and let it adapt install.sh to your system."
+  fi
   wanted=("${PACKAGES[@]}" "${BUILD_PACKAGES[@]}")
   if [ "$LOCK" = 1 ] || lock_screen_installed; then wanted+=("${LOCK_PACKAGES[@]}"); fi
-  for p in "${wanted[@]}"; do pacman -Qq "$p" >/dev/null 2>&1 || missing+=("$p"); done
-  if [ ${#missing[@]} -gt 0 ]; then
-    bold "Installing packages: ${missing[*]}"
-    confirm=(); [ "$YES" = 1 ] && confirm=(--noconfirm)
-    SUDO=(); [ "$(id -u)" != 0 ] && SUDO=(sudo)
-    if ! "${SUDO[@]}" pacman -S --needed "${confirm[@]}" "${missing[@]}"; then
-      die "pacman could not install the packages. If it reported missing files (404), update first with 'sudo pacman -Syu' and run this again."
-    fi
+  pkg_missing "${wanted[@]}"
+  if [ ${#MISSING[@]} -gt 0 ]; then
+    hint="$(immutable_hint "${MISSING[@]}" "${LAYER_PACKAGES[@]}")"
+    [ -z "$hint" ] || die "$hint"
+    bold "Installing packages ($PKG_TOOL): ${MISSING[*]}"
+    pkg_install_checked "the packages" "${MISSING[@]}"
   else
     bold "All packages are already installed"
+  fi
+  # gtk4-layer-shell on its own: a release without it still gets the native wallpaper
+  pkg_missing "${LAYER_PACKAGES[@]}"
+  if [ ${#MISSING[@]} -gt 0 ]; then
+    pkg_install "${MISSING[@]}" \
+      || info "gtk4-layer-shell is not available here (${MISSING[*]}): on Wayland the native wallpaper draws; the GTK host only on X11 or with --window"
   fi
 fi
 
@@ -646,9 +799,11 @@ import PIL  # noqa: F401
 import cairo  # noqa: F401
 try:
     gi.require_version("Gtk4LayerShell", "1.0")
-except ValueError:
+    from gi.repository import Gtk4LayerShell
+    Gtk4LayerShell.get_major_version()  # loads its library, which a typelib alone does not bring
+except Exception:  # noqa: BLE001 - ValueError: none; GLib.Error: the typelib without its library
     print("  note: gtk4-layer-shell is missing, so on Wayland only the native wallpaper can draw; "
-          "the GTK host runs on X11 or with --window")
+          "the GTK host and the login screen's box run on X11 or with --window")
 EOF
 
 # ---- 3. the app

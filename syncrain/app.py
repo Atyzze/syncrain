@@ -716,7 +716,7 @@ def main(argv=None):
             from gi.repository import Gtk4LayerShell as LayerShell
             if not LayerShell.is_supported():
                 LayerShell = None
-        except (ValueError, ImportError):
+        except (ValueError, ImportError, GLib.Error):  # GLib.Error: a typelib without its library
             LayerShell = None
         if LayerShell is None:
             print("syncrain: this Wayland compositor has no wlr-layer-shell support (GNOME?). "

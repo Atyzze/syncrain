@@ -159,11 +159,11 @@ def test_install_makes_the_rain_the_login_screen_and_puts_sddm_back_after(tmp_pa
     assert list((lib / "cache").glob("glyphs-*.png")), "the big symbols were drawn at install"
     config = (tmp_path / "etc/greetd/config.toml").read_text()
     login = f"{lib}/syncrain/login/login.sh"
-    assert f"command = \"sh -c 'test -x {login} && exec {login}; exec agreety --cmd startplasma-wayland'\"" in config
+    assert f"command = \"sh -c 'test -x {login} && SYNCRAIN_LOGIN_TEXT={tmp_path}/bin/agreety exec {login}; exec {tmp_path}/bin/agreety --cmd startplasma-wayland'\"" in config
     assert 'user = "greeter"' in config
     import tomllib
     command = tomllib.loads(config)["default_session"]["command"]
-    assert command == f"sh -c 'test -x {login} && exec {login}; exec agreety --cmd startplasma-wayland'"
+    assert command == f"sh -c 'test -x {login} && SYNCRAIN_LOGIN_TEXT={tmp_path}/bin/agreety exec {login}; exec {tmp_path}/bin/agreety --cmd startplasma-wayland'"
     assert "agreety --cmd /bin/sh" in (tmp_path / "etc/greetd/config.toml.before-syncrain").read_text()
     record = tmp_path / "etc/greetd/display-manager.before-syncrain"
     assert record.read_text() == "sddm.service\n" and not (lib / "previous-display-manager").exists()

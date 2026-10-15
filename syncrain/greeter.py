@@ -241,7 +241,7 @@ def run_box(config: dict, client: Greetd) -> int:
         from gi.repository import Gtk4LayerShell as LayerShell
         if not LayerShell.is_supported():
             LayerShell = None
-    except (ValueError, ImportError):
+    except (ValueError, ImportError, GLib.Error):     # GLib.Error: a typelib without its library
         LayerShell = None
 
     Gtk.init()

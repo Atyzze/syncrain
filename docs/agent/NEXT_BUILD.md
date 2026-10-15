@@ -1,19 +1,12 @@
-# The next build is 31
+# The next build is 32
 
 The first line is parsed: `# The next build is <N>`, exactly one above `BUILD_NUMBER`.
 
-## Build 31: the installer for four families
+## Build 32: what the operator asks next
 
 * Read what the operator sent last, and answer it in one plain sentence first.
-* `install.sh` on Debian (Ubuntu, Mint), Fedora and openSUSE beside the Arch family: each family's
-  packages for the wallpaper (GTK 4, gtk4-layer-shell, PyGObject, Pillow, a C compiler, EGL and
-  Wayland headers), the login screen (greetd) and the lock screen (cmake, Qt 6); what a family
-  lacks (gtk4-layer-shell on older releases) said plainly, with the GTK host or `--window` instead.
-* Test Debian for real in the sandbox; Fedora and openSUSE against stand-ins, and the README says
-  they are untested until someone runs them.
-* The README invites anyone else: hand this repository to your AI agent and let it adapt
-  `install.sh` to your system (the operator, 2026-10-15 13:30).
-* NixOS stays the base: the flake and its modules, then the NixOS image.
+* Without a request: the NixOS image's first step, the login and lock screens in the NixOS module
+  (`docs/ROADMAP.md`, "Planned builds" and "Open items"); or what they find on the lock screen.
 * No boot splash: never touch the bootloader, initramfs or Plymouth.
 
 **Known blockers**: watts, NVIDIA's driver and Plasma's shell exist only on the operator's machine;
