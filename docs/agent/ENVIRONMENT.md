@@ -64,3 +64,9 @@ Plasma session there: `plasma-workspace kwin`, then in `dbus-run-session`: `kwin
   (`org.kde.KWin.EIS.RemoteDesktop.connectToEIS`, one connection per word; `tests/lockscreen/type.c`).
 * Ubuntu's g-ir-scanner is Python 3.12's: with another `python3` first, building gtk4-layer-shell's
   typelib needs its first line pointed at `/usr/bin/python3.12`.
+* A script named after a standard module replaces it.
+* A heredoc ends at its terminator, even inside the text; tool parameters decode JSON escapes. A
+  `\u2028` written through a tool lands as the character, which ends a JavaScript regex literal:
+  make such escapes in a script (`chr(92) + "u2028"`) and check the page with `node --check`.
+* The system's `python3` may not be the one PyGObject was built for (a circular import of `_gi`):
+  run the app, outside the lanes too, with the venv of step 2 first on `PATH` and the exports above.

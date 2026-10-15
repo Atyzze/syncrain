@@ -1,59 +1,41 @@
-# Where we are, at build 29
+# Where we are, at build 30
 
 The project on one page. Detail: `docs/agent/HANDOFF.md`.
 
 ## What syncrain is
 
-A wallpaper of falling code that never repeats. Every frame comes from the clock and a channel
-name, so everyone on a channel sees the same rain. Linux (Wayland, X11) and the browser.
+syncrain backdrop: live code rain for the whole session (desktop, login screen, lock screen, a web
+page, videos) that never repeats. Every frame comes from the clock and a channel name, so everyone
+on a channel sees the same rain. Linux (Wayland, X11) and the browser; NixOS is the base. Boot stays
+plain text by design: the text means the machine is not up yet, the rain that it is.
 
 ## Where it stands
 
-* **Runs on your desktop** (KDE Plasma, RTX 5090, two screens) as a small C program: 123 MiB at
-  start and 0.9% of a core at 30 fps (Python and GTK took 205 MiB and 4.7%).
-* **Power**: about 11 W at 30 fps; the watts follow the frames, not the language.
-* **Covered screens are not drawn** (0 W behind a full-screen window), and every frame lands on
-  the refresh.
-* **Memory**: freed memory goes back every five minutes, with a record; `syncrain --diagnose`
-  shows it.
-* **Your picture options**: `--glow`, `--bloom`, `--bg-gain` (darker), `--speed`, `--density`,
-  `--snow off`, `--hieroglyphs` (0.15 by default).
-* **The glow flare-up**: not in the frames syncrain computes (two hours checked). Note the time
-  when you see it, and that moment can be drawn again.
-* **Your own symbols**: `syncrain --write-glyphs`, then edit `~/.config/syncrain/glyphs.json`: sets
-  of characters (any language, your favourites), each with a weight or a share.
-* **The login screen** (working on your desktop): `./install.sh --login-screen`; greetd, the rain
-  and a login box on every screen (a second factor asked there too), then Plasma, its splash and
-  wallpaper a still of the rain. A failure falls back to a text login. Optional: without it the
-  installer never touches your login, and `--login-screen-off` puts back what started at boot.
-* **The lock screen** (build 27, optional): `./install.sh --lock-screen`, then log out and in once;
-  Plasma's locker shows the rain; your box comes up on a key or a moved mouse, goes after a minute,
-  and every screen shows the same box. `--lock-screen-off` gives Plasma's back.
-* **Try every setting on the page**: open `index.html` (next to `install.sh`, or the live page),
-  press Settings, move anything, watch the rain change, Save config.json, then `./install.sh
-  --config config.json`. Your desktop draws what the page showed.
-* **Your own look** (build 22): the rain's colours, how many at once (each column its own, by the
-  channel or as a wave), a colour cycle like an RGB keyboard's, the background, any picture as the
-  logo, the hidden words. Presets to start from: **Syncrain** (your look, the default: your settings file of
-  2026-10-15 12:49, build 28: snow on, a bigger NixOS logo), NixOS and Matrix; your redrawn logo
-  stays a choice (`--logo syncrain`); the NixOS colours logo is gone. One colour over any logo.
-* **A video of your look** (build 29): `syncrain --video rain.mp4` (MP4, MKV, WebM or GIF, with
-  ffmpeg) or the page's Video section (WebM): a seamless loop, drawn frame by frame from your
-  settings. The live rain stays the default.
-* **Hidden sentences** (build 29): `WAKE UP NEO` falls as a word does, its spaces as gaps; up to 30
-  characters (21 on a 21:9 screen). The page's lists open on its own dark colours, readable.
-* **A review of build 17**: builds 18 and 19 fixed what matters now; a few small items are open
-  (`docs/ROADMAP.md`, "Open items").
-* **On GitHub**: github.com/Atyzze/syncrain, every build up to 29.
+* **Your desktop** (KDE Plasma, RTX 5090, two screens): a small C program, 123 MiB and 0.9% of a
+  core at 30 fps, about 11 W; covered screens are not drawn (0 W), every frame lands on the
+  refresh, freed memory goes back every five minutes.
+* **Your look is the default** (builds 24 and 28): your settings file of 2026-10-15 12:49, snow and
+  the NixOS logo at 0.44 included. NixOS and Matrix are presets; your redrawn logo is a choice.
+* **Try every setting on the page**: `index.html`, Settings, move anything, Save config.json, then
+  `./install.sh --config config.json`. Your desktop draws what the page showed.
+* **Picture options**: colours, how many at once and their cycle, background, any picture as the
+  logo with one colour over it, glow, bloom, speed, density, snow, your own symbol sets, hidden
+  words and sentences (up to 30 characters).
+* **The login screen** (optional, working on your desktop): `./install.sh --login-screen`; greetd,
+  the rain and a box on every screen; `--login-screen-off` puts back what was there.
+* **The lock screen** (optional, build 27): `./install.sh --lock-screen`, then log out and in once;
+  the rain stays live, your box comes up on a key or a moved mouse and is the same on every screen.
+  Not yet seen on your machine.
+* **Videos** (build 29): `syncrain --video rain.mp4` or the page's Video section, a seamless loop.
+* **On GitHub**: github.com/Atyzze/syncrain, every build up to 30.
 
 ## What comes next
 
-* **Build 30**: the consolidation; the README says what syncrain is now (syncrain backdrop: your
-  desktop, login screen, lock screen and videos) and why boot stays plain text.
 * **Build 31**: the installer for Debian, Fedora and openSUSE beside Arch, and an invitation for
   everyone else to hand the repository to their AI agent.
-* **Then**: a NixOS image, the base the others follow. No boot splash, ever: the text means the
-  machine is not up yet, the rain that it is.
+* **Then**: a NixOS image with the wallpaper, login screen and lock screen, the base the others
+  follow.
+* **Build 40**: the next consolidation (every number ending in 0).
 
 ## The decision in front of you
 
@@ -66,3 +48,4 @@ name, so everyone on a channel sees the same rain. Linux (Wayland, X11) and the 
 
 * **build**: one numbered archive. **channel**: the name a stream shares. **stream id**: names what
   decides the picture. **consolidation**: a build with no new behaviour, every number ending in 0.
+* **backdrop**: everything syncrain draws behind you: wallpaper, login screen, lock screen.

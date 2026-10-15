@@ -28,7 +28,7 @@ in
     type = types.nullOr (types.enum [ "syncrain" "nixos" "matrix" ]);
     default = null;
     description = ''
-      The preset the look starts from: `syncrain` (green, 64 colours in a wave, the NixOS logo),
+      The preset the look starts from: `syncrain` (white-tailed rain in 64 colours, a turning rainbow wave, the NixOS logo, snow),
       `nixos` (ice blue, snow, the NixOS logo) or `matrix` (green, no snow). Null: the settings file's, else syncrain.
     '';
   };
@@ -102,7 +102,7 @@ in
   logo = mkOption {
     type = types.nullOr (types.either (types.enum [ "syncrain" "nixos" "white" "none" "nixos-colours" "colours" ]) types.path);
     default = null;
-    description = "The logo: `syncrain`, `nixos`, `none` or a picture (null: the preset's). `nixos-colours`, gone in build 28, draws `nixos`.";
+    description = "The logo: `syncrain`, `nixos`, `none` or a picture (null: the preset's). The older names `white`, `nixos-colours` and `colours` draw `nixos`.";
   };
 
   logoColor = mkOption {
@@ -126,7 +126,7 @@ in
   background = mkOption {
     type = types.nullOr types.path;
     default = null;
-    description = "Optional background image (darkened with bgGamma/bgGain) instead of the background gradient.";
+    description = "Optional background image instead of the background gradient, darkened by bgGain (and --bg-gamma through extraArgs).";
   };
 
   mask = mkOption {
@@ -195,7 +195,7 @@ in
   hieroglyphs = mkOption {
     type = types.nullOr (types.numbers.between 0.0 1.0);
     default = null;
-    description = "Share of the changing symbols that are Egyptian hieroglyphs (null: 0.15; 0: none).";
+    description = "Share of the changing symbols that are Egyptian hieroglyphs (null: as the symbol sets say, 0.15 in the presets; 0: none).";
   };
 
   scale = mkOption {

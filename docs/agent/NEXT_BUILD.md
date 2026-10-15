@@ -1,18 +1,19 @@
-# The next build is 30
+# The next build is 31
 
 The first line is parsed: `# The next build is <N>`, exactly one above `BUILD_NUMBER`.
 
-## Build 30: the consolidation
+## Build 31: the installer for four families
 
 * Read what the operator sent last, and answer it in one plain sentence first.
-* No behaviour changes (every number ending in 0): fold builds 21 to 29's notes into
-  `docs/HISTORY.md`, make every document true and short again, list what it finds as open items.
-* The README says what syncrain is now, in the operator's word: **syncrain backdrop**, the rain for
-  the whole session (desktop, login screen, lock screen, videos), NixOS the base; and the design
-  choice that boot stays plain text: the text says the machine is not up yet, the rain that it is
-  (2026-10-15 13:30 and 13:37, `docs/ROADMAP.md`).
-* Then build 31: `install.sh` for Debian, Fedora and openSUSE beside Arch, and the README's
-  invitation to hand the repository to an AI agent for anything else.
+* `install.sh` on Debian (Ubuntu, Mint), Fedora and openSUSE beside the Arch family: each family's
+  packages for the wallpaper (GTK 4, gtk4-layer-shell, PyGObject, Pillow, a C compiler, EGL and
+  Wayland headers), the login screen (greetd) and the lock screen (cmake, Qt 6); what a family
+  lacks (gtk4-layer-shell on older releases) said plainly, with the GTK host or `--window` instead.
+* Test Debian for real in the sandbox; Fedora and openSUSE against stand-ins, and the README says
+  they are untested until someone runs them.
+* The README invites anyone else: hand this repository to your AI agent and let it adapt
+  `install.sh` to your system (the operator, 2026-10-15 13:30).
+* NixOS stays the base: the flake and its modules, then the NixOS image.
 * No boot splash: never touch the bootloader, initramfs or Plymouth.
 
 **Known blockers**: watts, NVIDIA's driver and Plasma's shell exist only on the operator's machine;

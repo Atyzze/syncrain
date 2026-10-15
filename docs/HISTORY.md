@@ -1,6 +1,6 @@
 # History
 
-A few lines per build, and the operator's words. The last two builds' notes (19 and 20) are in
+A few lines per build, and the operator's words. The last two builds' notes (29 and 30) are in
 `docs/build_notes/`; the rules they taught are in `docs/LESSONS.md`.
 
 ## Before build 1 (2026-10-06)
@@ -70,10 +70,46 @@ showed within seconds, which is why syncrain draws every frame from the clock.
   optional: only `--login-screen` changes how the machine logs in, `--login-screen-off` puts back
   what started at boot. In an Arch root build 17's login screen had copied `/etc/shadow` through a
   link; 18's upgrade removed the copy. Gate: 279 passed.
-* **19** (2026-10-14): the rest of the review: greetd's own settings kept, a second factor asked in
-  the box, a wallpaper chosen since kept, options checked as they are read.
+* **19** (2026-10-14): the rest of the review: greetd's own settings kept (only `[default_session]`
+  changes), a second factor asked in the box, the greeter's settings fresh at every boot, a
+  wallpaper or splash chosen since kept, options checked as they are read (status 2 at once, 78
+  for a picture or font that fails once drawing starts). Gate: 319 passed.
 * **20** (2026-10-14): consolidation. Builds 9 to 18 folded in here; the documents checked against
-  the code; what stays open listed in `docs/ROADMAP.md`.
+  the code; what stays open listed in `docs/ROADMAP.md`. Gate: 319 passed.
+* **21** (2026-10-14): the page's Settings panel: every option and symbol set tried live, saved as
+  `config.json` (`syncrain-config-1`), which `syncrain --config` and `./install.sh --config` take;
+  the browser lane draws one file on the page and the desktop and compares the frames. A wallpaper
+  page stops shrinking cells at 12 px, as the desktop does. Gate: 346 passed.
+* **22** (2026-10-14): presets instead of themes, every colour a setting; colours at once (each
+  column one of N hues, by the channel or as a wave) and a colour cycle; any picture as the logo,
+  kept in the settings file as the texture; `index.html` at the top, `web/` and `extras/` gone, and
+  the CachyOS remnants with them. One colour and no cycle drew build 21's frame to the pixel.
+  Stream `25b02556`. Gate: 375 passed.
+* **23** (2026-10-14): the operator's settings file as the `syncrain` preset and the default; their
+  logo redrawn as an SVG (`syncrain/data/logo-syncrain.svg`, 95% of the same ink); one colour over
+  any logo. Stream `f98ef1ca`. Gate: 377 passed.
+* **24** (2026-10-14): their settings file of 22:33 as the default: white-tailed matrix colours, 64
+  in a wave turning every 440 s, the NixOS logo, bloom 5, black. Their file drawn by 23 and the
+  default by 24: the same frame. Page and desktop compared at a bloom gain of 1.25, as the 8-bit
+  bloom rounds differently in Chromium and Mesa. Stream `a9c058f3`. Gate: 380 passed.
+* **25** (2026-10-15): the lock screen, optional (`--lock-screen`): Plasma's own locker loads
+  syncrain's shell package, a QML item drawing the native passes from the scene the wallpaper
+  writes, and syncrain's box. The `lockscreen` lane locks a real headless KWin and unlocks it by
+  typing. Not delivered: its review came first. Gate: 392 passed.
+* **26** (2026-10-15): 25's review fixed: PAM asked again only after Plasma 6.7's delay (25's box
+  looped and wiped the field), one conversation for all screens, PAM's prompts and reasons shown,
+  the rain loaded after the box's first frame. Gate: 395 passed.
+* **27** (2026-10-15): the lock screen's box away until a key or a moved mouse, gone after a minute
+  (forgetting what was typed), the same text on every screen (`Shared.qml`); tested with real key
+  and pointer events on two screens. Gate: 396 passed.
+* **28** (2026-10-15): their settings file of 12:49 as the default (logo at 0.44, its rainbow every
+  40 s, snow); the NixOS colours logo gone (the name still draws the NixOS one); the README
+  rewritten for visitors. Stream `85ace386`. Gate: 397 passed.
+* **29** (2026-10-15): a video of the look (`syncrain --video`, the page's Video section), a seamless
+  loop; hidden sentences up to 30 characters; the page's lists readable. Stream `822ea58a`. Gate:
+  432 passed.
+* **30** (2026-10-15): consolidation. Builds 19 to 28 folded in here; the documents checked against
+  the code; the README says what syncrain is now (syncrain backdrop) and why boot stays plain text.
 
 ## The review of build 17 (2026-10-14)
 
@@ -132,4 +168,25 @@ The operator's Claude doc "Syncrain build 17 code review": 9 middling findings (
   let you change/try out all the config settings, and select which char sets etc, basically, its a
   live previewer ... and then lets you export/save the json config file"; "fix the bugs first of
   course".
+* **After 21** (2026-10-14 18:25): a colour gradient for the rain so the themes can go; any logo,
+  the NixOS one the default; no CachyOS remnants; colours that cycle and "how many color flavors at
+  the same time"; one html file next to `install.sh`.
+* **After 22** (2026-10-14 19:53): their settings file as the default; their logo cleaned up,
+  "perhaps turn it into a svg"; "a color slider for the potential logo in the middle".
+* **After 23** (2026-10-14 22:33 and 22:44): "can we push this as new default template for syncrain
+  on our github please"; "we do want it visible as a lock screen wall paper as well, and also thus
+  a login box in the midde of our own, and ideally, booted up as soon as possible, even before LUKS
+  pwd is asked".
+* **After 26** (2026-10-15 10:16 and 10:45): "I think I want to keep it out of boot then. Current
+  boot is raw text, I disabled Plymouth since I wanted to be able to see everything"; on the lock
+  screen, "hide the login box unless there has been recent key input or mouse movement ... all
+  login boxes update, so it never matters which screen is visible".
+* **After 27** (2026-10-15 12:49 and 12:52): "this 'nixos colours' option doesnt seem to do anything
+  meaningful, get rid of it"; their new file as the default; "generate a .gif or .mp4 ... a loop
+  ... but we obviously want to retain the native real dynamic channel".
+* **After 28** (2026-10-15 13:18 to 13:37): the lists' white background; "hidden sentences as well,
+  not just words"; the installer for "the top 4" (Arch, Debian, Fedora, openSUSE), the rest invited
+  to "copy/hand this repo to your ai-agent"; boot "pure text based" by design, "the moment our rain
+  is up we know w'ere in"; "syncrain backdrop ... its more than jsut a wallapepr, its also a
+  lockscreen, a screensaver"; NixOS "the 5th paradigm of course, the default/base".
 * **Standing**: no long dashes in anything written to them.

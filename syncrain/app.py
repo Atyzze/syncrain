@@ -301,7 +301,7 @@ def parse_args(argv=None):
                          "else Python and GTK), native (the native program only) or gtk (Python and GTK, as on "
                          "X11 and in a window)")
     ap.add_argument("--logo", type=_logo, metavar="LOGO",
-                    help="syncrain, nixos, none, or a picture file (PNG or JPEG); the preset's otherwise")
+                    help="syncrain, nixos, none, or a picture file (PNG, JPEG, WebP: what Pillow reads); the preset's otherwise")
     ap.add_argument("--logo-color", type=_logo_colour, metavar="C",
                     help="one colour over the logo, #rrggbb (the default: the logo's own; 'own' for its own again)")
     ap.add_argument("--logo-size", type=_number(low=0.05, high=0.9), metavar="F",
@@ -323,7 +323,7 @@ def parse_args(argv=None):
                     help="seconds a turn of the rain's hue wheel, every flavour together (the preset's otherwise; "
                          "0 = the colours stay)")
     ap.add_argument("--words", type=_words, metavar="W,W,...",
-                    help="the hidden words and sentences that fall now and then, comma-separated, up to 40 characters "
+                    help="the hidden words and sentences that fall now and then, comma-separated, up to 30 characters "
                          "each; a space falls as a gap ('' for none)")
     ap.add_argument("--background", type=_image, metavar="IMAGE", help="use an image as the background instead of the background gradient")
     ap.add_argument("--mask", type=_image, metavar="IMAGE", help="greyscale mask (same framing as --background): white = keep bright, no rain")
@@ -371,8 +371,9 @@ def parse_args(argv=None):
     ap.add_argument("--time", type=_number(), help="freeze the clock at this UNIX time (screenshots, tests)")
     ap.add_argument("--screenshot", metavar="PNG", help="render one frame, save it, exit")
     ap.add_argument("--record", metavar="DIR", help="render a clip as numbered PNGs into DIR (from --time or now), exit")
-    ap.add_argument("--record-seconds", type=_number(above=0), default=8.0)
-    ap.add_argument("--record-fps", type=_number(above=0, high=1000), default=30.0)
+    ap.add_argument("--record-seconds", type=_number(above=0), default=8.0, help="how long --record is (default 8)")
+    ap.add_argument("--record-fps", type=_number(above=0, high=1000), default=30.0,
+                    help="frames per second of --record (default 30)")
     ap.add_argument("--video", metavar="FILE",
                     help="make a video of the rain that plays on anything (.mp4, .mkv, .webm or .gif; needs ffmpeg), "
                          "from --time or now, at --size (default 1920x1080, 640x360 for a GIF), exit")
@@ -384,7 +385,7 @@ def parse_args(argv=None):
                     help="--video ends where it begins, so a player repeating it shows no seam (default on)")
     ap.add_argument("--size", help="window size for --window / --record (default 1280x720), the size of --video, "
                                    "or the size --benchmark draws at (default: the first screen), e.g. 1920x1080")
-    ap.add_argument("--list-themes", action="store_true")
+    ap.add_argument("--list-themes", action="store_true", help="list the presets and exit")
     ap.add_argument("--benchmark", action="store_true",
                     help="time each pass on this machine's graphics card, print the table, exit")
     ap.add_argument("--power-sweep", action="store_true",

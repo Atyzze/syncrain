@@ -24,6 +24,10 @@ Rules learned by shipping their opposite, one line each. When and how: `docs/HIS
 * **C that must match Python must do Python's arithmetic**: float `//`, `round`, the order of
   operations. Compare both, printed exactly.
 * **Python rounds halves to even, JavaScript up**: say which, in both, when the two must agree.
+* **Two rasterizers round an 8-bit blur differently**, and a gain multiplies it: compare page and
+  desktop where the gain is small, and every other pass with it off.
+* **An untagged HD video is shown as BT.709**; ffmpeg's untagged default is BT.601. Convert to
+  BT.709 and say so in the file.
 
 ## Frame timing
 
@@ -50,6 +54,12 @@ Rules learned by shipping their opposite, one line each. When and how: `docs/HIS
 * **A toolkit's item inside someone else's shell breaks where no lane can see** (builds 13 and 14's
   Plasma wallpaper). Our own program, on our own surface, holds up.
 * **One screen that never draws must not hold up what all screens share** (the memory trim).
+* **Plasma's lock screen is Plasma's**: KWin 6 lets no other locker in; change what it shows, not
+  which locker runs (`docs/ARCHITECTURE.md`).
+* **kscreenlocker refuses a PAM start inside its delay** (3 s after a refusal in 6.7): ask again
+  after it, or the box loops and wipes the field.
+* **Each screen of a lock screen is its own QML root**: what all screens share (PAM, the typed
+  text) lives in a singleton, or a screen plugged in again cannot unlock.
 
 ## The login screen
 
@@ -91,12 +101,9 @@ Rules learned by shipping their opposite, one line each. When and how: `docs/HIS
 * **A loop shows on a wallpaper within seconds** (the GIFs before build 1).
 * **A frame is a function of the clock**: for a fault seen on screen, ask for the minute, and draw
   that moment again.
+* **A limit has to fit the screen it falls on**: 40-character sentences never fell where a column
+  has 36 rows. Test what a user sees, not only what the data holds.
+* **A new default can make old tests pass without testing anything** (snow on, a black
+  background): run them where the option still shows.
 
-## The sandbox
-
-The traps of the sandbox itself: `docs/agent/ENVIRONMENT.md`.
-
-* A script named after a standard module replaces it.
-* A heredoc ends at its terminator, even inside the text; tool parameters decode JSON escapes.
-  A `\u2028` written through a tool lands as the character, which ends a JavaScript regex
-  literal: make such escapes in a script (`chr(92) + "u2028"`) and check the page with `node --check`.
+The traps of the sandbox itself: `docs/agent/ENVIRONMENT.md`, "Traps".

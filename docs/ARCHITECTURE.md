@@ -25,9 +25,9 @@ Machines with synced clocks and the same stream id draw the same frame.
 6. **composite**: background, snow, glyphs, bloom, logo, front snow.
 
 Data: `syncrain/data/themes.json` (the presets), `syncrain/data/glyphs.png` (489 shipped glyphs: code,
-katakana, hiragana, kanji, Cyrillic, Greek, Arabic, French, 125 Egyptian hieroglyphs), the NixOS
-logos (CC BY 4.0), all made by `tools/build_assets.py`. The logo turns, drifts and cycles colour,
-against burn-in; nothing flashes.
+katakana, hiragana, kanji, Cyrillic, Greek, Arabic, French, 125 Egyptian hieroglyphs) and the NixOS
+logo (CC BY 4.0), made by `tools/build_assets.py`; syncrain's logo by `tools/build_logo.py`. The
+logo turns, drifts and cycles colour, against burn-in; nothing flashes.
 
 ## Symbols (`syncrain/glyphs.py`)
 
@@ -48,7 +48,7 @@ against burn-in; nothing flashes.
   before the first frame hands over to the GTK host; a lost compositor, or 5 s of frames that
   cannot be shown, exits with status 1 so the service restarts it.
 * **GTK host** (`syncrain/app.py`, `syncrain/renderer.py`): X11, windows, `--screenshot`,
-  `--record`, and the fallback. A GLArea per viewport, OpenGL through libepoxy (`syncrain/gl.py`),
+  `--record`, `--video`, and the fallback. A GLArea per viewport, OpenGL through libepoxy (`syncrain/gl.py`),
   `GSK_RENDERER=gl` and `GDK_DISABLE=dmabuf`.
 * **Web page** (`index.html`, at the top): WebGL2, one self-contained file; `tools/build_web.py`
   fills its data blocks (shaders, presets, images, the build) in place, and writes the live page's
@@ -71,7 +71,7 @@ GTK draws more pixels and scales them down), the page within texture filtering.
   glow beside a column follows it. **Cycle** turns every flavour together (`uRainHueCph`). One
   flavour skips the turn, so a preset with one (nixos) draws the picture it always drew.
 * **The logo** (`syncrain/logo.py`): syncrain's own (drawn in `logo-syncrain.svg`, its texture made
-  by `tools/build_logo.py`), the shipped snowflakes, or a picture made into the same kind
+  by `tools/build_logo.py`), the NixOS snowflake, or a picture made into the same kind
   of texture (a square, the picture in its middle two thirds, its own average colour under its
   see-through pixels). The page makes it and keeps it in the settings file as a PNG, used as it is.
   One colour over it (`uLogoTint`) keeps its shape and replaces its colours, and its glow's.
@@ -116,8 +116,17 @@ GTK draws more pixels and scales them down), the page within texture filtering.
   without them.
 * The rain is `SyncRain` (`rainitem.cpp`, the QML module `org.syncrain`): the native passes into a
   framebuffer on Qt Quick's OpenGL context, from the scene file `syncrain --write-scene` writes; the
-  wallpaper rewrites it at every start, so the lock screen draws the desktop's settings and runs no
-  Python. Build 14's Plasma wallpaper item, without its KWin watch.
+  native wallpaper rewrites it at every start (the GTK host does not; `install.sh` writes it too),
+  so the lock screen draws the desktop's settings and runs no Python.
+
+## Video (`syncrain/video.py`, the page's `makeVideo`)
+
+* The GTK host draws each frame off the screen at the video's size, in slices of a tenth of a second
+  per frame callback, and pipes it to ffmpeg (H.264 or VP9 in BT.709, or a GIF with one palette),
+  as `NAME.part.EXT`, renamed when whole. The page encodes with WebCodecs and writes the WebM itself.
+* A loop's first frames (2 s, or half the video) are the moments n frames on fading into their own
+  (`video.plan`): frame n-1 flows into frame 0. Python and the page do the same sums, halves
+  rounded up; the browser lane compares their frames with each other and with the app's.
 
 ## When a frame is drawn (`syncrain/pacing.py`, `syncrain/native/timing.c`)
 
@@ -132,14 +141,14 @@ which screens a maximized or full-screen window covers; those stop drawing until
 
 ## Memory and power
 
-* On the operator's RTX 5090: the native wallpaper 123 MiB and 0.9% of a core at 30 fps; the GTK
-  host 205 MiB and 4.7%. Most of either is the driver; syncrain's own state is a few MiB.
-* The watts follow the frames (about 0.17 J a frame per screen), not the pixels or the language.
-* NVIDIA's Wayland driver leaks a fixed amount per frame with explicit sync on, so syncrain turns
-  it off for its own process (`syncrain/app.py`, `avoid_the_explicit_sync_leak`).
+* The measurements on the operator's machine: `docs/agent/TARGET_ENVIRONMENT.md`. The watts follow
+  the frames, not the pixels or the language; syncrain's own state is a few MiB.
+* NVIDIA's explicit-sync leak (`docs/LESSONS.md`) is turned off for syncrain's own process
+  (`syncrain/app.py`, `avoid_the_explicit_sync_leak`).
 * The C heap keeps what is freed until asked: both hosts hand it back after the first frames and
   every five minutes after. The native wallpaper keeps a record (`record_memory`).
-* The picture options (`--speed`, `--glow` and the rest, `engine.look`) are uniforms set once.
+* The picture options (`--speed`, `--glow` and the rest, `engine.LOOK`; `--bg-gain` the
+  renderer's) are uniforms set once.
 
 ## Builds and the stream (`syncrain/build.py`)
 
@@ -150,7 +159,7 @@ which screens a maximized or full-screen window covers; those stop drawing until
 
 ## Packaging and release
 
-* `install.sh`: pacman packages, the app in `~/.local`, the native wallpaper built with gcc, an
+* `install.sh` (the Arch family): pacman packages, the app in `~/.local`, the native wallpaper built with gcc, an
   optional systemd user service.
 * `nix/package.nix`: the package (the native wallpaper in `libexec/`), with NixOS and home-manager
   modules beside it.

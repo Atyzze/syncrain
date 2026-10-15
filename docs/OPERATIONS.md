@@ -7,7 +7,7 @@ Every option and recipe. How it works: `docs/ARCHITECTURE.md`.
 Needs Linux with GTK 4.14+, OpenGL 3.3 or OpenGL ES 3.0, Python 3.10+ and a synced clock (NTP). On
 Wayland, a compositor with layer-shell (not GNOME: use `--window` or the web page there).
 
-**Arch, CachyOS, EndeavourOS, Manjaro**
+**Arch, CachyOS, EndeavourOS, Manjaro, Garuda**
 
 ```sh
 git clone https://github.com/Atyzze/syncrain && cd syncrain   # or unpack SYNCRAIN<N>.tar.zst
@@ -22,12 +22,13 @@ git clone https://github.com/Atyzze/syncrain && cd syncrain   # or unpack SYNCRA
 * Packages: `python python-gobject python-cairo python-pillow gtk4 gtk4-layer-shell`, plus
   `gcc pkgconf wayland dbus` to build the native wallpaper. If that build fails, the installer says
   why and Python and GTK draw instead.
-* `--preset`, `--channel`, `--rainbow` and `--arg ...` (repeatable) go into the autostart service and
-  the login screen's rain. Also `--prefix DIR`, `--no-deps`, `--yes`; `./install.sh --help`.
+* `--preset`, `--channel`, `--rainbow` and `--arg ...` (repeatable) go into the autostart service, the
+  lock screen's scene and, on a run with `--login-screen`, the login screen's rain. Also `--prefix
+  DIR`, `--no-deps`, `--yes`; `./install.sh --help`.
 * `--config FILE`: a settings file from the web page, checked, then kept as
   `~/.config/syncrain/config.json` (one there before is kept as `config.json.before`). The service
-  is written again without options, so the file decides; the login screen's rain gets a copy.
-* Builds 13 and 14's Plasma wallpaper (dropped in build 15) is removed by any later install.
+  is written again with only the options of that run, so the file decides; the login screen's rain
+  gets a copy.
 * The login screen is optional. Until `--login-screen` is run, the installer never touches how the
   machine logs in: installing, upgrading and removing the wallpaper leave the display manager,
   what starts at boot and their files as they are.
@@ -50,25 +51,24 @@ git clone https://github.com/Atyzze/syncrain && cd syncrain   # or unpack SYNCRA
   same box, so it never matters which one you type on. It builds a QML module (`cmake qt6-base qt6-declarative`) into
   `~/.local/lib/syncrain/`, puts the shell package `org.syncrain.lockscreen` in
   `~/.local/share/plasma/shells/`, writes the scene to `~/.local/state/syncrain/lock-screen.scene`
-  (each start of the wallpaper keeps it current), and gives KWin's unit alone a drop-in
+  (each start of the native wallpaper keeps it current), and gives KWin's unit alone a drop-in
   (`plasma-kwin_wayland.service.d/syncrain-lock-screen.conf`) naming the package. Log out and back
   in once. Unlocking is still Plasma's PAM service `kde`; without the module the box shows on black,
   and a lock screen that cannot load is Plasma's built-in one. Should it ever not unlock:
-  Ctrl+Alt+F3, log in, `loginctl unlock-sessions`. `--lock-screen-off` takes exactly those files
-  away; `--uninstall` too. What KWin starts (Xwayland, an input method) also sees the drop-in's
+  Ctrl+Alt+F3, log in, `loginctl unlock-sessions`. A plasmashellrc that spells out Plasma's own shell
+  package has that line taken out (it would win over the drop-in), and one naming another package
+  stops `--lock-screen` with nothing changed. `--lock-screen-off` takes those files away and puts
+  the line back; `--uninstall` too. What KWin starts (Xwayland, an input method) also sees the drop-in's
   variables, and its `QML_IMPORT_PATH` replaces one the session had; Plasma's shell, started by
   systemd, does not see them (were it to, it would open a fresh desktop layout).
 * Upgrading: run the newer `./install.sh`; it names the build it replaces and restarts the
   autostart service if it runs. `syncrain --build` says what is installed.
 
-**NixOS** (flake): `services.syncrain = { enable = true; theme = "nixos"; channel = "public"; };`
-with `syncrain.nixosModules.default` (or `homeManagerModules.default`). Options: `enable`,
-`package`, `settings` (a `config.json` from the page), `theme` (the preset), `channel`, `fps`,
-`rainColors`, `glowColor`, `backgroundColors`, `vignette`, `flavours`, `flavourLayout`, `cycle`,
-`logo` (a name or a picture), `logoColor`, `logoSize`, `logoCycle`, `words`, `background`, `mask`, `rainbow`,
-`spin`, `drift`, `speed`, `density`, `glow`, `bloom`, `bgGain`, `snow`, `hieroglyphs`, `scale`,
-`pauseUnder`, `layer`, `extraArgs` (`nix/options.nix`). Without installing:
-`nix run github:Atyzze/syncrain -- --window`.
+**NixOS** (flake): `services.syncrain = { enable = true; settings = ./config.json; };` with
+`syncrain.nixosModules.default` (or `homeManagerModules.default`): the wallpaper as a user service.
+`settings` takes the page's `config.json`; every other option, with its range, is in
+`nix/options.nix` (some ranges are narrower than the command line's: `scale` up to 1, `fps` up to
+240). Without installing: `nix run github:Atyzze/syncrain -- --window`.
 
 **Other systems**: GTK 4, gtk4-layer-shell, PyGObject, pycairo and Pillow, then `pip install .`.
 For the native wallpaper: `sh syncrain/native/build.sh <path>` and `SYNCRAIN_WALLPAPER=<path>` in
@@ -97,7 +97,7 @@ A Plasma web-wallpaper plugin can host it, behind the desktop icons.
 | `--cycle S` | preset's | Seconds a turn of the colour wheel, every flavour together (an RGB keyboard's rainbow); 0 = the colours stay |
 | `--background-colors C,C,C` | preset's | The background gradient: top, bottom, centre glow |
 | `--vignette F` | preset's | How much darker the corners are, 0 to 1 |
-| `--logo` | preset's | `syncrain`, `nixos`, `none`, or a picture file (PNG or JPEG) |
+| `--logo` | preset's | `syncrain`, `nixos`, `none`, or a picture file (PNG, JPEG, WebP: what Pillow reads) |
 | `--logo-color C` | its own | One colour over the logo's shape, any logo or picture; `own` for its own colours |
 | `--logo-size F` | preset's | The logo's height in screen heights, 0.05 to 0.9 |
 | `--logo-cycle S` | preset's | Seconds a turn of the logo's rainbow (over its colour); 0 = its own colours |
@@ -139,16 +139,15 @@ A Plasma web-wallpaper plugin can host it, behind the desktop icons.
 Environment: `SYNCRAIN_DEBUG_FPS=<s>` reports each screen's frame rate and timing ("even" and
 "steady" near 100% means smooth); `SYNCRAIN_GL_DEBUG=1` checks every OpenGL call;
 `SYNCRAIN_WALLPAPER=<path>` names the native program; `GSK_RENDERER` picks GTK's renderer.
-syncrain sets `__NV_DISABLE_EXPLICIT_SYNC=1` and `__GL_YIELD=USLEEP` for itself unless you set them
-(NVIDIA's driver leaks memory per frame with explicit sync on).
+syncrain sets `__NV_DISABLE_EXPLICIT_SYNC=1` and `__GL_YIELD=USLEEP` for itself unless you set them.
 
 ## Settings from the web page
 
 Open `index.html` (or the live page), press **Settings** and move anything: a preset to start from,
 the channel, the rain's colours and how many at once, the colour cycle, the background, the logo
 (or a picture of your own), motion, light, the symbol sets (add, remove, weigh, type your own), the
-hidden words and sentences, the frame rate. The rain changes as you go; **Screen shape** previews a 16:9, 21:9 or
-other desktop. Then **Save config.json** (or **Copy**) and, in the syncrain folder,
+hidden words and sentences, the frame rate. The rain changes as you go; **Screen shape** previews
+a 16:9, 21:9 or other desktop. Then **Save config.json** (or **Copy**) and, in the syncrain folder,
 `./install.sh --config config.json`.
 
 * The desktop draws what the page showed: the same frame at the same moment on the same channel.
@@ -165,16 +164,17 @@ other desktop. Then **Save config.json** (or **Copy**) and, in the syncrain fold
   the colour wheel; by the channel (the same columns on every machine) or as a wave across the
   screen. **Colour cycle** turns them all round the wheel together, like an RGB keyboard's rainbow.
   One colour and no cycle is the picture as it always was.
-* **Video** saves what the page shows as a WebM file, a seamless loop by default: 10 s to 2 min,
-  720p to 4K (or a phone's 1080x1920), 24 to 60 fps. It is drawn frame by frame, so it takes a
-  while; the rain is hidden meanwhile and **Stop** ends it. Chrome, Edge and Firefox make it;
-  Safari may not. `syncrain --video` makes MP4 and GIF too.
+* **Video** saves what the page shows as WebM: 10 s to 2 min, 720p to 4K (or a phone's 1080x1920),
+  24 to 60 fps. Drawn frame by frame, so it takes a while; the rain is hidden and the other settings
+  stand still meanwhile, and **Stop** ends it. Chrome, Edge and Firefox make it; Safari may not.
+  The same as `syncrain --video` (below, "A video").
 * Options on the command line go over the file. **Open a settings file** (or drop one on the page)
   shows one again; a symbols file (`glyphs.json`) loads as the sets.
 
 ## Your own symbols
 
-`syncrain --write-glyphs` writes `~/.config/syncrain/glyphs.json`, used whenever it is there:
+`syncrain --write-glyphs` writes `~/.config/syncrain/glyphs.json`, used when it is there and no
+settings file names sets (the page's always does, and wins):
 
 ```json
 { "balance": "sets",
@@ -204,8 +204,8 @@ picture or font it cannot use).
 
 ## Power and memory
 
-* Measured on the operator's RTX 5090 (two screens): about +11 W at 30 fps, +7 W at 20, +3.5 W at
-  15; 0 W behind a covering window. The watts follow the frames.
+* On the operator's machine (`docs/agent/TARGET_ENVIRONMENT.md`): +11.9 W at 30 fps, +7.3 W at 20,
+  +3.5 W at 15; 0 W behind a covering window. The watts follow the frames.
 * `systemctl --user stop syncrain`, then `syncrain --power-sweep`: a phase with nothing, then the
   wallpaper as installed, the GTK host (`--host gtk`), build 4's timer, 20 and 15 fps, and behind a
   maximized and a full-screen window. Per phase: watts, frames, timing, CPU %, MiB, what drew it;
@@ -213,8 +213,7 @@ picture or font it cannot use).
   `SYNCRAIN_POWER_COMMAND`.
 * **The last two phases turn every screen black** for about a minute (a covering window). The sweep
   warns first. To get the screens back sooner, Alt+Tab to its terminal and press Ctrl+C.
-* Memory: the native wallpaper keeps about 123 MiB on that card, the GTK host 205. Both hand freed
-  memory back every five minutes. The native one writes `~/.local/state/syncrain/memory.log` (a line
+* Memory: both hosts hand freed memory back every five minutes. The native one writes `~/.local/state/syncrain/memory.log` (a line
   an hour); `syncrain --diagnose` shows its end and every running wallpaper.
 
 ## Desktops
@@ -232,13 +231,11 @@ picture or font it cannot use).
 
 * **A video**: `syncrain --video rain.mp4` (30 s at 1920x1080, a seamless loop, your settings
   file's look); `--seconds 60 --size 3840x2160 --video-fps 60` for more, `rain.gif` for a GIF
-  (10 s at 640x360 and 15 fps: a GIF of rain is large, and its frames wait in memory for its
-  palette, so a big one is refused). The page's **Video** section saves the same frames as WebM in
-  the browser. Its first two seconds are the end fading into the start; `--loop off` leaves that
-  out. It is made as `rain.part.mp4` and named when whole: Ctrl+C or a failure leaves nothing, and
-  an earlier `rain.mp4` as it was. Colours are BT.709, as players take HD video. A video repeats
-  where the live rain never does, and plays the same anywhere where the live rain follows the
-  clock; whether it costs fewer watts is not measured yet.
+  (10 s at 640x360 and 15 fps: a GIF of rain is large, and a big one is refused). Its first two
+  seconds are the end fading into the start; `--loop off` leaves that out. It is made as
+  `rain.part.mp4` and named when whole: Ctrl+C or a failure leaves nothing, and an earlier
+  `rain.mp4` as it was. A video repeats where the live rain never does; whether it costs fewer
+  watts is not measured yet.
 * **Frames as pictures**: `syncrain --time 1791331200 --record /tmp/frames --size 1920x1080`.
 * **The README's pictures** (`docs/images/`; redo when the stream changes): under Xvfb with
   `GDK_BACKEND=x11`, `syncrain --config none --window --size 1600x900 --time 1791331207 --screenshot
@@ -249,15 +246,16 @@ picture or font it cannot use).
   keep part of it bright and the rain behind it.
 * **syncrain's logo**: `syncrain/data/logo-syncrain.svg` is its drawing; after a change,
   `python3 tools/build_logo.py` makes the texture (and the stream changes).
-* **New assets**: `python3 tools/build_assets.py --hieroglyph-font <NotoSansEgyptianHieroglyphs.ttf>`
-  (add `--nixos-artwork <checkout>` to redraw the logos), then `python3 tools/build_web.py`; a new
-  atlas or preset changes the stream.
+* **New assets**: `python3 tools/build_assets.py --hieroglyph-font <NotoSansEgyptianHieroglyphs.ttf>
+  --arabic-font <NotoSansArabic-Bold.ttf>` (add `--nixos-artwork <checkout>` to redraw the NixOS
+  logo), then `python3 tools/build_web.py`; a new atlas or preset changes the stream.
 
 ## Credits and licences
 
 Code: MIT (`LICENSE`). syncrain's logo (`syncrain/data/logo-syncrain.svg`): the operator's, drawn
 from their picture. The NixOS snowflake: Simon Frankau and Tim Cuthbertson (NixOS/nixos-artwork),
 CC BY 4.0; NixOS is a trademark of the NixOS Foundation. Glyphs from Noto Sans Mono CJK JP (OFL 1.1)
-and DejaVu Sans; Egyptian hieroglyphs from Noto Sans Egyptian Hieroglyphs (OFL 1.1). Wayland
+and DejaVu Sans; Arabic from Noto Sans Arabic (OFL 1.1); Egyptian hieroglyphs from Noto Sans
+Egyptian Hieroglyphs (OFL 1.1). Wayland
 protocol files in `syncrain/native/protocols/`: wayland-protocols and wlr-protocols, MIT-style, as
 each file says.

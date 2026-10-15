@@ -1,7 +1,5 @@
 # Working with the operator
 
-The same person GSD's documents describe; syncrain adopted that project's ways at build 3.
-
 ## What they send
 
 * **Screenshots** (Konsole, btop): read the commands, paths, versions and numbers, not only the

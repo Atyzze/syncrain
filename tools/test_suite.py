@@ -5,7 +5,8 @@
     python3 tools/test_suite.py --lane quick          # unit + contract: seconds, no display
     python3 tools/test_suite.py --lane all --require-all   # what the release runs
 
-Lanes: unit (no display), contract (the project's rules), render (the app on an X display, a
+Lanes: unit (no display), contract (the project's rules), native (the C wallpaper's arithmetic
+against Python's, and its build), render (the app on an X display, a
 private Xvfb by default), wayland (the wallpaper layer in a headless Sway), kwin (the wallpaper on
 a headless KWin 6, Plasma's compositor: covered screens and frame spacing), browser (the web page
 in Chromium, and against the app), nix (the package and the services, evaluated and built),

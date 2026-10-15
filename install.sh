@@ -12,7 +12,8 @@
 #   ./install.sh --uninstall         remove it again (pacman packages are left installed)
 #
 # Run from a newer build's folder, it upgrades in place and restarts a running wallpaper.
-# Everything goes into your home directory:
+# Everything goes into your home directory (only --login-screen writes outside it: /usr/local/lib/syncrain,
+# /var/lib/syncrain-login, greetd's config and PAM files):
 #   ~/.local/share/syncrain/                 the app (plus index.html, the browser version)
 #   ~/.local/bin/syncrain                    the launcher
 #   ~/.config/systemd/user/syncrain.service  only with --autostart

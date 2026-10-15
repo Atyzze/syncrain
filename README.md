@@ -1,10 +1,13 @@
-# syncrain
+# syncrain backdrop
 
-A live code-rain wallpaper that never repeats and stays in sync across machines. Every frame is
-worked out from the UTC clock and a channel name, so everyone on the same channel sees the same
-rain at the same moment, and it never loops. It runs as your desktop wallpaper on Linux (Wayland
-and X11, KDE Plasma included; on GNOME only in a window or the page), optionally as your login and
-lock screen, and as a web page.
+Live code rain for your whole Linux session: your desktop wallpaper, your login screen, your lock
+screen, a web page and, when you want one, a video. It never repeats and stays in sync across
+machines: every frame is worked out from the UTC clock and a channel name, so everyone on the same
+channel sees the same rain at the same moment. Every colour, symbol, word and motion is yours to
+tune, from a page that shows the result as you go.
+
+It runs on Wayland and X11, KDE Plasma included (GNOME only in a window or the page). NixOS is the
+base it is built for; the installer covers the Arch family today.
 
 <p align="center">
   <img src="docs/images/syncrain.jpg" width="49%" alt="The default look: katakana, digits and Egyptian hieroglyphs falling in columns over black with snow, the columns in a rainbow wave across the screen, the NixOS snowflake in rainbow colours in the middle">
@@ -65,11 +68,16 @@ where it begins; needs ffmpeg). `--seconds 60 --size 3840x2160 --video-fps 60` f
 for a GIF (10 s at 640x360 and 15 fps: a GIF of rain is large), `--loop off` for one that does not loop. In the browser, the page's Settings has a
 **Video** section that saves the same as WebM.
 
+**Why boot stays plain text**: syncrain never touches the bootloader, the initramfs or a boot
+splash. The plain text while the machine starts says it is not up yet; the moment the rain appears,
+on the login screen or the desktop, it is. That clear cut is by design.
+
 **When it does not draw**: `syncrain --diagnose` says what this machine offers and why.
 **Remove it**: `./install.sh --uninstall` (the pacman packages stay).
 
 **Elsewhere**: on NixOS, `nix run github:Atyzze/syncrain -- --window`, and the flake has NixOS and
-home-manager modules. In a browser, `index.html` alone; as a web wallpaper its URL takes the options
+home-manager modules for the wallpaper (the login and lock screens there are the next steps, see
+[`docs/ROADMAP.md`](docs/ROADMAP.md)). In a browser, `index.html` alone; as a web wallpaper its URL takes the options
 (`hud=0` hides the controls). Every option, other desktops, power and recipes:
 [`docs/OPERATIONS.md`](docs/OPERATIONS.md).
 
