@@ -12,9 +12,12 @@ Open questions, planned builds, the cadence and the constraints. What shipped: `
 
 ## Decisions answered
 
+* **2026-10-15 10:16**: no boot splash: "I think I want to keep it out of boot then. Current boot is
+  raw text, I disabled Plymouth since I wanted to be able to see everything". syncrain starts at the
+  login screen; nothing touches the bootloader, the initramfs or Plymouth.
 * **2026-10-14 22:44**: the lock screen too, "a login box in the midde of our own", and "booted up
-  as soon as possible, even before LUKS pwd is asked". Builds 25 and 26 (the lock screen), 27
-  (below).
+  as soon as possible, even before LUKS pwd is asked". Builds 25 and 26 (the lock screen); the
+  boot part dropped on 2026-10-15 (above).
 * **2026-10-14 22:33**: "can we push this as new default template for syncrain on our github
   please", their settings file attached; the lock screen "still goes back to plasma thing" (Plasma's
   kscreenlocker; syncrain has not drawn it since build 15). Build 24.
@@ -43,9 +46,7 @@ Open questions, planned builds, the cadence and the constraints. What shipped: `
 
 ## Planned builds
 
-1. **The boot splash through the LUKS prompt** (27): a Plymouth theme drawing the rain, with the
-   disk password asked in syncrain's box, until the login screen's live rain. Optional.
-2. **A NixOS image** with syncrain as its wallpaper and login screen.
+1. **A NixOS image** with syncrain as its wallpaper and login screen.
 
 ## Open items
 

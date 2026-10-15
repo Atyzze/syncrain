@@ -6,9 +6,8 @@ The first line is parsed: `# The next build is <N>`, exactly one above `BUILD_NU
 
 * Read what the operator sent last, and answer it in one plain sentence first.
 * Build 26 is the first lock screen they get (25 was not delivered); fix first what they find there.
-* Then the boot splash through the LUKS prompt (`docs/ROADMAP.md`, "Planned builds" 1): first what
-  their initramfs is (CachyOS: mkinitcpio or dracut, with or without Plymouth), asked through an
-  existing command's output, never one of ours.
+* With nothing asked: an open item, or the NixOS image (`docs/ROADMAP.md`). No boot splash: the
+  operator keeps the boot plain text (2026-10-15); never touch the bootloader, initramfs or Plymouth.
 
 **Known blockers**: watts, NVIDIA's driver and Plasma's shell exist only on the operator's machine;
 a real greetd and PAM only there too (the lanes speak to a stand-in). The page's Save inside the

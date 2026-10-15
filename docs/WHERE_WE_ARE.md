@@ -42,7 +42,8 @@ name, so everyone on a channel sees the same rain. Linux (Wayland, X11) and the 
 
 ## What comes next
 
-* **Next**: the boot splash through the LUKS prompt (27), then a NixOS image.
+* **Next**: what you find on the lock screen; else an open item, or a NixOS image. No boot splash:
+  the boot stays plain text, as you set it.
 * **Build 30**: the next consolidation (every number ending in 0).
 
 ## The decision in front of you
