@@ -42,12 +42,9 @@ Open questions, planned builds, the cadence and the constraints. What shipped: `
 
 ## Planned builds
 
-1. **The lock screen** (25): the rain with syncrain's own box in the middle, as the login screen
-   has; optional, as the login screen is. First: what KWin 6 on their machine offers a locker
-   (ext-session-lock-v1, or kscreenlocker's greeter), measured there.
-2. **The boot splash through the LUKS prompt** (26): a Plymouth theme drawing the rain, with the
+1. **The boot splash through the LUKS prompt** (26): a Plymouth theme drawing the rain, with the
    disk password asked in syncrain's box, until the login screen's live rain. Optional.
-3. **A NixOS image** with syncrain as its wallpaper and login screen.
+2. **A NixOS image** with syncrain as its wallpaper and login screen.
 
 ## Open items
 
@@ -60,6 +57,7 @@ What the documents and the review of build 17 leave to a build that changes code
 | L20: the stream id does not cover `renderer.py`'s geometry, `native/timing.c` or `index.html` | `syncrain/build.py` (`STREAM_FILES`) |
 | L21: no `flake.lock`, so a Nix build takes whatever nixpkgs is current | `flake.lock` |
 | An SVG as the logo: the page takes one, the desktop's `--logo` does not (Pillow draws no SVG) | `syncrain/logo.py`, with GTK's loader (librsvg) |
+| The lock screen on NixOS: `nix/lockscreen.nix` builds it; nothing points KWin at it yet | `nix/nixos-module.nix` |
 | The settings file holds no `background`, `mask`, `scale` or `layer` (the page cannot preview a picture file) | `syncrain/app.py` (`CONFIG_KEYS`) and the page, if wanted |
 
 ## Build cadence

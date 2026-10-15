@@ -1,0 +1,12 @@
+{
+    "KPackageStructure": "Plasma/Shell",
+    "KPlugin": {
+        "Description": "syncrain's lock screen: the rain, and syncrain's box to unlock",
+        "Id": "org.syncrain.lockscreen",
+        "License": "MIT",
+        "Name": "syncrain lock screen",
+        "Website": "https://github.com/Atyzze/syncrain"
+    },
+    "X-Plasma-APIVersion": "2",
+    "X-Plasma-FallbackPackage": "org.kde.plasma.desktop"
+}

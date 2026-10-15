@@ -1,4 +1,4 @@
-# Handoff: the state of syncrain at build 24
+# Handoff: the state of syncrain at build 25
 
 What is true now, for a context that has just opened this tree. Where this page and the code
 disagree, the code is right; fix the page in the same build.
@@ -56,13 +56,19 @@ This page, `docs/agent/NEXT_BUILD.md`, `docs/agent/WORKING_WITH_THE_OPERATOR.md`
   logo's rainbow every 30 s, black background, bloom 5); drawn by build 23, that file is the same
   frame. Their redrawn logo (`syncrain/data/logo-syncrain.svg`, build 23) stays a choice. One colour
   over any logo: `--logo-color`, `logo_color`.
+* **The lock screen** (build 25, optional, `install.sh --lock-screen`): Plasma's own locker loads
+  the shell package `org.syncrain.lockscreen` (`syncrain/lockscreen/`), named by
+  `PLASMA_DEFAULT_SHELL` in a drop-in for KWin's unit alone; the rain is a QML item drawing the
+  native passes from the scene file the wallpaper writes at each start; the box drives PAM as
+  Plasma's does. Tested in a real headless KWin, locked and unlocked by typing (lane `lockscreen`).
+  Not yet seen on the operator's machine.
 * **The settings file** (build 21): the page's Settings panel tries every option and symbol set
   live and saves `config.json` (`syncrain-config-1`); `./install.sh --config config.json` keeps it
   as `~/.config/syncrain/config.json`, read under the command line (`syncrain/app.py`,
   `CONFIG_KEYS`); the login screen's rain reads a copy. The browser lane draws one file on the page
   and the desktop and compares the frames. `--theme` refuses an unknown theme with status 2.
 * **Stream**: `a9c058f3` since build 24 (the syncrain preset); `f98ef1ca` in 23; `25b02556` in 22; `def5684f` 15 to 21; `c18f8be2` in 12 to 14; `48e6bf9c` 3 to 11.
-* **GitHub**: `main` holds builds 7 to 24, one commit each (`syncrain build <N>`).
+* **GitHub**: `main` holds builds 7 to 25, one commit each (`syncrain build <N>`).
 
 ## Waits on the operator
 
@@ -71,6 +77,8 @@ This page, `docs/agent/NEXT_BUILD.md`, `docs/agent/WORKING_WITH_THE_OPERATOR.md`
 * The memory record after a few hours of build 12 or later.
 * The time of the next glow flare-up: two hours of frames show none (`docs/HISTORY.md`, build 12).
 * The two questions in `docs/ROADMAP.md`.
+* Whether build 25's lock screen comes up and unlocks on their desktop (two screens, NVIDIA), and
+  how it looks.
 * How build 24's default looks on their desktop once their kept settings file is saved again from
   the page (over the new default, its bloom 2 doubles the bloom).
 

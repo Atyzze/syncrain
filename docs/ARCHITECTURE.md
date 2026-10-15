@@ -100,6 +100,22 @@ GTK draws more pixels and scales them down), the page within texture filtering.
 * Only `install.sh --login-screen` puts any of it there, with a record of what started at boot
   before (`/etc/greetd/display-manager.before-syncrain`) that `--login-screen-off` goes back to.
 
+## The lock screen (`syncrain/lockscreen/`)
+
+* KWin 6 lets no other locker in (no ext-session-lock): Plasma's own, `kscreenlocker_greet`, which
+  KWin starts, loads `lockscreen/LockScreen.qml` from the shell package plasmashellrc names, else
+  the one `PLASMA_DEFAULT_SHELL` names. `install.sh --lock-screen` sets that, with
+  `QML_IMPORT_PATH`, in a drop-in for KWin's unit alone: Plasma's shell keeps its layout under its
+  own package's name and never sees it.
+* The package `org.syncrain.lockscreen` (falling back to `org.kde.plasma.desktop`) is QML only: the
+  box (`Box.qml`, the login box's look) drives the `authenticator` the locker gives it, as Plasma's
+  own does; PAM decides. The rain and the Caps Lock note come through Loaders, so the box works
+  without them.
+* The rain is `SyncRain` (`rainitem.cpp`, the QML module `org.syncrain`): the native passes into a
+  framebuffer on Qt Quick's OpenGL context, from the scene file `syncrain --write-scene` writes; the
+  wallpaper rewrites it at every start, so the lock screen draws the desktop's settings and runs no
+  Python. Build 14's Plasma wallpaper item, without its KWin watch.
+
 ## When a frame is drawn (`syncrain/pacing.py`, `syncrain/native/timing.c`)
 
 Each screen draws for the refresh it will be shown on, every Nth refresh so the rate stays at or

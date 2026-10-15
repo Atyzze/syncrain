@@ -96,6 +96,46 @@ def scene_bytes(args, fallback: list[str] | None) -> bytes:
     return ("\n".join(header) + "\n").encode() + b"".join(blobs)
 
 
+def lock_scene_path() -> str:
+    """The lock screen's scene (syncrain/lockscreen/): there only while `install.sh --lock-screen`
+    has put the lock screen in place, which makes the first one."""
+    named = os.environ.get("SYNCRAIN_LOCK_SCENE")
+    if named:
+        return named
+    base = os.environ.get("XDG_STATE_HOME") or os.path.join(os.path.expanduser("~"), ".local", "state")
+    return os.path.join(base, "syncrain", "lock-screen.scene")
+
+
+def write_scene(args, path: str, data: bytes | None = None) -> int:
+    """`syncrain --write-scene PATH`: the scene for these options as a file, for the lock screen,
+    which draws it with the native wallpaper's passes and runs no Python itself. Written whole, then
+    renamed, so a reader never sees half of one."""
+    if data is None:
+        data = scene_bytes(args, None)
+    path = os.path.abspath(path)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    tmp = f"{path}.{os.getpid()}.tmp"
+    try:
+        with open(tmp, "wb") as fh:
+            fh.write(data)
+        os.replace(tmp, path)
+    finally:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+    return 0
+
+
+def refresh_lock_scene(data: bytes) -> None:
+    """The wallpaper starting with these settings: the lock screen, where installed, draws them too."""
+    path = lock_scene_path()
+    if not os.path.isfile(path):
+        return
+    try:
+        write_scene(None, path, data)
+    except OSError as e:
+        print(f"syncrain: the lock screen keeps its older scene ({e})", file=sys.stderr)
+
+
 def gtk_host_command(user_args) -> list[str]:
     """The command that started this process, with the same options and --host gtk: what the native
     program runs when it cannot draw. sys.orig_argv keeps the interpreter's own part (`python3 -m
@@ -157,7 +197,9 @@ def run(args, user_args, path: str) -> str:
     fd = None
     try:
         fallback = None if args.host == "native" else gtk_host_command(user_args)
-        fd = scene_fd(scene_bytes(args, fallback))
+        data = scene_bytes(args, fallback)
+        refresh_lock_scene(data)
+        fd = scene_fd(data)
         argv = command(path, args, fd)
         sys.stdout.flush()
         sys.stderr.flush()

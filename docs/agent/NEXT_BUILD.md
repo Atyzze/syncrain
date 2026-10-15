@@ -1,13 +1,14 @@
-# The next build is 25
+# The next build is 26
 
 The first line is parsed: `# The next build is <N>`, exactly one above `BUILD_NUMBER`.
 
-## Build 25: what the operator asks next
+## Build 26: what the operator asks next
 
 * Read what the operator sent last, and answer it in one plain sentence first.
-* Build 24 made their settings file of 2026-10-14 22:33 the default; fix first what they find.
-* Then the lock screen (`docs/ROADMAP.md`, "Planned builds" 1): the rain and syncrain's own box,
-  optional; the boot splash through the LUKS prompt after it.
+* Build 25 made the lock screen (optional); fix first what they find there.
+* Then the boot splash through the LUKS prompt (`docs/ROADMAP.md`, "Planned builds" 1): first what
+  their initramfs is (CachyOS: mkinitcpio or dracut, with or without Plymouth), asked through an
+  existing command's output, never one of ours.
 
 **Known blockers**: watts, NVIDIA's driver and Plasma's shell exist only on the operator's machine;
 a real greetd and PAM only there too (the lanes speak to a stand-in). The page's Save inside the

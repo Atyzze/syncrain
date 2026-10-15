@@ -14,6 +14,7 @@ git clone https://github.com/Atyzze/syncrain && cd syncrain   # or unpack SYNCRA
 ./install.sh                  # pacman packages (sudo once), then everything in ~/.local
 ./install.sh --autostart      # also a systemd user service
 ./install.sh --login-screen   # optional: also the login screen, from the next boot (greetd)
+./install.sh --lock-screen    # optional, KDE Plasma 6: also the lock screen, from the next login
 ./install.sh --config config.json   # the settings the web page saved (see below)
 ./install.sh --uninstall      # remove it (the pacman packages stay)
 ```
@@ -42,6 +43,17 @@ git clone https://github.com/Atyzze/syncrain && cd syncrain   # or unpack SYNCRA
   it again finishes. Where syncrain's login screen is not installed, it changes nothing.
 * From a text console (Ctrl+Alt+F3), with SDDM or Plasma Login recorded: `sudo systemctl enable
   --force` and its unit, then `sudo reboot`. `--diagnose` shows the record and the last starts.
+* The lock screen is optional too, and KDE Plasma 6 on Wayland only. `--lock-screen` gives Plasma's
+  own locker syncrain's screen: the rain, live, and syncrain's box (your name, the password, Unlock,
+  PAM's words) on every screen. It builds a QML module (`cmake qt6-base qt6-declarative`) into
+  `~/.local/lib/syncrain/`, puts the shell package `org.syncrain.lockscreen` in
+  `~/.local/share/plasma/shells/`, writes the scene to `~/.local/state/syncrain/lock-screen.scene`
+  (each start of the wallpaper keeps it current), and gives KWin's unit alone a drop-in
+  (`plasma-kwin_wayland.service.d/syncrain-lock-screen.conf`) naming the package. Log out and back
+  in once. Unlocking is still Plasma's PAM service `kde`; without the module the box shows on black,
+  and a lock screen that cannot load is Plasma's built-in one. Should it ever not unlock:
+  Ctrl+Alt+F3, log in, `loginctl unlock-sessions`. `--lock-screen-off` takes exactly those files
+  away; `--uninstall` too.
 * Upgrading: run the newer `./install.sh`; it names the build it replaces and restarts the
   autostart service if it runs. `syncrain --build` says what is installed.
 
@@ -202,6 +214,7 @@ picture or font it cannot use).
 | X11 | a desktop window over all monitors | Xvfb, every release |
 | GNOME | no layer-shell: `--window` or the web page | no |
 | Login screen (greetd, Arch) | KWin, the rain and a box on the overlay layer | headless KWin, every release |
+| Lock screen (KDE Plasma 6) | Plasma's locker loads syncrain's shell package: the rain and the box | headless KWin locked and unlocked through PAM, every release |
 
 ## Recipes
 

@@ -14,6 +14,7 @@ What every lane needs, how to bring a sandbox up, and its traps. `tools/prepare_
 | kwin | KWin 6 (`SYNCRAIN_KWIN` = its `kwin_wayland`), dbus-daemon, dbus-send, node |
 | browser | node with Playwright and its Chromium |
 | nix | nix-build; nixpkgs and home-manager checkouts (`SYNCRAIN_NIXPKGS`, `SYNCRAIN_HOME_MANAGER`); a driver in `/run/opengl-driver` |
+| lockscreen | Nix and `SYNCRAIN_NIXPKGS` (Qt, Plasma's locker, libei), sway, KWin 6 (`SYNCRAIN_KWIN`), dbus-daemon, cc; root, for a PAM service `kde` of the test's own (only where `/etc/pam.d/kde` is not the machine's) |
 | release | all of the above, plus setuptools and wheel |
 
 The release runs every lane with `--require-all`: a missing environment fails it.
@@ -57,3 +58,9 @@ Plasma session there: `plasma-workspace kwin`, then in `dbus-run-session`: `kwin
 * A file the release does not know at the tree's top fails the gate (a log included).
 * Web fonts cannot load; the browser lane serves empty stylesheets for them.
 * Qt writes its messages to the journal unless `QT_FORCE_STDERR_LOGGING=1`.
+* On a headless Sway with the pixman renderer, Qt's windows show nothing to grim: the lock screen's
+  frames are taken inside Qt (`grabToImage`), and the real lock is judged by KWin's log and PAM.
+* KWin 6.7 has no fake input for tests any more: keys go in through libei
+  (`org.kde.KWin.EIS.RemoteDesktop.connectToEIS`, one connection per word; `tests/lockscreen/type.c`).
+* Ubuntu's g-ir-scanner is Python 3.12's: with another `python3` first, building gtk4-layer-shell's
+  typelib needs its first line pointed at `/usr/bin/python3.12`.

@@ -8,7 +8,9 @@
 Lanes: unit (no display), contract (the project's rules), render (the app on an X display, a
 private Xvfb by default), wayland (the wallpaper layer in a headless Sway), kwin (the wallpaper on
 a headless KWin 6, Plasma's compositor: covered screens and frame spacing), browser (the web page
-in Chromium, and against the app), nix (the package and the services, evaluated and built).
+in Chromium, and against the app), nix (the package and the services, evaluated and built),
+lockscreen (syncrain's lock screen in Plasma's own locker: its frame, its box, a real KWin lock
+unlocked through PAM).
 `--require-all` turns every "this machine lacks X" skip into a failure, because a lane that skips
 on the release machine never ran.
 """
@@ -31,9 +33,10 @@ LANES = {
     "browser": ["tests/browser"],
     "kwin": ["tests/kwin"],
     "nix": ["tests/nix"],
+    "lockscreen": ["tests/lockscreen"],
     "quick": ["tests/unit", "tests/contract"],
     "all": ["tests/unit", "tests/contract", "tests/native", "tests/render", "tests/wayland", "tests/kwin",
-            "tests/browser", "tests/nix"],
+            "tests/browser", "tests/nix", "tests/lockscreen"],
 }
 
 

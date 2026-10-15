@@ -373,6 +373,7 @@ def parse_args(argv=None):
                     help="measure the graphics card's power with syncrain at several settings (a few minutes), "
                          "print the table and save it; every screen goes black in its last two phases")
     ap.add_argument("--sweep-seconds", type=int, default=25, help="seconds per --power-sweep phase (default 25)")
+    ap.add_argument("--write-scene", metavar="PATH", help=argparse.SUPPRESS)   # the lock screen's scene
     ap.add_argument("--diagnose", action="store_true",
                     help="check whether syncrain can draw on this machine, print what it found, exit")
     ap.add_argument("--build", action=_ShowBuild, help="print the build number and the stream fingerprint, exit")
@@ -632,6 +633,12 @@ def main(argv=None):
         print(f"syncrain: {args.config_file or 'no settings file'}: preset {r.theme_name}, channel "
               f"{r.channel!r}, {len(r.glyphs.sets)} symbol sets from {r.glyphs.source}")
         return 0
+    if args.write_scene:                      # for the lock screen: no window, no GTK
+        try:
+            return native.write_scene(args, args.write_scene)
+        except Exception as e:  # noqa: BLE001 - a picture or font the scene cannot use, said as such
+            print(f"syncrain: the scene could not be made ({type(e).__name__}: {e})", file=sys.stderr)
+            return 1
     # Before GTK is imported: PyGObject initialises GTK on import, and GDK reads GDK_DISABLE then.
     use_gl_renderer()
     avoid_the_explicit_sync_leak()

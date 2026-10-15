@@ -53,6 +53,8 @@ REQUIRED_RELEASE_PATHS = {
     "syncrain/__main__.py", "syncrain/app.py", "syncrain/build.py", "syncrain/diagnose.py", "syncrain/engine.py",
     "syncrain/renderer.py", "syncrain/logo.py", "syncrain/gl.py", "syncrain/native.py", "syncrain/native/build.sh",
     "syncrain/native/wallpaper.c", "syncrain/native/render.c", "syncrain/native/syncrain.h",
+    "syncrain/lockscreen/CMakeLists.txt", "syncrain/lockscreen/rainitem.cpp",
+    "syncrain/lockscreen/package/metadata.json", "syncrain/lockscreen/package/contents/lockscreen/LockScreen.qml",
     "syncrain/data/themes.json", "syncrain/data/glyphs.png",
     "index.html",
     "nix/package.nix", "nix/nixos-module.nix", "nix/hm-module.nix",

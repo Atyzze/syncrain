@@ -25,6 +25,7 @@ syncrain --window            # in a window
 syncrain                     # as your wallpaper (Ctrl+C stops it)
 ./install.sh --autostart     # start it with every login
 ./install.sh --login-screen  # optional: also the login screen (greetd)
+./install.sh --lock-screen   # optional, KDE Plasma 6: also the lock screen
 ```
 
 **Try every setting first**: open `index.html` (next to `install.sh`), press Settings, move anything
@@ -33,6 +34,8 @@ desktop draws what the page showed.
 
 * **The login screen is optional**: without `--login-screen` the installer leaves yours as it is,
   and `./install.sh --login-screen-off` puts it back.
+* **So is the lock screen**: `--lock-screen` gives KDE Plasma's own locker the rain and syncrain's
+  box (from your next login); `./install.sh --lock-screen-off` gives Plasma's back.
 * **NixOS**: `nix run github:Atyzze/syncrain -- --window`; the flake has NixOS and home-manager modules.
 * **Browser**: open `index.html`; as a web wallpaper, its URL takes the options (`hud=0` hides the controls).
 
@@ -58,7 +61,8 @@ python3 tools/test_suite.py                  # every lane this machine can run
 ```
 
 Lanes: unit, contract, native, render (Xvfb), wayland (headless Sway), kwin (headless KWin 6),
-browser (Chromium), nix. What each needs: `docs/agent/ENVIRONMENT.md`.
+browser (Chromium), nix, lockscreen (Plasma's locker in a headless KWin). What each needs:
+`docs/agent/ENVIRONMENT.md`.
 
 **What costs you if you get it wrong**
 
@@ -80,6 +84,7 @@ browser (Chromium), nix. What each needs: `docs/agent/ENVIRONMENT.md`.
     syncrain/          the login screen: greeter.py (the box), greetd.py, greetdconf.py, handover.py,
                        login/ (greetd's command)
     syncrain/native/   the native wallpaper in C
+    syncrain/lockscreen/  the lock screen: the QML item drawing the native passes, and the shell package
     nix/               package, web bundle, NixOS and home-manager modules and their options
     tools/             package_release.py, test_suite.py, stream_freeze.py, build_web.py, build_assets.py, build_logo.py,
                        prepare_environment.sh

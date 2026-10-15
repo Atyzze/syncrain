@@ -7,6 +7,8 @@
 #   ./install.sh --config config.json  ...and draw what the web page showed (the settings it exported)
 #   ./install.sh --login-screen      ...and the rain as your login screen too (optional; greetd, yours stays installed)
 #   ./install.sh --login-screen-off  back to the login screen you had (undoes only what --login-screen did)
+#   ./install.sh --lock-screen       ...and the rain with syncrain's box as KDE Plasma's lock screen (optional)
+#   ./install.sh --lock-screen-off   back to Plasma's own lock screen (undoes only what --lock-screen did)
 #   ./install.sh --uninstall         remove it again (pacman packages are left installed)
 #
 # Run from a newer build's folder, it upgrades in place and restarts a running wallpaper.
@@ -14,14 +16,17 @@
 #   ~/.local/share/syncrain/                 the app (plus index.html, the browser version)
 #   ~/.local/bin/syncrain                    the launcher
 #   ~/.config/systemd/user/syncrain.service  only with --autostart
+#   ~/.local/share/plasma/shells/org.syncrain.lockscreen/, ~/.local/lib/syncrain/  only with --lock-screen
 set -euo pipefail
 
 PACKAGES=(python python-gobject python-cairo python-pillow gtk4 gtk4-layer-shell)
 # what the native wallpaper is built with (syncrain/native/build.sh); wayland and dbus are on every Plasma desktop
 BUILD_PACKAGES=(gcc pkgconf wayland dbus)
+# what the lock screen's QML module is built with (syncrain/lockscreen/); only with --lock-screen
+LOCK_PACKAGES=(cmake qt6-base qt6-declarative)
 PREFIX="${PREFIX:-$HOME/.local}"
 SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-AUTOSTART=0 UNINSTALL=0 NODEPS=0 YES=0 LOGIN=0 LOGIN_OFF=0
+AUTOSTART=0 UNINSTALL=0 NODEPS=0 YES=0 LOGIN=0 LOGIN_OFF=0 LOCK=0 LOCK_OFF=0
 THEME="" CHANNEL="" RAINBOW="" CONFIG="" EXTRA=()
 
 bold() { printf '\033[1m%s\033[0m\n' "$*"; }
@@ -29,7 +34,7 @@ info() { printf '  %s\n' "$*"; }
 die()  { printf '\033[31merror:\033[0m %s\n' "$*" >&2; exit 1; }
 
 usage() {
-  sed -n '2,16p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+  sed -n '2,19p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
   cat <<'EOF'
 
 Options:
@@ -37,6 +42,9 @@ Options:
   --login-screen        optional: the rain and a login box as the login screen, from the next boot
                         (greetd); without it the installer never touches your login screen
   --login-screen-off    back to the login screen from before (undoes only what --login-screen did)
+  --lock-screen         optional, KDE Plasma 6 on Wayland: the rain and syncrain's box as the lock
+                        screen, from your next login; without it the installer never touches it
+  --lock-screen-off     back to Plasma's own lock screen (undoes only what --lock-screen did)
   --config FILE         a settings file the web page exported: the wallpaper (and the login screen)
                         draw what the page showed; kept as ~/.config/syncrain/config.json
   --preset NAME         where the look starts: syncrain (the default), nixos or matrix (--theme: the same)
@@ -56,6 +64,8 @@ while [ $# -gt 0 ]; do
     --autostart) AUTOSTART=1 ;;
     --login-screen) LOGIN=1 ;;
     --login-screen-off) LOGIN_OFF=1 ;;
+    --lock-screen) LOCK=1 ;;
+    --lock-screen-off) LOCK_OFF=1 ;;
     --preset|--theme) THEME="${2:?$1 needs a value}"; shift ;;
     --config) CONFIG="${2:?--config needs a file}"; shift ;;
     --channel) CHANNEL="${2:?--channel needs a value}"; shift ;;
@@ -444,6 +454,123 @@ skip = {i + 1 for i, a in enumerate(args) if a == "--glyphs"} | {i for i, a in e
   fi
 }
 
+# ---- the lock screen, only with --lock-screen: KDE Plasma's own locker (kscreenlocker_greet, which
+# KWin starts) loads its screen from the shell package that PLASMA_DEFAULT_SHELL names when
+# plasmashellrc names none. That variable goes to KWin alone, in a drop-in for its systemd unit, so
+# Plasma's shell (whose layout is kept under the name of its own package) never sees it. The package
+# (syncrain/lockscreen/package/) draws the rain with syncrain's QML module, built here, from the scene
+# file the wallpaper keeps current; nothing in the lock screen runs Python. Without --lock-screen none
+# of this runs, and --lock-screen-off takes away exactly these files.
+LOCK_SHELL="${XDG_DATA_HOME:-$HOME/.local/share}/plasma/shells/org.syncrain.lockscreen"
+LOCK_LIB="$PREFIX/lib/syncrain"
+LOCK_QML="$LOCK_LIB/qml"
+LOCK_STATE="${XDG_STATE_HOME:-$HOME/.local/state}/syncrain"
+LOCK_SCENE="$LOCK_STATE/lock-screen.scene"
+# plasmashellrc's ShellPackage when it said org.kde.plasma.desktop outright (the default spelled out,
+# which some global themes write): taken out so the variable decides, put back by --lock-screen-off
+LOCK_SHELL_BEFORE="$LOCK_STATE/plasmashellrc-ShellPackage.before-syncrain"
+LOCK_DROPIN_DIR="$UNITDIR/plasma-kwin_wayland.service.d"
+LOCK_DROPIN="$LOCK_DROPIN_DIR/syncrain-lock-screen.conf"
+lock_screen_installed() { [ -f "$LOCK_DROPIN" ]; }
+
+# The module, the package and the scene, each made beside the one in use and then put in its place.
+lock_screen_build() {
+  local work log
+  work="$(mktemp -d)"
+  if ! log="$(cmake -S "$APPDIR/syncrain/lockscreen" -B "$work" -DCMAKE_BUILD_TYPE=Release 2>&1 \
+              && cmake --build "$work" -j "$(nproc)" 2>&1)"; then
+    printf '%s\n' "$log" | tail -n 8 | sed 's/^/    /'
+    rm -rf -- "${work:?}"
+    info "the lock screen's module did not build (it is built with: ${LOCK_PACKAGES[*]})"
+    return 1
+  fi
+  rm -rf -- "${LOCK_QML:?}.new"
+  mkdir -p "$LOCK_QML.new/org/syncrain"
+  cp "$work"/qml/org/syncrain/qmldir "$work"/qml/org/syncrain/*.qmltypes "$work"/qml/org/syncrain/*.so \
+     "$LOCK_QML.new/org/syncrain/"
+  rm -rf -- "${work:?}" "${LOCK_QML:?}"
+  mv "$LOCK_QML.new" "$LOCK_QML"
+  mkdir -p "${XDG_DATA_HOME:-$HOME/.local/share}/plasma/shells"
+  rm -rf -- "${LOCK_SHELL:?}.new"
+  cp -r "$APPDIR/syncrain/lockscreen/package" "$LOCK_SHELL.new"
+  rm -rf -- "${LOCK_SHELL:?}"
+  mv "$LOCK_SHELL.new" "$LOCK_SHELL"
+  mkdir -p "$LOCK_STATE"
+  if ! "$BINDIR/syncrain" --write-scene "$LOCK_SCENE"; then
+    info "the lock screen's scene could not be made, so it shows the box on black (see above)"
+    return 1
+  fi
+}
+
+lock_screen_on() {
+  bold "Setting up the lock screen"
+  if ! { have_user_systemd && systemctl --user cat plasma-kwin_wayland.service >/dev/null 2>&1; }; then
+    die "--lock-screen is for KDE Plasma 6 on Wayland started by systemd (plasma-kwin_wayland.service); not found here, so nothing was changed"
+  fi
+  case "$LOCK_QML$LOCK_SCENE" in
+    *[\"\\%]*) die "--lock-screen cannot name $LOCK_QML or $LOCK_SCENE in KWin's unit (a quote, backslash or % in the path)" ;;
+  esac
+  local shell
+  shell="$(kreadconfig6 --file plasmashellrc --group Shell --key ShellPackage 2>/dev/null || true)"
+  if [ -n "$shell" ] && [ "$shell" != org.kde.plasma.desktop ]; then
+    die "plasmashellrc names the shell package $shell, and the lock screen follows it, so syncrain's would not show; nothing was changed"
+  fi
+  lock_screen_build || die "the lock screen was not set up (see above); nothing in Plasma was changed"
+  if [ "$shell" = org.kde.plasma.desktop ]; then
+    printf '%s\n' "$shell" > "$LOCK_SHELL_BEFORE"
+    kwriteconfig6 --file plasmashellrc --group Shell --key ShellPackage --delete
+    info "plasmashellrc spelled out Plasma's default shell; taken out (--lock-screen-off puts it back)"
+  fi
+  mkdir -p "$LOCK_DROPIN_DIR"
+  cat > "$LOCK_DROPIN" <<EOF
+# Written by syncrain's install.sh --lock-screen (./install.sh --lock-screen-off removes it): KWin
+# starts Plasma's lock screen with these, and the lock screen then shows syncrain's.
+[Service]
+Environment="PLASMA_DEFAULT_SHELL=org.syncrain.lockscreen"
+Environment="QML_IMPORT_PATH=$LOCK_QML"
+Environment="SYNCRAIN_LOCK_SCENE=$LOCK_SCENE"
+EOF
+  systemctl --user daemon-reload || true
+  info "the lock screen: syncrain's from your next login (log out and back in once: KWin starts it)"
+  info "should it ever not unlock: Ctrl+Alt+F3, log in there, loginctl unlock-sessions, then ./install.sh --lock-screen-off"
+}
+
+# Every install while the lock screen is in place: its module, package and scene on this build too.
+lock_screen_refresh() {
+  lock_screen_installed || return 0
+  if lock_screen_build >/dev/null; then info "the lock screen: build $BUILD too"
+  else info "the lock screen keeps what it had (see above)"; fi
+}
+
+lock_screen_off() {
+  local had=0
+  if [ -f "$LOCK_DROPIN" ]; then
+    rm -f -- "$LOCK_DROPIN"
+    rmdir -- "$LOCK_DROPIN_DIR" 2>/dev/null || true
+    if have_user_systemd; then systemctl --user daemon-reload || true; fi
+    had=1
+  fi
+  if [ -e "$LOCK_SHELL" ] || [ -e "$LOCK_QML" ] || [ -e "$LOCK_SCENE" ]; then had=1; fi
+  rm -rf -- "${LOCK_SHELL:?}" "${LOCK_SHELL:?}.new" "${LOCK_QML:?}" "${LOCK_QML:?}.new"
+  rm -f -- "$LOCK_SCENE"
+  rmdir -- "$LOCK_LIB" 2>/dev/null || true
+  if [ -f "$LOCK_SHELL_BEFORE" ]; then
+    kwriteconfig6 --file plasmashellrc --group Shell --key ShellPackage "$(cat "$LOCK_SHELL_BEFORE")" \
+      && rm -f -- "$LOCK_SHELL_BEFORE"
+  fi
+  if [ "$had" = 1 ]; then
+    bold "The lock screen is Plasma's own again"
+    info "from your next login (log out and back in once)"
+  else
+    info "the lock screen was not syncrain's; nothing to undo"
+  fi
+}
+
+if [ "$LOCK_OFF" = 1 ]; then
+  lock_screen_off
+  exit 0
+fi
+
 if [ "$LOGIN_OFF" = 1 ]; then
   login_screen_off
   exit 0
@@ -458,6 +585,7 @@ if [ "$UNINSTALL" = 1 ]; then
     if [ -f "$HANDOVER_STATE" ]; then handover_off; fi
   fi
   remove_plasma_wallpaper
+  if lock_screen_installed || [ -e "$LOCK_SHELL" ]; then lock_screen_off; fi
   bold "Removing syncrain"
   if [ -f "$UNIT" ]; then
     if have_user_systemd; then systemctl --user disable --now syncrain.service >/dev/null 2>&1 || true; fi
@@ -480,7 +608,9 @@ BUILD="$(tr -d '[:space:]' < "$SRC/BUILD_NUMBER")"
 if [ "$NODEPS" = 0 ]; then
   command -v pacman >/dev/null || die "pacman not found: this script is for Arch-based systems (use --no-deps if you installed the dependencies yourself: ${PACKAGES[*]} ${BUILD_PACKAGES[*]})"
   missing=()
-  for p in "${PACKAGES[@]}" "${BUILD_PACKAGES[@]}"; do pacman -Qq "$p" >/dev/null 2>&1 || missing+=("$p"); done
+  wanted=("${PACKAGES[@]}" "${BUILD_PACKAGES[@]}")
+  if [ "$LOCK" = 1 ] || lock_screen_installed; then wanted+=("${LOCK_PACKAGES[@]}"); fi
+  for p in "${wanted[@]}"; do pacman -Qq "$p" >/dev/null 2>&1 || missing+=("$p"); done
   if [ ${#missing[@]} -gt 0 ]; then
     bold "Installing packages: ${missing[*]}"
     confirm=(); [ "$YES" = 1 ] && confirm=(--noconfirm)
@@ -642,6 +772,7 @@ elif [ -f "$UNIT" ] && have_user_systemd && systemctl --user is-active --quiet s
 fi
 
 if [ "$LOGIN" = 1 ]; then login_screen_on; else login_screen_refresh; fi
+if [ "$LOCK" = 1 ]; then lock_screen_on; else lock_screen_refresh; fi
 
 # ---- 5. what next
 desktop="${XDG_CURRENT_DESKTOP:-}"

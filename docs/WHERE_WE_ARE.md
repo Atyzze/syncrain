@@ -1,4 +1,4 @@
-# Where we are, at build 24
+# Where we are, at build 25
 
 The project on one page. Detail: `docs/agent/HANDOFF.md`.
 
@@ -26,6 +26,8 @@ name, so everyone on a channel sees the same rain. Linux (Wayland, X11) and the 
   and a login box on every screen (a second factor asked there too), then Plasma, its splash and
   wallpaper a still of the rain. A failure falls back to a text login. Optional: without it the
   installer never touches your login, and `--login-screen-off` puts back what started at boot.
+* **The lock screen** (build 25, optional): `./install.sh --lock-screen`, then log out and in once;
+  Plasma's locker shows the rain and your box. `--lock-screen-off` gives Plasma's back.
 * **Try every setting on the page**: open `index.html` (next to `install.sh`, or the live page),
   press Settings, move anything, watch the rain change, Save config.json, then `./install.sh
   --config config.json`. Your desktop draws what the page showed.
@@ -36,12 +38,11 @@ name, so everyone on a channel sees the same rain. Linux (Wayland, X11) and the 
   One colour over any logo (build 23).
 * **A review of build 17**: builds 18 and 19 fixed what matters now; a few small items are open
   (`docs/ROADMAP.md`, "Open items").
-* **On GitHub**: github.com/Atyzze/syncrain, every build up to 24.
+* **On GitHub**: github.com/Atyzze/syncrain, every build up to 25.
 
 ## What comes next
 
-* **Next**: the lock screen with the rain and your box (25), then the boot splash through the LUKS
-  prompt (26), then a NixOS image.
+* **Next**: the boot splash through the LUKS prompt (26), then a NixOS image.
 * **Build 30**: the next consolidation (every number ending in 0).
 
 ## The decision in front of you
