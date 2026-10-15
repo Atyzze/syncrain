@@ -39,9 +39,10 @@ def test_the_seconds_wrap_as_an_unsigned_32_bit_counter():
     assert engine.split_time(epoch0 - 1, epoch0)[0] == 0xFFFFFFFF
 
 
-@pytest.mark.parametrize("period, per_hour", [(180, 20), (90, 40), (600, 6), (7, 514), (10_000, 1)])
+@pytest.mark.parametrize("period, per_hour", [(180, 20), (90, 40), (600, 6), (10, 360), (7, 360), (1e-320, 360),
+                                              (10_000, 1)])
 def test_every_periodic_motion_runs_whole_cycles_per_hour(period, per_hour):
-    """So the motion has no seam where the hour counter restarts."""
+    """So the motion has no seam where the hour counter restarts; none is shorter than 10 s."""
     assert engine.cycles_per_hour(period) == per_hour
 
 
@@ -95,6 +96,16 @@ def test_the_picture_options_are_multiples_of_the_theme_s_own_values():
                                   "snow": True}
     assert engine.look(theme, speed=9, density=-1, glow=0, bloom=3, hieroglyphs=2, snow="off") == {
         "speed": 4.0, "density": 0.0, "glow": 0.0, "bloom": 2.0, "hieroglyphs": 1.0, "snow": False}
+
+
+def test_a_preset_says_where_its_sliders_start():
+    """An option not given is the preset's "look" (1 where it says nothing); one given replaces it."""
+    theme = engine.load_meta()["themes"]["syncrain"]
+    assert theme["look"] == {"speed": 1.0, "density": 1.15, "glow": 0.5, "bloom": 1.0, "bg_gain": 0.6}
+    assert engine.look(theme) == {"speed": 1.0, "density": 1.15, "glow": 0.5, "bloom": 1.0, "hieroglyphs": None,
+                                  "snow": True}
+    assert engine.look(theme, density=1.0, glow=2.0)["density"] == 1.0
+    assert engine.look(theme, density=1.0, glow=2.0)["glow"] == 2.0
 
 
 def uniforms(**look):

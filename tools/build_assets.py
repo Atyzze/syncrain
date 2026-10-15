@@ -90,26 +90,31 @@ MATRIX_GLYPHS = {'balance': 'sets', 'sets': [
 SYNCRAIN_GLYPHS = {'balance': 'sets', 'sets': [
     {'name': 'katakana', 'chars': G.KATAKANA, 'weight': 135, 'mirror': True},
     {'name': 'digits', 'chars': '01234589', 'weight': 16},
-    {'name': 'symbols', 'chars': 'Z:.=*+-<>¦|sSs"', 'weight': 7.2},
-    {'name': 'hieroglyphs', 'chars': G.HIEROGLYPHS + G.HIEROGLYPHS_MORE, 'share': 0.15}]}
+    {'name': 'symbols', 'chars': 'Z:.=*+-<>¦|sSs"', 'weight': 8},
+    {'name': 'hieroglyphs', 'chars': G.HIEROGLYPHS + G.HIEROGLYPHS_MORE, 'share': 0.15},
+    {'name': 'latin', 'chars': G.UPPER + G.LOWER, 'weight': 8},
+    {'name': 'arabic', 'chars': G.ARABIC, 'weight': 8}]}
 MATRIX_COLORS = {'deep': [0.0, 0.62, 0.22], 'mid': [0.12, 1.0, 0.36], 'pale': [0.6, 1.0, 0.68],
                  'head': [0.85, 1.0, 0.9], 'glow': [0.04, 0.6, 0.22]}
 MATRIX_BACKGROUND = {'mode': 'gradient', 'top': rgb('#020604'), 'bottom': rgb('#03090a'),
                      'center': rgb('#06180f'), 'vignette': 0.4}
 
 themes = {
-    # the operator's own (their settings files of 2026-10-14 22:33 and 2026-10-15 12:49): the matrix
+    # the operator's own (their settings file of 2026-10-15, after build 33's review): the matrix
     # colours with a white tail and a bright glow, 64 of them at once in a wave across the screen
     # turning every 440 s, the NixOS logo at 0.44 turning its rainbow every 40 s, snow, a black
-    # background, twice build 23's bloom; their digits (no 6 or 7) and `sSs` among the symbols
+    # background with a green glow in the middle, twice build 23's bloom; their digits (no 6 or 7),
+    # `sSs` among the symbols, Latin and Arabic letters, their words and sentences
     'syncrain': {
         'label': 'Syncrain',
         'glyphs': SYNCRAIN_GLYPHS,
-        'wordText': ['AI', 'sSs', 'NEURAL', 'TENSOR', 'AGENT', 'LINUX', 'ONLINE', 'MATRIX'],
+        'wordText': ['AI', 'AGI', 'sSs', 'LINUX', 'WAKE UP', 'HELLO', 'NYX NYX NYX'],
         'colors': dict(MATRIX_COLORS, deep=[1.0, 1.0, 1.0], glow=rgb('#00ff51')),
-        # their background gain 0 drew it black whatever its colours: black colours draw the same
         'background': {'mode': 'gradient', 'top': [0.0, 0.0, 0.0], 'bottom': [0.0, 0.0, 0.0],
-                       'center': [0.0, 0.0, 0.0], 'vignette': 0.66},
+                       'center': rgb('#00ff04'), 'vignette': 0.66},
+        # where its sliders start (engine.look): their file's values, so their file and no file
+        # draw the same frame
+        'look': {'speed': 1.0, 'density': 1.15, 'glow': 0.5, 'bloom': 1.0, 'bg_gain': 0.6},
         'logo': {'default': 'white', 'size': 0.44, 'glow': [0.3, 0.9, 0.6], 'glowStrength': 0.0,
                  'spin': 300, 'hueCycle': 40, 'drift': 0.0},
         # bloom 5: their 2 times build 23's 2.5, so the slider's 1 is their look

@@ -140,6 +140,8 @@ def check_config(cfg, where="the symbols") -> dict:
     sets = []
     for i, s in enumerate(cfg["sets"]):
         name = s.get("name", f"set {i + 1}") if isinstance(s, dict) else f"set {i + 1}"
+        if not isinstance(name, str):
+            raise GlyphsError(f"{where}: set {i + 1}'s name is text")
         if not isinstance(s, dict) or not isinstance(s.get("chars"), str) or not s["chars"].strip():
             raise GlyphsError(f"{where}: {name} needs \"chars\", a string of characters")
         for key in ("weight", "share", "size"):
@@ -149,9 +151,11 @@ def check_config(cfg, where="the symbols") -> dict:
             raise GlyphsError(f"{where}: {name}'s size is in cells, 0.2 to 2")
         if "font" in s and not isinstance(s["font"], str):
             raise GlyphsError(f"{where}: {name}'s font is a family name or a file")
+        if "mirror" in s and not isinstance(s["mirror"], bool):     # "no" would mirror them
+            raise GlyphsError(f"{where}: {name}'s mirror is true or false")
         if s.get("share", 0) > 1:
             raise GlyphsError(f"{where}: {name}'s share is a fraction of all symbols, 0 to 1")
-        sets.append(dict(s, name=str(name)))
+        sets.append(dict(s, name=name))
     if _total(s.get("share", 0) for s in sets) > 1.0 + 1e-9:
         raise GlyphsError(f"{where}: the shares add up to more than 1")
     if len(sets) > MAX_SETS:
@@ -308,6 +312,10 @@ def resolve(meta, theme, data_dir, config=None, source="the preset", hieroglyphs
             keys.append(key)
         return slots[key]
 
+    # a file far over the limits is refused before any work on it (a set of millions of characters)
+    given = sum(len(set(s["chars"])) for s in cfg["sets"])
+    if given > 8 * MAX_TABLE:
+        raise GlyphsError(f"{source}: {given} characters in all sets together; at most {MAX_TABLE} symbols")
     words, specs = [], {}                              # key -> (character, the set that names it)
     for word in theme.get("wordText", []):             # first: the words texture holds 8 bits
         for ch in word:

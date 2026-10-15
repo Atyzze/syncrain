@@ -1,4 +1,4 @@
-# Where we are, at build 34
+# Where we are, at build 35
 
 The project on one page. Detail: `docs/agent/HANDOFF.md`.
 
@@ -14,8 +14,9 @@ plain text by design: the text means the machine is not up yet, the rain that it
 * **Your desktop** (KDE Plasma, RTX 5090, two screens): a small C program, 123 MiB and 0.9% of a
   core at 30 fps, about 11 W; covered screens are not drawn (0 W), every frame lands on the
   refresh, freed memory goes back every five minutes.
-* **Your look is the default** (builds 24 and 28): your settings file of 2026-10-15 12:49, snow and
-  the NixOS logo at 0.44 included. NixOS and Matrix are presets; your redrawn logo is a choice.
+* **Your look is the default** (build 35): your settings file sent with the review, the green
+  glow in the middle, density 1.15, your words, Latin and Arabic letters; your file and no file
+  draw the same frame. NixOS and Matrix are presets; your redrawn logo is a choice.
 * **Try every setting on the page**: `index.html`, Settings, move anything, Save config.json, then
   `./install.sh --config config.json`. Your desktop draws what the page showed.
 * **Picture options**: colours, how many at once and their cycle, background, any picture as the
@@ -36,12 +37,12 @@ plain text by design: the text means the machine is not up yet, the rain that it
 * **Your NixOS flavour** (build 33): `nix flake init -t github:Atyzze/syncrain`, your hardware and
   boot loader, `nixos-rebuild switch`: Plasma 6 with the rain as wallpaper, login and lock screen.
   The whole system builds here; no machine has booted it yet.
-* **On GitHub**: github.com/Atyzze/syncrain, every build up to 34.
+* **On GitHub**: github.com/Atyzze/syncrain, every build up to 35.
 
 ## What comes next
 
-* **Next**: the rest of the review of build 33, the most critical first: your new default (35),
-  the login screen (36), the installer (37), Nix and the tests (38), the hosts (39).
+* **Next**: the rest of the review of build 33, the most critical first: the login screen (36),
+  the installer (37), Nix and the tests (38), the hosts (39), the page (41).
 * **Build 40**: the next consolidation (every number ending in 0).
 
 ## The decision in front of you

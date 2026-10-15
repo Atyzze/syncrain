@@ -78,6 +78,8 @@ def test_the_web_page_resolves_the_shares_the_same_way():
     ({"sets": [{"name": "x", "chars": "a", "share": 0.7}, {"name": "y", "chars": "b", "share": 0.5}]}, "more than 1"),
     ({"balance": "evenly", "sets": [{"chars": "a"}]}, "balance"),
     ({"sets": [{"name": "x", "chars": "   "}]}, "needs \"chars\""),
+    ({"sets": [{"name": "x", "chars": "a", "mirror": "no"}]}, "mirror is true or false"),
+    ({"sets": [{"name": 5, "chars": "a"}]}, "name is text"),
     ({"sets": [{"name": "x", "chars": "a", "size": 0}]}, "0.2 to 2"),
 ])
 def test_a_symbols_file_that_cannot_work_says_why(cfg, says):

@@ -45,14 +45,17 @@ def decode(choice: str):
     from PIL import Image
     try:
         raw = base64.b64decode(choice[len(DATA_PREFIX):], validate=True)
-        im = Image.open(io.BytesIO(raw))
-        im.load()
+        im = Image.open(io.BytesIO(raw))           # the header only: its size is known, nothing decoded
     except Exception as e:  # noqa: BLE001 - base64's and Pillow's errors are of every kind
         raise LogoError(f"the logo's picture cannot be read ({type(e).__name__})") from None
     if im.format != "PNG":
         raise LogoError("the logo's picture is not a PNG")
-    if max(im.size) > MAX_SIDE:
+    if max(im.size) > MAX_SIDE:                    # before decoding: a small file can say a vast size
         raise LogoError(f"the logo's picture is larger than {MAX_SIDE} pixels")
+    try:
+        im.load()
+    except Exception as e:  # noqa: BLE001
+        raise LogoError(f"the logo's picture cannot be read ({type(e).__name__})") from None
     return im
 
 

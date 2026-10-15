@@ -413,7 +413,8 @@ class Renderer:
         self.background, self.mask = background, mask
         dark = background is not None
         self.bg_gamma = bg_gamma if bg_gamma is not None else (2.0 if dark else 1.0)
-        self.bg_gain = bg_gain if bg_gain is not None else (0.42 if dark else 1.0)
+        # a picture's own default dims it under the rain; the gradient's is where the preset puts it
+        self.bg_gain = bg_gain if bg_gain is not None else (0.42 if dark else self.th.get("look", {}).get("bg_gain", 1.0))
         self.motion = engine.motion(self.th, spin=spin, drift=drift)
         self.look = engine.look(self.th, speed=speed, density=density, snow=snow, glow=glow, bloom=bloom,
                                 hieroglyphs=hieroglyphs)

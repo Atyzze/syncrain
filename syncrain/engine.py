@@ -53,11 +53,15 @@ def cover_fit(screen_w, screen_h, img_w, img_h):
     return (k, 1.0), (0.5 - 0.5 * k, 0.0)
 
 
+#: The shortest period of any motion, in seconds: shorter would flash (and 1e-320 overflowed).
+SHORTEST_PERIOD = 10.0
+
+
 def cycles_per_hour(seconds) -> float:
     """Whole cycles per hour for a period in seconds (0 or less: off), so the motion has no seam at the hour."""
     if not seconds or seconds <= 0:
         return 0.0
-    return float(max(1, round(3600.0 / seconds)))
+    return float(max(1, round(3600.0 / max(float(seconds), SHORTEST_PERIOD))))
 
 
 #: The settings `compose` puts over a preset, by their command-line names (the options' dests).
@@ -80,11 +84,9 @@ def colour(value):
     are written) or three numbers 0 to 1. ValueError if it is neither."""
     if isinstance(value, str):
         h = value.strip()
-        if len(h) == 7 and h[0] == "#":
-            try:
-                return [round(int(h[i:i + 2], 16) / 255, 4) for i in (1, 3, 5)]
-            except ValueError:
-                pass
+        # six hex digits and nothing else: int() also takes "-1" and " 1", which are no colour
+        if len(h) == 7 and h[0] == "#" and all(c in "0123456789abcdefABCDEF" for c in h[1:]):
+            return [round(int(h[i:i + 2], 16) / 255, 4) for i in (1, 3, 5)]
         raise ValueError(f"not a colour: {value!r} (#rrggbb)")
     if isinstance(value, (list, tuple)) and len(value) == 3 and all(
             isinstance(v, (int, float)) and not isinstance(v, bool) and 0 <= v <= 1 for v in value):
@@ -149,10 +151,12 @@ LOOK = {"speed": (0.25, 4.0), "density": (0.0, 2.3), "glow": (0.0, 2.0), "bloom"
 
 
 def look(theme, speed=None, density=None, snow=None, glow=None, bloom=None, hieroglyphs=None):
-    """The picture options as multipliers of the preset's own values (1: as the preset has it), the
-    share of hieroglyphs among the changing glyphs (None: as the symbol sets say), and whether the
-    snow falls."""
+    """The picture options as multipliers of the preset's own values, the share of hieroglyphs among
+    the changing glyphs (None: as the symbol sets say), and whether the snow falls. An option not
+    given is where the preset puts its slider (its "look"; 1 where it says nothing), so a settings
+    file that names the preset's own values draws what no settings file draws."""
     given = dict(speed=speed, density=density, glow=glow, bloom=bloom, hieroglyphs=hieroglyphs)
+    preset = theme.get("look", {})
     out = {}
     for key, value in given.items():
         lo, hi = LOOK[key]
@@ -160,7 +164,7 @@ def look(theme, speed=None, density=None, snow=None, glow=None, bloom=None, hier
             if key == "hieroglyphs":          # the sets' own share (syncrain/glyphs.py)
                 out[key] = None
                 continue
-            value = 1.0
+            value = preset.get(key, 1.0)
         out[key] = float(min(hi, max(lo, value)))
     if snow is None:                          # as the preset has it
         out["snow"] = bool(theme.get("snowDefault", True))

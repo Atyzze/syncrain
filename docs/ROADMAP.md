@@ -41,15 +41,16 @@ Open questions, planned builds, the cadence and the constraints. What shipped: `
 The review of build 33 (84 items, numbered, in the operator's review document), fixed most
 critical first, one area a build:
 
-1. **35**: the operator's new default (their settings file of 2026-10-15) and `composite.frag` to
-   its spec (69): one stream change.
-2. **36**: the login screen (4 to 7, 31 to 38).
+1. **35** (done): the operator's new default, `composite.frag` to its spec (69), and the values
+   that passed and then broke the picture (65, 66, 76, on the desktop and the page alike): the one
+   stream change.
+2. **36**: the login screen (4 to 7, 23, 31 to 38).
 3. **37**: the installer (8 to 11, 39 to 46).
-4. **38**: Nix and the test harness (2, 12, 16 to 23, 47).
-5. **39**: the native host, the Python host and the page (13 to 15, 24 to 26, 29, 48 to 55, 57 to
-   68, 70 to 84).
-6. **40**: the consolidation; anything left over in 41 and later.
-7. **An installer ISO** of the flavour, if wanted (the operator chose the template first,
+4. **38**: Nix and the test harness (2, 12, 16 to 18, 20 to 22, 47).
+5. **39**: the native host and the Python host (14, 15, 29, 48 to 55, 57 to 64, 67, 68).
+6. **40**: the consolidation.
+7. **41**: the page and the release tool (13, 19, 24 to 26, 70 to 75, 77 to 84).
+8. **An installer ISO** of the flavour, if wanted (the operator chose the template first,
    2026-10-15): several GB to build, and tried only where a VM runs.
 
 ## Open items
@@ -65,6 +66,7 @@ What the documents and the review of build 17 leave to a build that changes code
 | An SVG as the logo: the page takes one, the desktop's `--logo` does not (Pillow draws no SVG) | `syncrain/logo.py`, with GTK's loader (librsvg) |
 | The lock screen draws at 30 fps on every screen while locked and lit (NVIDIA's explicit-sync growth is not turned off in KWin's greeter) | measure there; a lower rate after a while without input, `syncrain/lockscreen/rainitem.cpp` |
 | The lock screen shows no keyboard layout (Plasma's does) | `syncrain/lockscreen/package/` |
+| The lock screen's frame is about 2% darker than the desktop's in the lockscreen lane (llvmpipe), in proportion to brightness; the cause is not found | `syncrain/lockscreen/rainitem.cpp`, `tests/lockscreen/test_the_lock_screen.py` |
 | Plasma still loads its lock-screen wallpaper under syncrain's, unseen | `kscreenlockerrc`, only with `--lock-screen` |
 | The login and lock screens on NixOS (build 32): evaluated, built, the login screen run in a headless KWin; never booted, and no VM here (no KVM) | someone booting it, or the image's VM test |
 | Debian, Fedora and openSUSE: installed in roots, never booted; Fedora's SELinux may stop greetd running the login screen from `/usr/local/lib` | someone booting one; `restorecon` or a policy note in `install.sh` |

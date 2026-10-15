@@ -143,24 +143,24 @@ A Plasma web-wallpaper plugin can host it, behind the desktop icons.
 | `--glow-color C` | preset's | The glow round the rain |
 | `--flavours N` | preset's | Colours at once, 1 to 64: each column one of N hues round the colour wheel |
 | `--flavour-layout` | preset's | `random`: the columns' hues by the channel; `wave`: in order across the screen |
-| `--cycle S` | preset's | Seconds a turn of the colour wheel, every flavour together (an RGB keyboard's rainbow); 0 = the colours stay |
+| `--cycle S` | preset's | Seconds a turn of the colour wheel, every flavour together (an RGB keyboard's rainbow); 0 = the colours stay, else 10 or more |
 | `--background-colors C,C,C` | preset's | The background gradient: top, bottom, centre glow |
 | `--vignette F` | preset's | How much darker the corners are, 0 to 1 |
 | `--logo` | preset's | `syncrain`, `nixos`, `none`, or a picture file (PNG, JPEG, WebP: what Pillow reads) |
 | `--logo-color C` | its own | One colour over the logo's shape, any logo or picture; `own` for its own colours |
 | `--logo-size F` | preset's | The logo's height in screen heights, 0.05 to 0.9 |
-| `--logo-cycle S` | preset's | Seconds a turn of the logo's rainbow (over its colour); 0 = its own colours |
+| `--logo-cycle S` | preset's | Seconds a turn of the logo's rainbow (over its colour); 0 = its own colours, else 10 or more |
 | `--words W,W` | preset's | The hidden words and sentences that fall now and then, up to 32, each up to 30 characters (on a 21:9 screen, 21 fall); a space falls as a gap (`--words=` for none) |
 | `--background IMAGE` | - | An image instead of the gradient, darkened by `--bg-gamma` (2.0) and `--bg-gain` (0.42) |
 | `--mask IMAGE` | - | Greyscale mask for the background: white stays bright, rain passes behind |
 | `--rainbow` | `logo` | The earlier spelling: `all` is `--cycle 600`, `off` is `--logo-cycle 0` |
-| `--spin S` | preset's (300; 180 nixos, matrix) | Seconds per logo turn; 0 = still |
+| `--spin S` | preset's (300; 180 nixos, matrix) | Seconds per logo turn; 0 = still, else 10 or more |
 | `--drift F` | preset's (0; 0.03 nixos, matrix) | Logo orbit (or image pan) in screen heights; 0 = fixed |
-| `--bg-gain F` | `1` | Background brightness; lower is darker (0.42 with `--background`). The syncrain preset's background is black: give it `--background-colors` to see this |
-| `--glow F` | `1` | Glow around the centre and the logo, 0 (none) to 2; the syncrain preset has none to scale |
+| `--bg-gain F` | preset's (0.6; 1 nixos, matrix) | Background brightness; lower is darker (0.42 with `--background`) |
+| `--glow F` | preset's (0.5; 1 nixos, matrix) | Glow around the centre and the logo, 0 (none) to 2 |
 | `--bloom F` | `1` | Glow around the falling symbols, 0 (none) to 2 |
 | `--speed F` | `1` | Fall speed, 0.25 to 4 |
-| `--density F` | `1` | How often a column starts a stream, 0 to 2.3 |
+| `--density F` | preset's (1.15; 1 nixos, matrix) | How often a column starts a stream, 0 to 2.3 |
 | `--snow` | preset's | `on` or `off`: the falling snowflakes (on for syncrain and nixos, off for matrix) |
 | `--hieroglyphs F` | sets' | Share of the changing symbols that are Egyptian hieroglyphs (the presets: 0.15) |
 | `--config FILE` | see below | A settings file (the web page saves one); `none` for none. Options given go over it |

@@ -9,7 +9,7 @@ uniform int uHasLogo, uHasMask;
 uniform vec3 bgTop, bgBot, bgCenter;
 uniform float bgVignette;
 uniform float uBgGamma, uBgGain;     // background tone: the image's curve (not under the mask), or the gradient's level
-uniform float uCentreGlow;           // the gradient's glow around the centre, times the theme's
+uniform float uCentreGlow;           // the gradient's glow around its centre colour: the glow setting
 uniform vec2 uBgScale, uBgOffset;    // cover-fit of the image
 uniform vec3 cGlow, cLogoGlow;
 uniform vec4 uLogoTint;              // one colour over the logo's own (a = 1), and its glow; a = 0: its own
@@ -34,7 +34,8 @@ float segDist(vec2 p, vec2 a, vec2 b) {
 // Six-fold ice crystal: main arms with two pairs of side branches. p is relative to the centre.
 float crystal(vec2 p, float rad, float spin, float aa) {
     float r = length(p);
-    float a = mod(atan(p.y, p.x) + spin, 1.0471976);   // 60-degree sectors
+    // 60-degree sectors; atan(0, 0) is undefined, and at the very centre the core covers it anyway
+    float a = mod(atan(p.y, r > 0.0 ? p.x : 1.0) + spin, 1.0471976);
     a = min(a, 1.0471976 - a);                           // angle to the nearest arm (mirror fold)
     vec2 q = r * vec2(cos(a), sin(a));                   // arm along +x
     vec2 dir = vec2(0.5, 0.8660254);                     // branches leave the arm at 60 degrees
@@ -86,7 +87,8 @@ vec3 snowLayer(int i, vec2 px) {
         inten = crystal(d, rad, spin, aa * (C.w > 0.5 ? 2.2 : 1.0))
               + 0.22 * exp(-dist * dist / (0.72 * rad * rad));
     } else {
-        inten = smoothstep(rad + aa * 0.5, rad * 0.2, dist) + 0.25 * exp(-dist * dist / (4.0 * rad * rad));
+        // smoothstep's edges in order (the other way round is undefined), and turned over
+        inten = 1.0 - smoothstep(rad * 0.2, rad + aa * 0.5, dist) + 0.25 * exp(-dist * dist / (4.0 * rad * rad));
     }
     return C.rgb * A.w * inten;
 }
@@ -103,7 +105,8 @@ vec2 driftOffset() {
 
 vec3 softClip(vec3 x) {
     const float k = 0.78;
-    return mix(x, k + (1.0 - k) * tanh((x - k) / (1.0 - k)), step(k, x));
+    // tanh of a large number overflows to NaN on some drivers; at 10 it is 1 to eight places
+    return mix(x, k + (1.0 - k) * tanh(clamp((x - k) / (1.0 - k), vec3(-10.0), vec3(10.0))), step(k, x));
 }
 
 void main() {
@@ -152,7 +155,7 @@ void main() {
             if (uLogoHueCph > 0.0) {
                 // rainbow wheel fixed to the arms, flowing round over time; keeps the logo's own shading
                 float base = cyclesPerHour(uLogoHueCph);
-                float hue = fract(base + atan(r.y, r.x) / 6.2831853);
+                float hue = fract(base + atan(r.y, dot(r, r) > 0.0 ? r.x : 1.0) / 6.2831853);   // atan(0, 0) is undefined
                 float lum = dot(logoRGB, vec3(0.299, 0.587, 0.114));
                 if (lum < 0.04) lum = 0.9;               // a black logo (syncrain's) shows the rainbow too
                 logoRGB = hsv2rgb(vec3(hue, 0.7, 1.0)) * min(1.0, lum * 1.12);

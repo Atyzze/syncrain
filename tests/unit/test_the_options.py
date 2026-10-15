@@ -252,18 +252,36 @@ def test_the_default_is_the_operator_s_own_look():
     r = from_args(parse_args(["--config", "none"]), glyphs="theme")
     assert (r.theme_name, r.logo_choice, r.th["rain"]["flavours"], r.th["rain"]["cycle"],
             r.th["rain"]["flavourLayout"]) == ("syncrain", "white", 64, 440, "wave")
-    assert "sSs" in r.th["wordText"] and r.look["snow"] is True
-    # their settings files of 2026-10-14 22:33 and 2026-10-15 12:49: bloom 2 times build 23's 2.5, the
-    # background at gain 0 (black colours draw the same), no glow, the NixOS logo at 0.44 and its
-    # rainbow every 40 s, snow
+    assert r.th["wordText"] == ["AI", "AGI", "sSs", "LINUX", "WAKE UP", "HELLO", "NYX NYX NYX"]
+    assert r.look["snow"] is True
+    # their settings file of 2026-10-15 (after build 33's review): bloom 2 times build 23's 2.5, a
+    # green glow in the middle of black at half the glow and 0.6 of the brightness, density 1.15,
+    # the NixOS logo at 0.44 and its rainbow every 40 s, snow, Latin and Arabic letters
     uniforms = {n: v for _, n, _, v in static_uniforms(r)}
     assert uniforms["uBloomK"] == (5.0,) and uniforms["uLogoGlowK"] == (0.0,)
-    assert r.th["background"]["top"] == r.th["background"]["center"] == [0.0, 0.0, 0.0]
+    assert uniforms["uCentreGlow"] == (0.5,) and uniforms["uBgGain"] == (0.6,)
+    assert uniforms["uDensity"] == (pytest.approx(0.43 * 1.15),)
+    assert r.th["background"]["top"] == r.th["background"]["bottom"] == [0.0, 0.0, 0.0]
+    assert r.th["background"]["center"] == [0.0, 1.0, 0.0157]
     assert r.th["colors"]["deep"] == [1.0, 1.0, 1.0] and r.th["colors"]["glow"] == [0.0, 1.0, 0.3176]
     assert (r.th["logo"]["spin"], r.th["logo"]["hueCycle"], r.th["logo"]["drift"], r.th["logo"]["size"]) == (300, 40, 0.0, 0.44)
+    assert [s["name"] for s in r.th["glyphs"]["sets"]] == ["katakana", "digits", "symbols", "hieroglyphs", "latin", "arabic"]
     nixos = from_args(parse_args(["--config", "none", "--preset", "nixos"]), glyphs="theme")
     assert nixos.logo_choice == "white" and nixos.th["rain"]["flavours"] == 1, "nixos as it was"
+    nixos_uniforms = {n: v for _, n, _, v in static_uniforms(nixos)}
+    assert nixos_uniforms["uCentreGlow"] == (1.0,) and nixos_uniforms["uBgGain"] == (1.0,), "nixos's sliders at 1"
     assert from_args(parse_args(["--config", "none", "--logo", "syncrain"]), glyphs="theme").logo_choice == "syncrain"
+
+
+def test_the_operator_s_settings_file_draws_what_no_settings_file_draws(root):
+    """Their file names the preset's own values, sliders included: read over the preset, it must
+    change nothing (a slider's value is not applied twice)."""
+    from syncrain.renderer import from_args, static_uniforms
+    theirs = from_args(parse_args(["--config", str(root / "tests/fixtures/operator_config.json")]))
+    plain = from_args(parse_args(["--config", "none"]), glyphs="theme")
+    assert static_uniforms(theirs) == static_uniforms(plain)
+    assert theirs.glyphs.words_bytes() == plain.glyphs.words_bytes()
+    assert (theirs.logo_choice, theirs.look, theirs.bg_gain) == (plain.logo_choice, plain.look, plain.bg_gain)
 
 
 def test_the_nixos_colours_logo_gone_since_build_28_draws_the_nixos_one(tmp_path):
@@ -289,3 +307,39 @@ def test_a_sentence_falls_with_gaps_where_its_spaces_are():
     assert row[len(sentence)] == 255 and all(g < glyphs.GAP for i, g in enumerate(row[:len(sentence)])
                                              if sentence[i] != " ")
     assert len(parse_args(["--config", "none", "--words", "A" * 30]).words[0]) == 30
+
+
+@pytest.mark.parametrize("argv, says", [
+    (["--spin", "1e-320"], "too short"), (["--cycle", "0.07"], "too short"), (["--logo-cycle", "5"], "too short"),
+    (["--time", "1e306"], "outside"), (["--offset=-1e300"], "outside"),
+    (["--channel", "a\udc80b"], "no character"), (["--rain-colors", "#-1-1-1,#000000,#000000,#000000"], "colour"),
+])
+def test_values_the_parser_once_took_and_the_picture_could_not_use_are_refused(argv, says, capsys):
+    """Each of these passed the options and then flashed, overflowed or raised at every frame."""
+    with pytest.raises(SystemExit) as stop:
+        parse_args(["--config", "none", *argv])
+    assert stop.value.code == 2 and says in capsys.readouterr().err
+
+
+def test_off_and_long_periods_still_go(capsys):
+    args = parse_args(["--config", "none", "--spin", "0", "--cycle", "10", "--logo-cycle", "600", "--spin", "-1"])
+    assert (args.spin, args.cycle, args.logo_cycle) == (-1.0, 10.0, 600.0)
+
+
+def test_a_settings_file_nested_past_python_s_reading_is_not_json(tmp_path, capsys):
+    path = tmp_path / "deep.json"
+    path.write_text("[" * 100000 + "]" * 100000)
+    with pytest.raises(SystemExit):
+        parse_args(["--config", str(path)])
+    assert "not JSON" in capsys.readouterr().err
+
+
+def test_a_short_period_in_a_settings_file_is_the_shortest(tmp_path, capsys):
+    """Pages before build 35 wrote 5 one click from 0: such a file still starts (with 10 s, said),
+    where a period typed on the command line is refused."""
+    import json
+    path = tmp_path / "config.json"
+    path.write_text(json.dumps({"contract": "syncrain-config-1", "spin": 5, "cycle": 0, "logo_cycle": 40}))
+    args = parse_args(["--config", str(path)])
+    assert (args.spin, args.cycle, args.logo_cycle) == (10.0, 0.0, 40.0)
+    assert "spin 5 s is 10 s" in capsys.readouterr().err

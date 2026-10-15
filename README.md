@@ -10,7 +10,7 @@ It runs on Wayland and X11, KDE Plasma included (GNOME only in a window or the p
 base it is built for; the installer covers the four big families: Arch, Debian, Fedora and openSUSE.
 
 <p align="center">
-  <img src="docs/images/syncrain.jpg" width="49%" alt="The default look: katakana, digits and Egyptian hieroglyphs falling in columns over black with snow, the columns in a rainbow wave across the screen, the NixOS snowflake in rainbow colours in the middle">
+  <img src="docs/images/syncrain.jpg" width="49%" alt="The default look: katakana, digits, Latin letters and Egyptian hieroglyphs falling in columns over black with a green glow in the middle and snow, the columns in a rainbow wave across the screen, the NixOS snowflake in rainbow colours in the middle">
   <img src="docs/images/nixos.jpg" width="49%" alt="The nixos preset: pale blue characters and hieroglyphs falling over dark blue, with snowflakes and the NixOS snowflake in rainbow colours in the middle">
 </p>
 <p align="center"><sub>Left, the default; right, the nixos preset. Channel <code>public</code> at 2026-10-07
@@ -18,10 +18,11 @@ base it is built for; the installer covers the four big families: Arch, Debian, 
 
 ## What you get
 
-* **The default look** (the `syncrain` preset): katakana, digits and hieroglyphs with white-hot
-  tails, 64 colours at once in a rainbow wave across the screen that turns once every 440 s, the
-  NixOS snowflake in the middle in its own turning rainbow, snow, on black. Hidden words (`AI`,
-  `NEURAL`, `MATRIX` and more) fall now and then; whole sentences can too (`WAKE UP NEO`, up to 30 characters).
+* **The default look** (the `syncrain` preset): katakana, digits, Latin and Arabic letters and
+  hieroglyphs with white-hot tails, 64 colours at once in a rainbow wave across the screen that
+  turns once every 440 s, the NixOS snowflake in the middle in its own turning rainbow, snow, on
+  black with a green glow in the middle. Hidden words (`AI`, `AGI`, `LINUX` and more) fall now and
+  then; whole sentences can too (`WAKE UP`, up to 30 characters).
 * **Two more presets**: `nixos` (ice blue, snow) and `matrix` (classic green). Every colour,
   speed, the logo (or a picture of your own), the symbols and the words can be changed.
 * **Your desktop wallpaper**: a small native program (under 1% of a core, and about 11 W at 30 fps

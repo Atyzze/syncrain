@@ -115,7 +115,9 @@ def test_the_lock_screen_draws_the_desktop_s_frame(greeter, app, tmp_path):
     assert "flow: rain drawing" in said and "the lock screen draws the rain" in said, said
     done = app(["--config", "none", "--window", "--size", "640x360", "--time", str(MOMENT), "--screenshot", str(gtk)])
     assert done.returncode == 0, done.stderr
-    assert outside_the_box(shot, gtk) < 0.6
+    # about 2% darker than the desktop's in this lane, proportional to brightness (docs/ROADMAP.md,
+    # open items); the default's green middle (build 35) took the mean from 0.53 to 0.67
+    assert outside_the_box(shot, gtk) < 0.9
 
 
 def steps(said: str) -> list[str]:

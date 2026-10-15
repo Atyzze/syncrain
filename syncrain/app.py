@@ -72,6 +72,28 @@ def _number(low=None, high=None, above=None):
     return parse
 
 
+def _period(low=None):
+    """A period in seconds: off (0, or below for a spin) or at least engine.SHORTEST_PERIOD, so
+    nothing flashes (a cycle of 0.07 s strobed; a spin of 1e-320 overflowed every frame)."""
+    number = _number(low=low)
+
+    def parse(text):
+        value = number(text)
+        if 0 < value < 10:
+            raise argparse.ArgumentTypeError(f"{text} s is too short: 0 (off) or 10 s and more")
+        return value
+    return parse
+
+
+def _channel(text):
+    """A channel name the seed can be made of: text UTF-8 can carry (no lone surrogate)."""
+    try:
+        text.encode("utf-8")
+    except UnicodeEncodeError:
+        raise argparse.ArgumentTypeError("the channel holds a character that is no character") from None
+    return text
+
+
 def _theme(text):
     """A theme there is: refused here (status 2, which the service does not restart on), not when
     the wallpaper starts (status 1, which it restarts on, for good)."""
@@ -227,8 +249,8 @@ def _read_settings(ap, path):
             cfg = json.load(fh)
     except OSError as e:
         wrong(e.strerror or str(e))
-    except ValueError as e:
-        wrong(f"not JSON ({e})")
+    except (ValueError, RecursionError) as e:    # RecursionError: nested past what Python reads
+        wrong(f"not JSON ({type(e).__name__ if isinstance(e, RecursionError) else e})")
     if not isinstance(cfg, dict) or cfg.get("contract") != CONFIG_CONTRACT:
         wrong(f'not a syncrain settings file (it says "contract": "{CONFIG_CONTRACT}")')
     out = []
@@ -253,6 +275,10 @@ def _read_settings(ap, path):
         elif isinstance(value, bool):
             value = "on" if value else "off"
         elif isinstance(value, (int, float)):
+            if key in ("spin", "cycle", "logo_cycle") and 0 < value < 10:
+                # pages before build 35 wrote 5 one click from 0: 10 s, the shortest, said once
+                print(f"syncrain: {path}: {key} {value:g} s is 10 s (the shortest)", file=sys.stderr)
+                value = 10
             try:
                 value = repr(float(value))
             except OverflowError:
@@ -287,7 +313,7 @@ def parse_args(argv=None):
     ap.add_argument("--preset", "--theme", dest="theme", type=_theme,
                     help="where the look starts: syncrain (the default), nixos or matrix; every option below "
                          "goes over it")
-    ap.add_argument("--channel", default="public",
+    ap.add_argument("--channel", default="public", type=_channel,
                     help="stream name; everyone on the same channel with a synced clock sees the same frame")
     ap.add_argument("--fps", type=_number(above=0, high=1000), default=30.0,
                     help="frame rate cap (default 30); frames land on whole refreshes of the screen")
@@ -306,7 +332,7 @@ def parse_args(argv=None):
                     help="one colour over the logo, #rrggbb (the default: the logo's own; 'own' for its own again)")
     ap.add_argument("--logo-size", type=_number(low=0.05, high=0.9), metavar="F",
                     help="the logo's height, in screen heights (the preset's otherwise)")
-    ap.add_argument("--logo-cycle", type=_number(low=0), metavar="SECONDS",
+    ap.add_argument("--logo-cycle", type=_period(low=0), metavar="SECONDS",
                     help="seconds a turn of the logo's rainbow (the preset's otherwise; 0 = the logo's own colours)")
     ap.add_argument("--rain-colors", type=_colours(4), metavar="C,C,C,C",
                     help="the rain's gradient, dark to bright, then the leading symbol: #rrggbb each")
@@ -319,7 +345,7 @@ def parse_args(argv=None):
                     help="colours at once, 1 to 64 (the preset's otherwise): each column of rain one of N hues round the wheel")
     ap.add_argument("--flavour-layout", choices=("random", "wave"),
                     help="random: the columns' hues by the channel; wave: in order across the screen (the preset's otherwise)")
-    ap.add_argument("--cycle", type=_number(low=0), metavar="SECONDS",
+    ap.add_argument("--cycle", type=_period(low=0), metavar="SECONDS",
                     help="seconds a turn of the rain's hue wheel, every flavour together (the preset's otherwise; "
                          "0 = the colours stay)")
     ap.add_argument("--words", type=_words, metavar="W,W,...",
@@ -329,12 +355,12 @@ def parse_args(argv=None):
     ap.add_argument("--mask", type=_image, metavar="IMAGE", help="greyscale mask (same framing as --background): white = keep bright, no rain")
     ap.add_argument("--bg-gamma", type=_number(above=0), help="darkening curve for --background (default 2.0; 1 = unchanged)")
     ap.add_argument("--bg-gain", type=_number(low=0),
-                    help="background brightness: the gradient's (default 1; lower is darker; the syncrain preset's "
-                         "gradient is black) or --background's (default 0.42; 1 = unchanged)")
+                    help="background brightness: the gradient's (the preset's otherwise: 0.6 for syncrain, 1 for "
+                         "nixos and matrix; lower is darker) or --background's (default 0.42; 1 = unchanged)")
     ap.add_argument("--rainbow", choices=("logo", "all", "off"), action=_Rainbow,
                     help="the earlier spelling of --logo-cycle and --cycle: logo (as is), all (--cycle 600) or "
                          "off (--logo-cycle 0)")
-    ap.add_argument("--spin", type=_number(), metavar="SECONDS",
+    ap.add_argument("--spin", type=_period(), metavar="SECONDS",
                     help="seconds per logo revolution (the preset's otherwise: 300 for syncrain, 180 for nixos "
                          "and matrix; 0 = still)")
     ap.add_argument("--drift", type=_number(), metavar="FRACTION",
@@ -343,10 +369,11 @@ def parse_args(argv=None):
     ap.add_argument("--speed", type=_number(above=0), metavar="F",
                     help="how fast the symbols fall, times the preset's (default 1; 0.25 to 4)")
     ap.add_argument("--density", type=_number(low=0), metavar="F",
-                    help="how often a column starts a new stream, times the preset's (default 1; 0 to 2.3)")
+                    help="how often a column starts a new stream, times the preset's (the preset's otherwise: "
+                         "1.15 for syncrain, 1 for nixos and matrix; 0 to 2.3)")
     ap.add_argument("--glow", type=_number(low=0), metavar="F",
-                    help="the glow around the centre and the logo, times the preset's (default 1; 0 = none; the "
-                         "syncrain preset has none)")
+                    help="the glow around the centre and the logo (the preset's otherwise: 0.5 for syncrain, 1 for "
+                         "nixos and matrix; 0 = none)")
     ap.add_argument("--bloom", type=_number(low=0), metavar="F",
                     help="the glow around the falling symbols, times the preset's (default 1; 0 = none)")
     ap.add_argument("--snow", choices=("on", "off"), help="the falling snowflakes (the preset's otherwise: on for syncrain and nixos, off for matrix)")
@@ -367,8 +394,11 @@ def parse_args(argv=None):
     ap.add_argument("--layer", choices=("background", "bottom"),
                     help="Wayland layer (default: bottom on KDE Plasma, whose own desktop sits on the background layer)")
     ap.add_argument("--window", action="store_true", help="ordinary window instead of a wallpaper")
-    ap.add_argument("--offset", type=_number(), default=0.0, help="add this many seconds to the clock")
-    ap.add_argument("--time", type=_number(), help="freeze the clock at this UNIX time (screenshots, tests)")
+    # within about 3000 years of now, which the millisecond grid still carries exactly
+    ap.add_argument("--offset", type=_number(low=-1e11, high=1e11), default=0.0,
+                    help="add this many seconds to the clock")
+    ap.add_argument("--time", type=_number(low=0, high=1e11),
+                    help="freeze the clock at this UNIX time (screenshots, tests)")
     ap.add_argument("--screenshot", metavar="PNG", help="render one frame, save it, exit")
     ap.add_argument("--record", metavar="DIR", help="render a clip as numbered PNGs into DIR (from --time or now), exit")
     ap.add_argument("--record-seconds", type=_number(above=0), default=8.0, help="how long --record is (default 8)")

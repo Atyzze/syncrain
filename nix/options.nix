@@ -71,7 +71,8 @@ in
   };
 
   cycle = mkOption {
-    type = types.nullOr types.ints.unsigned;
+    # 0 (off) or 10 s and more, as syncrain takes it: shorter would flash
+    type = types.nullOr (types.addCheck types.ints.unsigned (n: n == 0 || n >= 10));
     default = null;
     description = "Seconds a turn of the rain's colour wheel, every flavour together (null: the preset's; 0: the colours stay).";
   };
@@ -118,7 +119,8 @@ in
   };
 
   logoCycle = mkOption {
-    type = types.nullOr types.ints.unsigned;
+    # 0 (off) or 10 s and more, as syncrain takes it: shorter would flash
+    type = types.nullOr (types.addCheck types.ints.unsigned (n: n == 0 || n >= 10));
     default = null;
     description = "Seconds a turn of the logo's rainbow (null: the preset's; 0: the logo's own colours).";
   };
@@ -145,7 +147,8 @@ in
   };
 
   spin = mkOption {
-    type = types.nullOr types.ints.unsigned;
+    # 0 (off) or 10 s and more, as syncrain takes it: shorter would flash
+    type = types.nullOr (types.addCheck types.ints.unsigned (n: n == 0 || n >= 10));
     default = null;
     description = "Seconds per logo revolution (null: the preset's, 300 for syncrain, 180 for nixos and matrix; 0: still).";
   };
@@ -159,19 +162,19 @@ in
   speed = mkOption {
     type = types.nullOr (types.numbers.between 0.25 4.0);
     default = null;
-    description = "How fast the symbols fall, times the preset's (null: 1).";
+    description = "How fast the symbols fall, times the preset's (null: where the preset puts it, 1).";
   };
 
   density = mkOption {
     type = types.nullOr (types.numbers.between 0.0 2.3);
     default = null;
-    description = "How often a column starts a new stream, times the preset's (null: 1).";
+    description = "How often a column starts a new stream, times the preset's (null: where the preset puts it: 1.15 for syncrain, 1 for nixos and matrix).";
   };
 
   glow = mkOption {
     type = types.nullOr (types.numbers.between 0.0 2.0);
     default = null;
-    description = "The glow around the centre and the logo, times the preset's (null: 1; 0: none).";
+    description = "The glow around the centre and the logo (null: where the preset puts it: 0.5 for syncrain, 1 for nixos and matrix; 0: none).";
   };
 
   bloom = mkOption {
@@ -183,7 +186,7 @@ in
   bgGain = mkOption {
     type = types.nullOr (types.numbers.between 0.0 2.0);
     default = null;
-    description = "Background brightness (null: 1 for the gradient, 0.42 for `background`; lower is darker).";
+    description = "Background brightness (null: the preset's for the gradient, 0.6 for syncrain and 1 for nixos and matrix; 0.42 for `background`; lower is darker).";
   };
 
   snow = mkOption {
