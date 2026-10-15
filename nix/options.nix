@@ -77,9 +77,10 @@ in
   };
 
   words = mkOption {
-    type = types.nullOr (types.listOf (types.strMatching "[^,[:space:]]{1,16}"));
+    # bytes, not characters, to Nix: room for 30 katakana (three bytes each); syncrain checks the rest
+    type = types.nullOr (types.listOf (types.strMatching "[^,\t\n\r]{1,120}"));
     default = null;
-    description = "The hidden words that fall now and then (null: the preset's; [ ]: none).";
+    description = "The hidden words and sentences that fall now and then, up to 30 characters each, a space falling as a gap (null: the preset's; [ ]: none).";
   };
 
   channel = mkOption {

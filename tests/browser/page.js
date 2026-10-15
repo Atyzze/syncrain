@@ -8,6 +8,8 @@
 //   node page.js symbols <json>...                     what the page drew its symbols from, with those files
 //   node page.js logo <picture>                       a picture given as the logo: the settings it saves
 //   node page.js studio                                the settings panel used as a person would, and saved
+//   node page.js video <webm> <w> <h> <seconds> <fps> <loop> <t0>  a video made by the page's Save video
+//   node page.js dropdowns                             the colours a dropdown's options are drawn in
 'use strict';
 const { chromium } = require('playwright');
 const crypto = require('crypto');
@@ -51,6 +53,24 @@ const PAGE = 'file://' + path.resolve(__dirname, '..', '..', 'index.html');
     const page = await open(800, 450, 'hud=0');
     out = await page.evaluate(() => Object.assign({}, window.__syncrainIdentity,
       { ident: document.getElementById('ident').textContent }));
+  } else if (mode === 'video') {
+    const [file, w, h, seconds, fps, loop, t0] = rest;
+    const page = await open(640, 360, 'fps=1');
+    const b64 = await page.evaluate(o => window.__syncrainVideo(o),
+      { size: [Number(w), Number(h)], seconds: Number(seconds), fps: Number(fps), loop: loop === '1', t0: Number(t0) });
+    require('fs').writeFileSync(file, Buffer.from(b64, 'base64'));
+    out.bytes = Buffer.from(b64, 'base64').length;
+  } else if (mode === 'dropdowns') {
+    const page = await open(1280, 720, 'fps=1');
+    await page.click('#open');
+    // every list's options as the browser paints them when it opens: the chosen one, and the rest
+    out.lists = await page.evaluate(() => Array.from(document.querySelectorAll('select')).map(sel => ({
+      id: sel.id,
+      options: Array.from(sel.options).map(o => {
+        const cs = getComputedStyle(o);
+        return { chosen: o.selected, disabled: o.disabled, background: cs.backgroundColor, color: cs.color };
+      }),
+    })));
   } else if (mode === 'controls') {
     for (const [name, w, h] of [['desk', 1440, 900], ['phone', 390, 844]]) {
       const page = await open(w, h, 'fps=2');

@@ -1,4 +1,4 @@
-# Handoff: the state of syncrain at build 28
+# Handoff: the state of syncrain at build 29
 
 What is true now, for a context that has just opened this tree. Where this page and the code
 disagree, the code is right; fix the page in the same build.
@@ -66,13 +66,25 @@ This page, `docs/agent/NEXT_BUILD.md`, `docs/agent/WORKING_WITH_THE_OPERATOR.md`
   shows the same text and eye (`Shared.qml`; build 27). Tested in a real headless KWin, locked and
   unlocked by typing, and on two screens with real key and pointer events (lane `lockscreen`).
   Not yet seen on the operator's machine.
+* **Video** (build 29): `syncrain --video FILE` (`syncrain/video.py`) draws each frame off the
+  screen at the video's size in the GTK host and pipes it to ffmpeg (MP4/MKV H.264, WebM VP9, GIF
+  with one palette); the page's Video section (`makeVideo`, a WebM muxer of its own over WebCodecs)
+  the same frames. A loop's first two seconds are the moments after its end fading into themselves
+  (`video.plan`, the same sums as the page). Made in slices of a tenth of a second per frame
+  callback, so the window answers its compositor; written as `NAME.part.EXT` and renamed when whole.
+  The browser lane compares the page's frames with the
+  app's and with `--video`'s.
+* **Hidden sentences** (build 29): the words texture is 40 wide (`glyphs.WORD_CELLS`); a space is
+  byte 254 (`glyphs.GAP`), which `state.frag` leaves dark.
+* **The name** (the operator, 2026-10-15 13:37): syncrain backdrop, the rain for the whole session.
+  NixOS is the base; the installer is to cover Arch, Debian, Fedora and openSUSE (build 31).
 * **The settings file** (build 21): the page's Settings panel tries every option and symbol set
   live and saves `config.json` (`syncrain-config-1`); `./install.sh --config config.json` keeps it
   as `~/.config/syncrain/config.json`, read under the command line (`syncrain/app.py`,
   `CONFIG_KEYS`); the login screen's rain reads a copy. The browser lane draws one file on the page
   and the desktop and compares the frames. `--theme` refuses an unknown theme with status 2.
-* **Stream**: `85ace386` since build 28 (the preset, the colours logo gone); `a9c058f3` 24 to 27; `f98ef1ca` in 23; `25b02556` in 22; `def5684f` 15 to 21; `c18f8be2` in 12 to 14; `48e6bf9c` 3 to 11.
-* **GitHub**: `main` holds builds 7 to 28, one commit each (`syncrain build <N>`).
+* **Stream**: `822ea58a` since build 29 (sentences' gaps and trails in `state.frag`); `85ace386` in 28; `a9c058f3` 24 to 27; `f98ef1ca` in 23; `25b02556` in 22; `def5684f` 15 to 21; `c18f8be2` in 12 to 14; `48e6bf9c` 3 to 11.
+* **GitHub**: `main` holds builds 7 to 29, one commit each (`syncrain build <N>`).
 
 ## Waits on the operator
 

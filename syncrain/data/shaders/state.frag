@@ -10,7 +10,8 @@ uniform int uCols, uRows;
 uniform sampler2D uTable;    // n x 1: atlas slots, R + 256 G, set after set (syncrain/glyphs.py)
 uniform int uSetN;           // the symbol sets
 uniform vec4 uSets[16];      // each: where its share ends (cumulative, 0..1), first table entry, entries
-uniform sampler2D uWords;    // 16 x n: hidden words, one per row (R = glyph index / 255, 255 = end)
+uniform sampler2D uWords;    // 40 x n: hidden words and sentences, one per row (R = glyph index / 255,
+                             // 254 = a space's gap, 255 = end)
 uniform int uNumWords;
 uniform vec4 uKeep;          // cells kept free of words (the logo): col0, row0, col1, row1
 uniform float uDensity;      // spawn probability per column per second
@@ -35,7 +36,7 @@ int pickGlyph(uint h) {
 int wordGlyph(int w, int i) { return int(texelFetch(uWords, ivec2(i, w), 0).r * 255.0 + 0.5); }
 int wordLen(int w) {
     int n = 0;
-    for (int i = 0; i < 16; i++) { if (wordGlyph(w, i) == 255) break; n++; }
+    for (int i = 0; i < 40; i++) { if (wordGlyph(w, i) == 255) break; n++; }
     return n;
 }
 
@@ -48,8 +49,9 @@ void main() {
     int G = -1;
     bool headCell = false;
 
-    // longest life: a word drop (7 rows/s at speed 1) crossing the screen plus its 34-row trail
-    int back = int(ceil((float(uRows) + 41.0) / (7.0 * uSpeed))) + 1;
+    // longest life: a word drop (7 rows/s at speed 1) crossing the screen plus its trail (34 rows, or
+    // a 40-cell sentence's 50) and a few rows' start
+    int back = int(ceil((float(uRows) + 57.0) / (7.0 * uSpeed))) + 1;
     for (int i = 0; i < 256; i++) {
         if (i > back) break;
         uint k = uSec - uint(i);                               // spawn second
@@ -86,7 +88,8 @@ void main() {
             }
             if (word >= 0) {
                 v = mix(7.0, 10.0, U(H(cu, k, 0u, 16u)));
-                T = mix(26.0, 34.0, U(H(cu, k, 0u, 17u)));
+                // a long sentence's trail outlasts it, so its first letters are still lit at its last
+                T = max(mix(26.0, 34.0, U(H(cu, k, 0u, 17u))), float(L) + 10.0);
                 a = 1.0; hw = 1.0; hot = 1;
             }
         }
@@ -114,6 +117,9 @@ void main() {
             if (isHead) { b = 1.0; w = 1.0; }
             else if (alive && r == hr - 1) w = 0.22;
         }
+
+        // a sentence's space: this drop leaves the cell dark (another drop may still light it)
+        if (word >= 0 && r >= wr && r < wr + wl && wordGlyph(word, r - wr) == 254) continue;
 
         if (b > B) {
             B = b; W = max(W, w); headCell = isHead; G = -1;

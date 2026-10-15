@@ -89,7 +89,7 @@ def running_lines(record_lines=8) -> list[str]:
         if comm == "syncrain-wallpa":
             what = "the native wallpaper"
         elif is_syncrain_command(argv):           # the launcher's python -m syncrain, or Nix's wrapped script
-            if any(a in argv for a in ("--diagnose", "--power-sweep", "--benchmark", "--screenshot", "--record")):
+            if any(a in argv for a in ("--diagnose", "--power-sweep", "--benchmark", "--screenshot", "--record", "--video")):
                 continue
             what = "the GTK host"
         else:

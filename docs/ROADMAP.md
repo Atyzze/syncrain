@@ -12,6 +12,17 @@ Open questions, planned builds, the cadence and the constraints. What shipped: `
 
 ## Decisions answered
 
+* **2026-10-15 13:37**: the name: "syncrain backdrop", "since ye its more than jsut a wallapepr, its
+  also a lockscreen, a screensaver". NixOS is "the 5th paradigm of course, the default/base"; they
+  run CachyOS now and will move to NixOS, where syncrain should come along as it is. Build 30
+  (the documents) and 31 (the installer).
+* **2026-10-15 13:30**: the installer for "the top 4": Arch, Debian, Fedora and openSUSE, and for
+  the rest the invitation to "copy/hand this repo to your ai-agent and let it build/adapt the script
+  for your specific environment"; no boot splash as a design choice: boot stays "pure text based"
+  so the text says the OS is not fully up, and "the moment our rain is up we know w'ere in". They
+  are making a NixOS flavour "anyone can 1 click image apply to their box". Builds 30 to 32.
+* **2026-10-15 13:18**: the open lists' white background (light text on white), and "hidden
+  sentences as well, not just words". Build 29.
 * **2026-10-15 12:52**: "the functionality where the user can generate a .gif or .mp4 as
   recorded/set by their index.html preferences", "a loop, a static one ... just displayed as a
   video", keeping "the native real dynamic channel"; and GitHub explaining the main functionality and
@@ -56,12 +67,15 @@ Open questions, planned builds, the cadence and the constraints. What shipped: `
 
 ## Planned builds
 
-1. **A video of the look** (29): the page's "Save video" renders the current settings frame by
-   frame and crossfades the end into the start, so it loops seamlessly (WebM, MP4 where the browser
-   encodes it); `syncrain --video FILE --seconds N --size WxH` the same with ffmpeg (MP4, and GIF
-   for small previews). Measure a video wallpaper's watts against the live rain's on their machine
-   before claiming it uses less.
-2. **A NixOS image** with syncrain as its wallpaper and login screen.
+1. **Consolidation** (30): the documents true and short again, the README says what syncrain is
+   now (syncrain backdrop: the rain as your desktop, login screen, lock screen and video) and why the
+   boot stays plain text (the text means the machine is not up yet, the rain that it is).
+2. **The installer for four families** (31): `install.sh` with apt (Debian, Ubuntu, Mint), dnf
+   (Fedora) and zypper (openSUSE) beside pacman; Debian tested in the sandbox, the others against
+   stand-ins and said to be untested until someone runs them. The README invites anyone else to
+   hand the repository to their AI agent to adapt.
+3. **A NixOS image** (32 or later) with syncrain as its wallpaper, login screen and lock screen,
+   the base the others are written against.
 
 ## Open items
 
@@ -78,6 +92,8 @@ What the documents and the review of build 17 leave to a build that changes code
 | The lock screen shows no keyboard layout (Plasma's does) | `syncrain/lockscreen/package/` |
 | Plasma still loads its lock-screen wallpaper under syncrain's, unseen | `kscreenlockerrc`, only with `--lock-screen` |
 | The lock screen on NixOS: `nix/lockscreen.nix` builds it; nothing points KWin at it yet | `nix/nixos-module.nix` |
+| A video's watts against the live rain's: not measured (no graphics card in the sandbox) | measure on their machine before claiming it uses less |
+| The page's Video needs WebCodecs with a VP9 or VP8 encoder (Chrome, Edge, Firefox); Safari may say it cannot | `syncrain --video` instead |
 | The settings file holds no `background`, `mask`, `scale` or `layer` (the page cannot preview a picture file) | `syncrain/app.py` (`CONFIG_KEYS`) and the page, if wanted |
 
 ## Build cadence

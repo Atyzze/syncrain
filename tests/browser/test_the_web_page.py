@@ -124,7 +124,7 @@ def test_a_theme_that_is_no_theme_gives_the_default_one(page):
 SETTINGS = {
     "contract": "syncrain-config-1", "theme": "matrix", "channel": "friends", "rainbow": "all", "logo": "nixos",
     "spin": 60, "drift": 0.05, "speed": 1.3, "density": 1.2, "glow": 0.7, "bloom": 1.4, "bg_gain": 0.8,
-    "snow": False, "hieroglyphs": 0.3, "fps": 30, "pause_under": "never",
+    "snow": False, "hieroglyphs": 0.3, "fps": 30, "pause_under": "never", "words": ["WAKE UP NEO", "AI"],
     "glyphs": {"balance": "glyphs", "sets": [
         {"name": "katakana", "chars": "アイウエオカキクケコ", "weight": 2, "mirror": True},
         {"name": "greek", "chars": "ΓΔΘΛΞΠΣΦΨΩ", "share": 0.2},
@@ -288,3 +288,73 @@ def test_the_page_reads_a_file_as_the_desktop_does(page, tmp_path, given, then):
     desktop = {"preset": r.theme_name, "snow": r.look["snow"], "logo_cycle": r.th["logo"]["hueCycle"],
                "words": r.th["wordText"]}
     assert {k: desktop[k] for k in then} == then
+
+
+def _rgb(css: str) -> tuple[float, ...]:
+    return tuple(float(v) / 255 for v in css[css.index("(") + 1:css.index(")")].split(",")[:3])
+
+
+def _luminance(css: str) -> float:
+    lin = [c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4 for c in _rgb(css)]
+    return 0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2]
+
+
+def test_every_list_opens_readable(page):
+    """An open list's options were light text on the browser's white (the operator's screenshot of
+    build 28): each option, chosen or not, is now its text on the page's own colours, readable (a
+    contrast of 4.5, the WCAG's for ordinary text)."""
+    lists = page("dropdowns")["lists"]
+    assert len(lists) >= 4 and all(lst["options"] for lst in lists)
+    for lst in lists:
+        for o in lst["options"]:
+            if o["disabled"]:
+                continue
+            fg, bg = _luminance(o["color"]), _luminance(o["background"])
+            contrast = (max(fg, bg) + 0.05) / (min(fg, bg) + 0.05)
+            assert contrast >= 4.5, (lst["id"], o)
+            if not o["chosen"]:
+                assert bg < 0.05, (lst["id"], o)          # the page's dark sheet, not the browser's white
+
+
+def test_the_page_makes_a_video_the_desktop_would(page, app, tmp_path, root):
+    """The Video section's WebM, decoded: its frames are the moments the app draws, and a looping
+    video's first frame is the moment just after its last, so a player repeating it shows no seam."""
+    ffmpeg = shutil.which("ffmpeg")
+    need(ffmpeg is not None, "no ffmpeg to decode the page's video")
+    t0, seconds, fps, w, h = int(MOMENT), 3, 10, 640, 360
+    webm = tmp_path / "page.webm"
+    page("video", webm, w, h, seconds, fps, 1, t0)
+    probe = subprocess.run(["ffprobe", "-v", "error", "-count_frames", "-show_entries",
+                            "stream=codec_name,width,height,nb_read_frames", "-of", "csv=p=0", str(webm)],
+                           capture_output=True, text=True)
+    codec, *rest = probe.stdout.strip().split(",")
+    assert codec in ("vp9", "vp8") and [int(v) for v in rest] == [w, h, seconds * fps], probe.stdout
+    for k, moment in ((0, t0 + seconds), (25, t0 + 25 / fps)):     # the fade is 2 s: frame 0 is all end
+        frame, native = tmp_path / f"frame{k}.png", tmp_path / f"native{k}.png"
+        subprocess.run([ffmpeg, "-v", "error", "-y", "-i", str(webm), "-vf", f"select=eq(n\\,{k})", "-vsync", "0",
+                        "-frames:v", "1", str(frame)], check=True)
+        done = app(["--window", "--size", f"{w}x{h}", "--time", repr(moment), "--screenshot", str(native)])
+        assert done.returncode == 0, done.stderr
+        later = tmp_path / f"later{k}.png"                  # a tenth of a second on: not this frame
+        done = app(["--window", "--size", f"{w}x{h}", "--time", repr(moment + 0.1), "--screenshot", str(later)])
+        assert done.returncode == 0, done.stderr
+        here = mean_abs_diff(frame, native)
+        assert here < 6.0 and here < mean_abs_diff(frame, later) / 2, k   # a lossy video of a busy picture
+
+
+def test_the_desktop_makes_the_video_the_page_does(page, app, tmp_path):
+    """syncrain --video and the page's Video section: the same frames, through different encoders."""
+    ffmpeg = shutil.which("ffmpeg")
+    need(ffmpeg is not None, "no ffmpeg for syncrain --video")
+    t0, seconds, fps, w, h = int(MOMENT), 3, 10, 640, 360
+    webm, mkv = tmp_path / "page.webm", tmp_path / "app.mkv"
+    page("video", webm, w, h, seconds, fps, 1, t0)
+    done = app(["--time", str(t0), "--video", str(mkv), "--seconds", str(seconds), "--video-fps", str(fps),
+                "--size", f"{w}x{h}"], timeout=300)
+    assert done.returncode == 0, done.stderr
+    for k in (0, 10, 25):                             # in the fade, at its middle, after it
+        a, b = tmp_path / f"page{k}.png", tmp_path / f"app{k}.png"
+        for src, dst in ((webm, a), (mkv, b)):
+            subprocess.run([ffmpeg, "-v", "error", "-y", "-i", str(src), "-vf", f"select=eq(n\\,{k})", "-vsync", "0",
+                            "-frames:v", "1", str(dst)], check=True)
+        assert mean_abs_diff(a, b) < 7.0, k            # two lossy encoders

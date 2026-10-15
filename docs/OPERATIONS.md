@@ -101,7 +101,7 @@ A Plasma web-wallpaper plugin can host it, behind the desktop icons.
 | `--logo-color C` | its own | One colour over the logo's shape, any logo or picture; `own` for its own colours |
 | `--logo-size F` | preset's | The logo's height in screen heights, 0.05 to 0.9 |
 | `--logo-cycle S` | preset's | Seconds a turn of the logo's rainbow (over its colour); 0 = its own colours |
-| `--words W,W` | preset's | The hidden words that fall now and then (`--words=` for none) |
+| `--words W,W` | preset's | The hidden words and sentences that fall now and then, up to 32, each up to 30 characters (on a 21:9 screen, 21 fall); a space falls as a gap (`--words=` for none) |
 | `--background IMAGE` | - | An image instead of the gradient, darkened by `--bg-gamma` (2.0) and `--bg-gain` (0.42) |
 | `--mask IMAGE` | - | Greyscale mask for the background: white stays bright, rain passes behind |
 | `--rainbow` | `logo` | The earlier spelling: `all` is `--cycle 600`, `off` is `--logo-cycle 0` |
@@ -121,11 +121,15 @@ A Plasma web-wallpaper plugin can host it, behind the desktop icons.
 | `--scale` | `1.0` | Render resolution scale, up to 4 (0.75 on a weak GPU) |
 | `--layer` | auto | `background` or `bottom`; auto is `bottom` on KDE |
 | `--window` | - | A normal window instead of the wallpaper |
-| `--size WxH` | `1280x720` | Size for `--window` and `--record`; for `--benchmark` (default: the first screen) |
+| `--size WxH` | `1280x720` | Size for `--window` and `--record`; of `--video` (1920x1080, a GIF 640x360); for `--benchmark` (default: the first screen) |
 | `--offset S` | `0` | Add S seconds to the clock |
 | `--time T` | - | Freeze the clock at UNIX time T |
 | `--screenshot PNG` | - | Draw one frame, save it, exit |
 | `--record DIR` | - | Save `--record-seconds` (8) at `--record-fps` (30) as PNGs |
+| `--video FILE` | - | A video of the rain from `--time` or now: `.mp4`, `.mkv`, `.webm` or `.gif` (needs ffmpeg) |
+| `--seconds N` | `30` (a GIF 10) | How long `--video` is |
+| `--video-fps F` | `30` (a GIF 15, at most 50) | Frames per second of `--video` |
+| `--loop` | `on` | `--video` ends where it begins, so a player repeating it shows no seam; `off` for the moments only |
 | `--diagnose` | - | What this machine offers and why syncrain can or can't draw |
 | `--benchmark` | - | GPU time of each pass on this card |
 | `--power-sweep` | - | The card's watts at several settings, about four minutes |
@@ -143,7 +147,7 @@ syncrain sets `__NV_DISABLE_EXPLICIT_SYNC=1` and `__GL_YIELD=USLEEP` for itself 
 Open `index.html` (or the live page), press **Settings** and move anything: a preset to start from,
 the channel, the rain's colours and how many at once, the colour cycle, the background, the logo
 (or a picture of your own), motion, light, the symbol sets (add, remove, weigh, type your own), the
-hidden words, the frame rate. The rain changes as you go; **Screen shape** previews a 16:9, 21:9 or
+hidden words and sentences, the frame rate. The rain changes as you go; **Screen shape** previews a 16:9, 21:9 or
 other desktop. Then **Save config.json** (or **Copy**) and, in the syncrain folder,
 `./install.sh --config config.json`.
 
@@ -161,6 +165,10 @@ other desktop. Then **Save config.json** (or **Copy**) and, in the syncrain fold
   the colour wheel; by the channel (the same columns on every machine) or as a wave across the
   screen. **Colour cycle** turns them all round the wheel together, like an RGB keyboard's rainbow.
   One colour and no cycle is the picture as it always was.
+* **Video** saves what the page shows as a WebM file, a seamless loop by default: 10 s to 2 min,
+  720p to 4K (or a phone's 1080x1920), 24 to 60 fps. It is drawn frame by frame, so it takes a
+  while; the rain is hidden meanwhile and **Stop** ends it. Chrome, Edge and Firefox make it;
+  Safari may not. `syncrain --video` makes MP4 and GIF too.
 * Options on the command line go over the file. **Open a settings file** (or drop one on the page)
   shows one again; a symbols file (`glyphs.json`) loads as the sets.
 
@@ -222,8 +230,16 @@ picture or font it cannot use).
 
 ## Recipes
 
-* **A video**: `syncrain --time 1791331200 --record /tmp/frames --size 1920x1080`, then
-  `ffmpeg -framerate 30 -i /tmp/frames/frame_%05d.png -c:v libx264 -crf 17 -pix_fmt yuv420p rain.mp4`.
+* **A video**: `syncrain --video rain.mp4` (30 s at 1920x1080, a seamless loop, your settings
+  file's look); `--seconds 60 --size 3840x2160 --video-fps 60` for more, `rain.gif` for a GIF
+  (10 s at 640x360 and 15 fps: a GIF of rain is large, and its frames wait in memory for its
+  palette, so a big one is refused). The page's **Video** section saves the same frames as WebM in
+  the browser. Its first two seconds are the end fading into the start; `--loop off` leaves that
+  out. It is made as `rain.part.mp4` and named when whole: Ctrl+C or a failure leaves nothing, and
+  an earlier `rain.mp4` as it was. Colours are BT.709, as players take HD video. A video repeats
+  where the live rain never does, and plays the same anywhere where the live rain follows the
+  clock; whether it costs fewer watts is not measured yet.
+* **Frames as pictures**: `syncrain --time 1791331200 --record /tmp/frames --size 1920x1080`.
 * **The README's pictures** (`docs/images/`; redo when the stream changes): under Xvfb with
   `GDK_BACKEND=x11`, `syncrain --config none --window --size 1600x900 --time 1791331207 --screenshot
   syncrain.png` (and `--preset nixos`); save as JPEG with Pillow, `quality=90, subsampling=0, progressive=True`.

@@ -18,7 +18,7 @@ lock screen, and as a web page.
 * **The default look** (the `syncrain` preset): katakana, digits and hieroglyphs with white-hot
   tails, 64 colours at once in a rainbow wave across the screen that turns once every 440 s, the
   NixOS snowflake in the middle in its own turning rainbow, snow, on black. Hidden words (`AI`,
-  `NEURAL`, `MATRIX` and more) fall now and then.
+  `NEURAL`, `MATRIX` and more) fall now and then; whole sentences can too (`WAKE UP NEO`, up to 30 characters).
 * **Two more presets**: `nixos` (ice blue, snow) and `matrix` (classic green). Every colour,
   speed, the logo (or a picture of your own), the symbols and the words can be changed.
 * **Your desktop wallpaper**: a small native program (under 1% of a core, and about 11 W at 30 fps
@@ -29,6 +29,10 @@ lock screen, and as a web page.
   a key, and is the same on every screen). Without asking for them, the installer leaves both alone.
 * **The web page** (`index.html`): the same rain in a browser, and a Settings panel to try every
   option live and save it as `config.json` for the desktop.
+* **A video of your look**: a seamless loop as MP4, WebM or GIF, for a phone, a TV, a video
+  wallpaper app or anywhere the live rain cannot run (whether playing one costs fewer watts than
+  the live rain is not measured yet). The live rain stays the default: it never repeats and stays
+  in sync, which a video cannot.
 
 ## Install (Arch, CachyOS, EndeavourOS, Manjaro)
 
@@ -55,6 +59,11 @@ exactly what the page showed.
 
 After `--lock-screen`, log out and back in once. Should the lock screen ever not unlock:
 Ctrl+Alt+F3, log in, `loginctl unlock-sessions`, then `./install.sh --lock-screen-off`.
+
+**Make a video**: `syncrain --video rain.mp4` (30 s at 1920x1080 with your settings, ending
+where it begins; needs ffmpeg). `--seconds 60 --size 3840x2160 --video-fps 60` for more, `rain.gif`
+for a GIF (10 s at 640x360 and 15 fps: a GIF of rain is large), `--loop off` for one that does not loop. In the browser, the page's Settings has a
+**Video** section that saves the same as WebM.
 
 **When it does not draw**: `syncrain --diagnose` says what this machine offers and why.
 **Remove it**: `./install.sh --uninstall` (the pacman packages stay).
@@ -102,7 +111,7 @@ browser (Chromium), nix, lockscreen (Plasma's locker in a headless KWin). What e
 
     syncrain/          app.py (options, GTK host), native.py (starts the native wallpaper), renderer.py,
                        gl.py, pacing.py, hidden.py (KWin), engine.py, glyphs.py (symbols), build.py,
-                       diagnose.py, bench.py, power.py, cover.py, logo.py, data/ (shaders, presets, atlas, logos and
+                       diagnose.py, bench.py, power.py, cover.py, logo.py, video.py, data/ (shaders, presets, atlas, logos and
                        syncrain's logo drawing)
     syncrain/          the login screen: greeter.py (the box), greetd.py, greetdconf.py, handover.py,
                        login/ (greetd's command)

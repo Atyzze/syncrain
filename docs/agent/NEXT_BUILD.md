@@ -1,15 +1,19 @@
-# The next build is 29
+# The next build is 30
 
 The first line is parsed: `# The next build is <N>`, exactly one above `BUILD_NUMBER`.
 
-## Build 29: what the operator asks next
+## Build 30: the consolidation
 
 * Read what the operator sent last, and answer it in one plain sentence first.
-* The video of the look (`docs/ROADMAP.md`, "Planned builds" 1), as offered on 2026-10-15 12:52:
-  the page's Save video and `syncrain --video`, a seamless loop; the live channel stays the default.
-  Then the README's section on it.
-* No boot splash: the operator keeps the boot plain text (2026-10-15); never touch the bootloader,
-  initramfs or Plymouth.
+* No behaviour changes (every number ending in 0): fold builds 21 to 29's notes into
+  `docs/HISTORY.md`, make every document true and short again, list what it finds as open items.
+* The README says what syncrain is now, in the operator's word: **syncrain backdrop**, the rain for
+  the whole session (desktop, login screen, lock screen, videos), NixOS the base; and the design
+  choice that boot stays plain text: the text says the machine is not up yet, the rain that it is
+  (2026-10-15 13:30 and 13:37, `docs/ROADMAP.md`).
+* Then build 31: `install.sh` for Debian, Fedora and openSUSE beside Arch, and the README's
+  invitation to hand the repository to an AI agent for anything else.
+* No boot splash: never touch the bootloader, initramfs or Plymouth.
 
 **Known blockers**: watts, NVIDIA's driver and Plasma's shell exist only on the operator's machine;
 a real greetd and PAM only there too (the lanes speak to a stand-in). The page's Save inside the

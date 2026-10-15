@@ -9,7 +9,7 @@ toolkit. Python's memory goes with the exec.
 
 Where the program is: SYNCRAIN_WALLPAPER (the Nix package sets it, the test lanes too), else
 `syncrain/native/syncrain-wallpaper` beside this file, where install.sh builds it. Without it, on
-X11, in a window, for --screenshot and --record, or with --host gtk, the GTK host draws as before.
+X11, in a window, for --screenshot, --record and --video, or with --host gtk, the GTK host draws as before.
 The scene names the command that starts the GTK host; the native program runs it when it cannot
 draw (no layer-shell, no EGL, a driver that refuses the shaders), so the wallpaper still draws
 wherever the GTK host would.
@@ -47,7 +47,7 @@ def wayland_session() -> bool:
 def applies(args) -> bool:
     """The wallpaper itself, on Wayland: what the native program draws. Build 4's frame timer
     (--pacing timer, the power sweep's point of comparison) is the GTK host's, as it was."""
-    return not (args.window or args.record or args.screenshot) and args.pacing == "refresh" and wayland_session()
+    return not (args.window or args.record or args.screenshot or args.video) and args.pacing == "refresh" and wayland_session()
 
 
 def _number(kind, value) -> str:

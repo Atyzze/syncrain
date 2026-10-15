@@ -1,4 +1,4 @@
-# Where we are, at build 28
+# Where we are, at build 29
 
 The project on one page. Detail: `docs/agent/HANDOFF.md`.
 
@@ -37,16 +37,23 @@ name, so everyone on a channel sees the same rain. Linux (Wayland, X11) and the 
   logo, the hidden words. Presets to start from: **Syncrain** (your look, the default: your settings file of
   2026-10-15 12:49, build 28: snow on, a bigger NixOS logo), NixOS and Matrix; your redrawn logo
   stays a choice (`--logo syncrain`); the NixOS colours logo is gone. One colour over any logo.
+* **A video of your look** (build 29): `syncrain --video rain.mp4` (MP4, MKV, WebM or GIF, with
+  ffmpeg) or the page's Video section (WebM): a seamless loop, drawn frame by frame from your
+  settings. The live rain stays the default.
+* **Hidden sentences** (build 29): `WAKE UP NEO` falls as a word does, its spaces as gaps; up to 30
+  characters (21 on a 21:9 screen). The page's lists open on its own dark colours, readable.
 * **A review of build 17**: builds 18 and 19 fixed what matters now; a few small items are open
   (`docs/ROADMAP.md`, "Open items").
-* **On GitHub**: github.com/Atyzze/syncrain, every build up to 28.
+* **On GitHub**: github.com/Atyzze/syncrain, every build up to 29.
 
 ## What comes next
 
-* **Next**: a video of your look from the page or the command line, looping seamlessly (29); then
-  what you find on the lock screen, an open item, or a NixOS image. No boot splash:
-  the boot stays plain text, as you set it.
-* **Build 30**: the next consolidation (every number ending in 0).
+* **Build 30**: the consolidation; the README says what syncrain is now (syncrain backdrop: your
+  desktop, login screen, lock screen and videos) and why boot stays plain text.
+* **Build 31**: the installer for Debian, Fedora and openSUSE beside Arch, and an invitation for
+  everyone else to hand the repository to their AI agent.
+* **Then**: a NixOS image, the base the others follow. No boot splash, ever: the text means the
+  machine is not up yet, the rain that it is.
 
 ## The decision in front of you
 

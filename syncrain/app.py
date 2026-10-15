@@ -63,8 +63,11 @@ def _number(low=None, high=None, above=None):
         if above is not None and not value > above:
             raise argparse.ArgumentTypeError(f"{text} is not above {above:g}")
         if (low is not None and value < low) or (high is not None and value > high):
-            raise argparse.ArgumentTypeError(f"{text} is outside {low:g} to {high:g}" if high is not None
-                                             else f"{text} is below {low:g}")
+            if high is None:
+                raise argparse.ArgumentTypeError(f"{text} is below {low:g}")
+            if low is None:
+                raise argparse.ArgumentTypeError(f"{text} is above {high:g}")
+            raise argparse.ArgumentTypeError(f"{text} is outside {low:g} to {high:g}")
         return value
     return parse
 
@@ -114,20 +117,25 @@ def _flavours(text):
     return int(value)
 
 
-#: Hidden words: at most this many, each this long at most (the words texture is 16 slots wide), and
-#: at most this many different characters among them (a word's slot is a byte, 255 ends a word).
-MAX_WORDS, MAX_WORD, MAX_WORD_CHARS = 32, 16, 254
+#: Hidden words and sentences: at most this many, each this long at most, and at most this many
+#: different characters among them besides the space (a word's slot is a byte: 255 ends a word, 254
+#: is a space's gap). A word falls only where a column has rows for it and three to spare at each end
+#: (state.frag): a 16:9 screen has 36 rows, room for 30; a 21:9 one 27, room for 21. The words
+#: texture (glyphs.WORD_CELLS) has room for more.
+MAX_WORDS, MAX_WORD, MAX_WORD_CHARS = 32, 30, 254
 
 
 def _words(text):
-    """The hidden words, comma-separated; none for none."""
+    """The hidden words and sentences, comma-separated; none for none. A space inside falls as a gap
+    in the column (glyphs.GAP); other spacing (a tab, a line break) is no part of one."""
     words = [w.strip() for w in text.split(",")] if text.strip() else []
     for w in words:
-        if not w or any(ch.isspace() for ch in w) or len(w) > MAX_WORD:
-            raise argparse.ArgumentTypeError(f"a word is 1 to {MAX_WORD} characters with no space: {w!r}")
+        if not w or any(ch.isspace() and ch != " " for ch in w) or len(w) > MAX_WORD:
+            raise argparse.ArgumentTypeError(f"a word or sentence is 1 to {MAX_WORD} characters, spaces between "
+                                             f"words only: {w!r}")
     if len(words) > MAX_WORDS:
         raise argparse.ArgumentTypeError(f"at most {MAX_WORDS} words")
-    if len(set("".join(words))) > MAX_WORD_CHARS:
+    if len(set("".join(words).replace(" ", ""))) > MAX_WORD_CHARS:
         raise argparse.ArgumentTypeError(f"at most {MAX_WORD_CHARS} different characters in all the words")
     return words
 
@@ -315,7 +323,8 @@ def parse_args(argv=None):
                     help="seconds a turn of the rain's hue wheel, every flavour together (the preset's otherwise; "
                          "0 = the colours stay)")
     ap.add_argument("--words", type=_words, metavar="W,W,...",
-                    help="the hidden words that fall now and then, comma-separated ('' for none)")
+                    help="the hidden words and sentences that fall now and then, comma-separated, up to 40 characters "
+                         "each; a space falls as a gap ('' for none)")
     ap.add_argument("--background", type=_image, metavar="IMAGE", help="use an image as the background instead of the background gradient")
     ap.add_argument("--mask", type=_image, metavar="IMAGE", help="greyscale mask (same framing as --background): white = keep bright, no rain")
     ap.add_argument("--bg-gamma", type=_number(above=0), help="darkening curve for --background (default 2.0; 1 = unchanged)")
@@ -364,8 +373,17 @@ def parse_args(argv=None):
     ap.add_argument("--record", metavar="DIR", help="render a clip as numbered PNGs into DIR (from --time or now), exit")
     ap.add_argument("--record-seconds", type=_number(above=0), default=8.0)
     ap.add_argument("--record-fps", type=_number(above=0, high=1000), default=30.0)
-    ap.add_argument("--size", help="window size for --window / --record (default 1280x720), or the size "
-                                   "--benchmark draws at (default: the first screen), e.g. 1920x1080")
+    ap.add_argument("--video", metavar="FILE",
+                    help="make a video of the rain that plays on anything (.mp4, .mkv, .webm or .gif; needs ffmpeg), "
+                         "from --time or now, at --size (default 1920x1080, 640x360 for a GIF), exit")
+    ap.add_argument("--seconds", type=_number(above=0, high=3600), metavar="N",
+                    help="how long --video is (default 30, a GIF 10)")
+    ap.add_argument("--video-fps", type=_number(above=0, high=240), metavar="FPS",
+                    help="frames per second of --video (default 30, a GIF 15)")
+    ap.add_argument("--loop", choices=("on", "off"), default="on",
+                    help="--video ends where it begins, so a player repeating it shows no seam (default on)")
+    ap.add_argument("--size", help="window size for --window / --record (default 1280x720), the size of --video, "
+                                   "or the size --benchmark draws at (default: the first screen), e.g. 1920x1080")
     ap.add_argument("--list-themes", action="store_true")
     ap.add_argument("--benchmark", action="store_true",
                     help="time each pass on this machine's graphics card, print the table, exit")
@@ -401,6 +419,14 @@ def parse_args(argv=None):
     # the channel as the web page takes it: spaces around it (what JavaScript's trim() takes, which is
     # not quite what str.strip() takes) are no part of the name, and none is public
     args.channel = args.channel.strip(JS_SPACE) or "public"
+    if args.video:                                # said now, not after the window has opened
+        from . import video
+        if args.record or args.screenshot:
+            ap.error("--video makes one file: not with --record or --screenshot")
+        try:
+            video.settle(args)
+        except ValueError as e:
+            ap.error(f"argument --video: {e}")
     return args
 
 
@@ -654,7 +680,7 @@ def main(argv=None):
                 return 1
         elif args.host == "native":
             print("syncrain: the native wallpaper draws only the wallpaper on a Wayland session, paced by the "
-                  "refresh; use --host gtk for X11, --window, --screenshot, --record and --pacing timer",
+                  "refresh; use --host gtk for X11, --window, --screenshot, --record, --video and --pacing timer",
                   file=sys.stderr)
             return 1
     _preload_layer_shell()
@@ -683,7 +709,7 @@ def main(argv=None):
     from .renderer import from_args as renderer_from_args
 
     LayerShell = None
-    if "Wayland" in backend and not (args.window or args.record):
+    if "Wayland" in backend and not (args.window or args.record or args.video):
         try:
             gi.require_version("Gtk4LayerShell", "1.0")
             from gi.repository import Gtk4LayerShell as LayerShell
@@ -930,7 +956,18 @@ def main(argv=None):
                     self._frames, self._since = 0, now
                 elif not hasattr(self, "_since"):
                     self._since = now
-            if args.screenshot or args.record:
+            if args.video:
+                # a slice of the video each frame, so the window goes on answering its compositor (a
+                # window that does not is offered to be killed) and Ctrl+C is heard
+                try:
+                    if not self._video():
+                        return True
+                except (OSError, ValueError, RuntimeError) as e:     # a folder it cannot write, ffmpeg's no
+                    print(f"\nsyncrain: not saved: {e}", file=sys.stderr, flush=True)
+                    app.exit_code = app.exit_code or 1
+                self.renderer = None                 # one video only; then out
+                GLib.idle_add(app.quit, priority=GLib.PRIORITY_HIGH)
+            elif args.screenshot or args.record:
                 try:
                     if args.screenshot:
                         self._save(out, W, H, args.screenshot)
@@ -949,6 +986,40 @@ def main(argv=None):
                 self.renderer = None                 # one frame, or one clip, only; then out
                 GLib.idle_add(app.quit, priority=GLib.PRIORITY_HIGH)
             return True
+
+        def _video(self) -> bool:
+            """--video: frames drawn off the screen at the video's size, read back and handed to ffmpeg,
+            for a tenth of a second at a time; True once the video is saved."""
+            from . import video
+            w, h = args.video_size
+            if app.video is None:
+                limit = gl.get_integer(gl.GL_MAX_TEXTURE_SIZE)
+                if w > limit or h > limit:
+                    raise ValueError(f"this graphics card draws at most {limit}x{limit}: {w}x{h}")
+                off = self._offscreen(w, h)
+                gl.glBindFramebuffer(gl.GL_FRAMEBUFFER, off)
+                if gl.glCheckFramebufferStatus(gl.GL_FRAMEBUFFER) != gl.GL_FRAMEBUFFER_COMPLETE:
+                    raise ValueError(f"this graphics card cannot draw {w}x{h} off the screen")
+                t0 = args.time if args.time is not None else time.time() + args.offset
+
+                def draw(t):
+                    self.renderer.render(t, off, 0, 0, w, h)
+                    gl.glBindFramebuffer(gl.GL_FRAMEBUFFER, off)
+                    return gl.read_pixels(0, 0, w, h)
+                app.video = video.Writer(args.video, w, h, args.video_fps,
+                                         video.plan(args.seconds, args.video_fps, args.loop == "on", t0), draw)
+            writer, until = app.video, time.monotonic() + 0.1
+            while time.monotonic() < until:
+                if writer.step():
+                    app.video = None
+                    if sys.stderr.isatty():
+                        print(file=sys.stderr)
+                    print(f"syncrain: saved {args.video} ({w}x{h}, {writer.done} frames at {args.video_fps:g} "
+                          f"fps, {'a loop' if args.loop == 'on' else 'not a loop'})", flush=True)
+                    return True
+            if sys.stderr.isatty():
+                video.progress_line(writer.done, len(writer.frames))
+            return False
 
         @staticmethod
         def _save(fbo, W, H, path):
@@ -971,6 +1042,7 @@ def main(argv=None):
             self._settle = None                # the GLib source that will settle memory, while it waits
             self._rebuild = None               # the GLib source that will rebuild the screens, while it waits
             self.settled = False               # memory settled since the screens were last built
+            self.video = None                  # --video's syncrain.video.Writer, while it is being made
 
         def do_activate(self):
             self.hold()
@@ -1093,10 +1165,11 @@ def main(argv=None):
 
         def build(self):
             monitors = [display.get_monitors().get_item(i) for i in range(display.get_monitors().get_n_items())]
-            windowed = args.window or args.record or (args.screenshot and not monitors)
+            windowed = args.window or args.record or args.video or (args.screenshot and not monitors)
             self.screens = 0 if windowed else len(monitors)
             if windowed:
-                w, h = (int(v) for v in (args.size or "1280x720").lower().split("x"))
+                # a video is drawn at its own size off the screen: its window only gives the drawing a context
+                w, h = (320, 180) if args.video else (int(v) for v in (args.size or "1280x720").lower().split("x"))
                 self.add_window(Gtk.Window(application=self), RainArea(), size=(w, h))
             elif LayerShell is not None:
                 layer = LayerShell.Layer.BOTTOM if layer_name == "bottom" else LayerShell.Layer.BACKGROUND
@@ -1157,4 +1230,8 @@ def main(argv=None):
         rc = app.run([])
     finally:
         app.stop_watch()                         # the script leaves KWin with us
+        if app.video is not None:                # stopped (Ctrl+C) before it was whole: nothing kept
+            app.video.abort()
+            print(f"\nsyncrain: {args.video} not made (stopped)", file=sys.stderr)
+            app.exit_code = app.exit_code or 1
     return app.exit_code or rc

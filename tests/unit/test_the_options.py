@@ -157,7 +157,7 @@ def test_the_look_s_options_and_their_settings(tmp_path):
 
 @pytest.mark.parametrize("argv", [["--rain-colors", "#000000,#ffffff"], ["--rain-colors", "red,green,blue,white"],
                                   ["--glow-color", "1/2/3"], ["--flavours", "65"], ["--flavours", "2.5"],
-                                  ["--words", "TOO LONG A WORD"], ["--words", "A" * 17], ["--logo", "/no/such.png"],
+                                  ["--words", "A" * 31], ["--words", "A\tTAB"], ["--logo", "/no/such.png"],
                                   ["--logo-size", "1"], ["--vignette", "2"], ["--flavour-layout", "spiral"]])
 def test_a_look_it_cannot_draw_ends_with_status_2(argv, capsys):
     with pytest.raises(SystemExit) as stop:
@@ -273,3 +273,19 @@ def test_the_nixos_colours_logo_gone_since_build_28_draws_the_nixos_one(tmp_path
         assert from_args(parse_args(["--config", "none", "--logo", name]), glyphs="theme").logo_choice == "white"
         path = settings(tmp_path, logo=name)
         assert from_args(parse_args(["--config", path]), glyphs="theme").logo_choice == "white"
+
+
+def test_a_sentence_falls_with_gaps_where_its_spaces_are():
+    """A space inside a hidden word makes it a sentence: the words texture holds glyphs.GAP there,
+    which state.frag leaves dark; up to 30 characters, what a 16:9 screen has rows for."""
+    from syncrain import glyphs
+    from syncrain.renderer import from_args
+    sentence = "WAKE UP NEO THE MATRIX HAS YOU"
+    r = from_args(parse_args(["--config", "none", "--words", f"{sentence},AI"]), glyphs="theme")
+    data, n = r.glyphs.words_bytes()
+    assert n == 2 and len(data) == glyphs.WORD_CELLS * 2 * 4
+    row = [data[i * 4] for i in range(glyphs.WORD_CELLS)]
+    assert [i for i, g in enumerate(row) if g == glyphs.GAP] == [i for i, ch in enumerate(sentence) if ch == " "]
+    assert row[len(sentence)] == 255 and all(g < glyphs.GAP for i, g in enumerate(row[:len(sentence)])
+                                             if sentence[i] != " ")
+    assert len(parse_args(["--config", "none", "--words", "A" * 30]).words[0]) == 30

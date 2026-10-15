@@ -167,8 +167,8 @@ for name, theme in themes.items():                    # every symbol a theme nam
     for s in theme['glyphs']['sets']:
         for ch in s['chars']:
             assert G.spec_key(ch, s.get('mirror', False)) in meta['library']['glyphs'], (name, ch)
-    for word in theme['wordText']:                    # the words texture holds 8 bits (the page's slots)
-        assert all(meta['library']['glyphs'].index(ch) < 256 for ch in word), word
+    for word in theme['wordText']:                    # the words texture holds 8 bits (254: a gap, 255: the end)
+        assert all(ch == ' ' or meta['library']['glyphs'].index(ch) < 254 for ch in word), word
 with open(os.path.join(args.out, 'themes.json'), 'w', encoding='utf-8') as fh:
     json.dump(meta, fh, ensure_ascii=False, separators=(',', ':'))
 

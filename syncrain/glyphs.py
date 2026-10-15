@@ -22,6 +22,8 @@ import unicodedata
 CELL = 64                     # atlas pixels per rain cell
 SLOT = CELL * 3 // 2          # 96: a slot spans 1.5 cells, the glyph centred, room for its glow
 GRID = 16                     # slots per atlas row
+WORD_CELLS = 40               # a hidden word or sentence's longest (the words texture's width; state.frag)
+GAP = 254                     # a space in one: no glyph, the column dark there (255 ends one)
 MAX_GLYPHS = 640              # 40 rows: 3840 px, within what any card takes (4096)
 MAX_SETS = 16                 # state.frag's uSets
 MAX_TABLE = 2048              # the table texture's width
@@ -283,10 +285,10 @@ class Resolved:
 
     def words_bytes(self):
         n = max(1, len(self.words))
-        out = bytearray([255]) * (16 * n * 4)
+        out = bytearray([255]) * (WORD_CELLS * n * 4)
         for row, w in enumerate(self.words):
-            for i, g in enumerate(w[:16]):
-                out[(row * 16 + i) * 4] = g
+            for i, g in enumerate(w[:WORD_CELLS]):
+                out[(row * WORD_CELLS + i) * 4] = g
         return bytes(out), n
 
     def atlas(self):
@@ -309,8 +311,9 @@ def resolve(meta, theme, data_dir, config=None, source="the preset", hieroglyphs
     words, specs = [], {}                              # key -> (character, the set that names it)
     for word in theme.get("wordText", []):             # first: the words texture holds 8 bits
         for ch in word:
-            specs.setdefault(spec_key(ch, False), (ch, {}))
-        words.append([slot_of(spec_key(ch, False)) for ch in word])
+            if ch != " ":
+                specs.setdefault(spec_key(ch, False), (ch, {}))
+        words.append([GAP if ch == " " else slot_of(spec_key(ch, False)) for ch in word])
     table, sets = [], []
     for s in cfg["sets"]:
         first = len(table)
