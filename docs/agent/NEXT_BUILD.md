@@ -1,12 +1,15 @@
-# The next build is 34
+# The next build is 35
 
 The first line is parsed: `# The next build is <N>`, exactly one above `BUILD_NUMBER`.
 
-## Build 34: what the operator asks next
+## Build 35: the operator's new default, and the composite pass to its spec
 
 * Read what the operator sent last, and answer it in one plain sentence first.
-* Without a request: wait for what they find with the flavour on NixOS;
-  an installer ISO only if they ask (`docs/ROADMAP.md`).
+* The operator sent a new settings file on 2026-10-15 to be the default: make it the `syncrain`
+  preset with `tools/build_assets.py`, and fix `composite.frag` to the review's item 69 in the
+  same build. One deliberate stream change: `python3 tools/stream_freeze.py --write`.
+* Then the review of build 33, in order (`docs/ROADMAP.md`, "Planned builds"): the login screen
+  (36), the installer (37), Nix and the harness (38), the hosts (39), the consolidation (40).
 * No boot splash: never touch the bootloader, initramfs or Plymouth.
 
 **Known blockers**: watts, NVIDIA's driver and Plasma's shell exist only on the operator's machine;

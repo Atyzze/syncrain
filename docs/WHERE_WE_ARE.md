@@ -1,4 +1,4 @@
-# Where we are, at build 33
+# Where we are, at build 34
 
 The project on one page. Detail: `docs/agent/HANDOFF.md`.
 
@@ -25,7 +25,8 @@ plain text by design: the text means the machine is not up yet, the rain that it
   the rain and a box on every screen; `--login-screen-off` puts back what was there.
 * **The lock screen** (optional, build 27): `./install.sh --lock-screen`, then log out and in once;
   the rain stays live, your box comes up on a key or a moved mouse and is the same on every screen.
-  In use on your desktop since build 26; its code unchanged since build 27.
+  In use on your desktop since build 26. Build 34 fixed what the review found: a screen coming
+  back after every screen went, a second factor, a prompt that wants only Enter, the hidden eye.
 * **Videos** (build 29): `syncrain --video rain.mp4` or the page's Video section, a seamless loop.
 * **Four families** (build 31): `./install.sh` on Arch, Debian, Fedora and openSUSE, each installed
   for real in a root of its own; anything else gets the packages named, or its AI agent.
@@ -35,12 +36,12 @@ plain text by design: the text means the machine is not up yet, the rain that it
 * **Your NixOS flavour** (build 33): `nix flake init -t github:Atyzze/syncrain`, your hardware and
   boot loader, `nixos-rebuild switch`: Plasma 6 with the rain as wallpaper, login and lock screen.
   The whole system builds here; no machine has booted it yet.
-* **On GitHub**: github.com/Atyzze/syncrain, every build up to 33.
+* **On GitHub**: github.com/Atyzze/syncrain, every build up to 34.
 
 ## What comes next
 
-* **Next**: what you find when you try the flavour on NixOS; an
-  installer ISO if you want one.
+* **Next**: the rest of the review of build 33, the most critical first: your new default (35),
+  the login screen (36), the installer (37), Nix and the tests (38), the hosts (39).
 * **Build 40**: the next consolidation (every number ending in 0).
 
 ## The decision in front of you

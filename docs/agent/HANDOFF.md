@@ -1,4 +1,4 @@
-# Handoff: the state of syncrain at build 33
+# Handoff: the state of syncrain at build 34
 
 What is true now, for a context that has just opened this tree. Where this page and the code
 disagree, the code is right; fix the page in the same build. Each fact has one home; this page
@@ -38,14 +38,22 @@ This page, `docs/agent/NEXT_BUILD.md`, `docs/agent/WORKING_WITH_THE_OPERATOR.md`
   them, and `-off` puts back what was there. `tests/unit/test_the_login_screen_is_optional.py` and
   `tests/unit/test_the_lock_screen_is_optional.py` hold every build to it. The lock screen is tested
   in a real headless KWin, and in use on the operator's desktop since build 26 (their request of
-  2026-10-15 10:45 came from using it); `syncrain/lockscreen/` is unchanged since build 27.
+  2026-10-15 10:45 came from using it). Build 34 made it answer PAM after every screen went and
+  one came back (kscreenlocker 6.7 frees the QML engine at zero views), keep a pending password from
+  a second factor, take an empty answer to a visible prompt and ignore clicks while hidden.
 * **Boot stays plain text** (the operator, 2026-10-15): never the bootloader, the initramfs or a
   boot splash.
 * **Stream**: `822ea58a` since build 29 (sentences' gaps and trails in `state.frag`); `85ace386` in
   28; `a9c058f3` 24 to 27; `f98ef1ca` in 23; `25b02556` in 22; `def5684f` 15 to 21; `c18f8be2` in 12
   to 14; `48e6bf9c` 3 to 11.
-* **GitHub**: `main` holds builds 7 to 33, a commit `syncrain build <N>` each, and a few
+* **GitHub**: `main` holds builds 7 to 34, a commit `syncrain build <N>` each, and a few
   documents-only commits between them.
+
+## Under way
+
+The review of build 33 (84 numbered items, in the operator's review document) is being fixed one
+area a build, the most critical first: `docs/ROADMAP.md`, "Planned builds". Build 34 did the lock
+screen (1, 3, 27, 28, 30, 56).
 
 ## Waits on the operator
 

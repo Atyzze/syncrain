@@ -12,6 +12,8 @@ Open questions, planned builds, the cadence and the constraints. What shipped: `
 
 ## Decisions answered
 
+* **2026-10-15, after build 33's review**: "fix all the found issues", split over several builds,
+  the most critical first; and their new settings file as the default. Builds 34 and on.
 * **2026-10-15, after build 32**: the NixOS image as a flake template ("1-click apply": `nix flake init -t`,
   the machine's hardware, `nixos-rebuild switch`), not an installer ISO for now. Build 33.
 
@@ -36,7 +38,18 @@ Open questions, planned builds, the cadence and the constraints. What shipped: `
 
 ## Planned builds
 
-1. **An installer ISO** of the flavour, if wanted (the operator chose the template first,
+The review of build 33 (84 items, numbered, in the operator's review document), fixed most
+critical first, one area a build:
+
+1. **35**: the operator's new default (their settings file of 2026-10-15) and `composite.frag` to
+   its spec (69): one stream change.
+2. **36**: the login screen (4 to 7, 31 to 38).
+3. **37**: the installer (8 to 11, 39 to 46).
+4. **38**: Nix and the test harness (2, 12, 16 to 23, 47).
+5. **39**: the native host, the Python host and the page (13 to 15, 24 to 26, 29, 48 to 55, 57 to
+   68, 70 to 84).
+6. **40**: the consolidation; anything left over in 41 and later.
+7. **An installer ISO** of the flavour, if wanted (the operator chose the template first,
    2026-10-15): several GB to build, and tried only where a VM runs.
 
 ## Open items

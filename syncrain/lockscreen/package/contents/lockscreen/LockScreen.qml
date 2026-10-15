@@ -53,7 +53,12 @@ Item {
     Connections {
         target: Pam
         function onRefused() { Shared.wake(); shake.restart(); }
-        function onAsked() { box.focusPassword(); }
+        function onAsked() {
+            // a question whose answer shows: a password typed before it came would show in clear
+            if (!Pam.secret)
+                Shared.typed = "";
+            box.focusPassword();
+        }
         function onNotice() { Shared.wake(); }
     }
 
@@ -105,7 +110,10 @@ Item {
         title: typeof kscreenlocker_userName === "undefined" ? "" : kscreenlocker_userName
         message: [caps.item && caps.item.on ? qsTr("Caps Lock is on") : "", Pam.message].filter(s => s).join("\n")
         failing: Pam.failing
-        allowEmpty: Pam.passwordless
+        // an empty answer: no password needed, or a question whose answer shows asks for just Enter
+        allowEmpty: Pam.passwordless || (Pam.waiting && !Pam.secret)
+        plain: Pam.waiting && !Pam.secret
+        awake: Shared.shown
         shared: Shared.typed
         peeking: Shared.peek
         // away, the box still has the keyboard: the first key brings it up and goes into the field
@@ -141,7 +149,7 @@ Item {
 
     Component.onCompleted: {
         if (!Pam.auth && typeof authenticator !== "undefined")
-            Pam.auth = authenticator;
+            Pam.attach(authenticator);
         box.focusPassword();
         Pam.start();
     }

@@ -154,6 +154,54 @@ def test_a_question_whose_answer_shows_is_answered(greeter):
     assert steps(said) == ["responded right", "stopped"], said
 
 
+def test_a_question_asked_before_the_screen_came_is_still_answered(greeter):
+    """Every screen gone while locked and one back: kscreenlocker 6.7 makes the new view on a new
+    QML engine, whose singletons never saw PAM's question. The password typed there answers it."""
+    code, said = greeter("fresh")
+    assert code == 0, said
+    assert steps(said) == ["loaded late", "responded right", "stopped"], said
+
+
+def test_a_yes_said_while_no_screen_was_there_unlocks(greeter):
+    code, said = greeter("unlocked")
+    assert code == 0, said
+    assert steps(said) == ["loaded late", "stopped"], said
+
+
+def test_a_password_sent_again_during_the_check_does_not_answer_the_second_factor(greeter):
+    """The password, then PAM's second question (a one-time code): what was typed while the password
+    was checked is not the code, so it is not sent, and the second question is said."""
+    code, said = greeter("twofactor")
+    assert code == 0, said
+    assert steps(said) == ["responded right",
+                           "second question, answers so far [\"right\"], message 'Verificatiecode: '",
+                           "responded 123456", "stopped"], said
+
+
+def test_a_question_that_wants_only_enter_is_answered_by_enter(greeter):
+    code, said = greeter("enter")
+    assert code == 0, said
+    assert steps(said) == ["responded ", "stopped"], said
+
+
+def test_a_screen_back_while_pam_checks_sends_nothing_to_the_second_factor(greeter):
+    """kscreenlocker 6.7 keeps an answer given while PAM checks the last one and hands it to the
+    next question: a password typed on a screen that came back then would answer a second factor.
+    The new screen sends nothing until PAM asks, and says the second question when it comes."""
+    code, said = greeter("checking")
+    assert code == 0, said
+    assert steps(said) == ["responded right", "loaded late",
+                           "second question, answers so far [\"right\"], message 'Verificatiecode: '",
+                           "responded 123456", "stopped"], said
+
+
+def test_a_screen_back_just_after_a_refusal_waits_out_the_delay(greeter):
+    code, said = greeter("idle")
+    assert code == 0, said
+    assert "too soon" not in said, said
+    assert steps(said) == ["responded wrong", "loaded late", "responded right", "stopped"], said
+
+
 def test_two_screens_show_one_box_that_comes_and_goes_with_the_person(built):
     """tests/lockscreen/tst_two_screens.qml, real key and pointer events on two screens: the box is
     away until a key or a moved pointer (KWin's first placing of the pointer not counted), goes after
@@ -164,7 +212,7 @@ def test_two_screens_show_one_box_that_comes_and_goes_with_the_person(built):
                           capture_output=True, text=True, timeout=180)
     said = done.stdout + done.stderr
     assert done.returncode == 0 and "0 failed" in said, said[-4000:]
-    assert said.count("PASS   : qmltestrunner::TwoScreens::test_") == 11, said[-4000:]
+    assert said.count("PASS   : qmltestrunner::TwoScreens::test_") == 17, said[-4000:]
 
 
 def test_without_the_rain_s_module_the_box_still_unlocks(greeter, tmp_path):

@@ -252,6 +252,7 @@ static GLuint make_texture(int w, int h, const void *pixels, enum filter filter)
 	glBindTexture(GL_TEXTURE_2D, t);
 	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+	glPixelStorei(GL_UNPACK_ALIGNMENT, 4);     /* OpenGL's default again: on the lock screen the context is Qt's */
 	if (filter == FILTER_MIP)
 		glGenerateMipmap(GL_TEXTURE_2D);
 	GLint minify = filter == FILTER_MIP ? GL_LINEAR_MIPMAP_LINEAR : filter == FILTER_LINEAR ? GL_LINEAR : GL_NEAREST;
@@ -322,7 +323,6 @@ struct passes *passes_create(const struct scene *scene, bool es, char *why, size
 	locate(P, PROGRAM_BLUR, BLUR_U, BLUR_N, P->blur_u);
 	locate(P, PROGRAM_COMPOSITE, COMP_U, COMP_N, P->comp_u);
 	glGenVertexArrays(1, &P->vao);
-	glPixelStorei(GL_UNPACK_ALIGNMENT, 4);         /* OpenGL's default again: the context may be Qt's */
 	glFinish();                                    /* the pixels can go once the card has them */
 	check("setting up");
 	return P;

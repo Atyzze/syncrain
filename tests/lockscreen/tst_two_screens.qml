@@ -23,9 +23,12 @@ Item {
         property string promptForSecret: "Password: "
         property string infoMessage: ""
         property string errorMessage: ""
+        property int state: 1                 // Authenticating
+        property bool busy: false
         property var answers: []
         signal failed(int kind)
         signal succeeded()
+        signal loginFailedDelayStarted(int kind, var who, int uSecDelay)
         function startAuthenticating() { if (asks) promptForSecretChanged(); }
         function stopAuthenticating() {}
         function respond(text) { answers.push(String(text)); }
@@ -54,8 +57,22 @@ Item {
         function init() {
             authenticator.asks = true;
             authenticator.hadPrompt = true;
+            authenticator.prompt = "";
+            authenticator.promptForSecret = "Password: ";
+            authenticator.state = 1;
+            authenticator.busy = false;
             Lock.Pam.passwordless = false;
             Lock.Pam.waiting = false;
+            Lock.Pam.secret = true;
+            Lock.Pam.conversing = false;
+            Lock.Pam.fresh = false;
+            Lock.Pam.firstOpen = false;
+            Lock.Pam.answers = 0;
+            Lock.Pam.pending = "";
+            Lock.Pam.delayGiven = false;
+            Lock.Pam.message = "";
+            Lock.Pam.retry.stop();
+            Lock.Pam.retry.interval = 3000;
             Lock.Shared.idleMs = 60000;
             Lock.Shared.sleep();
             authenticator.answers = [];
@@ -163,6 +180,88 @@ Item {
             authenticator.succeeded();
             compare(Lock.Shared.shown, true);
             compare(find(left, "message").text, "Unlock: no password is needed");
+        }
+
+        function test_12_the_hidden_box_s_eye_takes_no_click() {
+            compare(Lock.Shared.shown, false);
+            const eye = find(left, "peek");
+            mouseClick(eye);                      // where the eye is, but nobody can see it
+            compare(Lock.Shared.peek, false, "a stray click shows no password on any screen");
+            compare(Lock.Shared.shown, true, "the click brings the box up instead");
+            mouseClick(eye);
+            compare(Lock.Shared.peek, true, "once the box is up, the eye works");
+            mouseClick(eye);
+        }
+
+        function test_13_a_long_delay_from_pam_counts_once() {
+            authenticator.loginFailedDelayStarted(0, null, 60000000);   // faillock: a minute
+            authenticator.failed(0);
+            compare(Lock.Pam.retry.interval, 60100);
+            Lock.Pam.retry.stop();
+            authenticator.failed(0);                                    // the next refusal asks for none
+            compare(Lock.Pam.retry.interval, 3000, "back to the usual 3 s");
+            Lock.Pam.retry.stop();
+        }
+
+        function test_14_enter_on_the_hidden_box_answers_nothing() {
+            authenticator.asks = false;           // the question below is the one open
+            authenticator.prompt = "Passcode or option (1-3): ";
+            authenticator.promptChanged();        // a question whose answer shows, empty allowed
+            compare(Lock.Pam.waiting, true);
+            compare(Lock.Shared.shown, false);
+            keyClick(Qt.Key_Return);              // the key that wakes the screen
+            compare(authenticator.answers, [], "an empty answer counts as a refusal: not sent unseen");
+            compare(Lock.Shared.shown, true);
+            keyClick(Qt.Key_Return);              // at the box that is up, it is the person's answer
+            compare(authenticator.answers, [""]);
+        }
+
+        function test_15_a_question_whose_answer_shows_clears_a_password_typed_before_it() {
+            keyClick(Qt.Key_S);
+            keyClick(Qt.Key_E);
+            compare(find(left, "password").text, "se");
+            authenticator.prompt = "Touch the key, then press Enter";
+            authenticator.promptChanged();
+            compare(find(left, "password").echoMode, TextInput.Normal);
+            compare(find(left, "password").text, "", "never a password in clear");
+            compare(find(right, "password").text, "");
+        }
+
+        function test_16_empty_words_are_no_question() {
+            authenticator.promptForSecret = "";
+            authenticator.promptForSecretChanged();   // a conversation's end clears the words
+            authenticator.promptChanged();
+            compare(Lock.Pam.waiting, false);
+            compare(Lock.Pam.secret, true);
+        }
+
+        function test_17_a_new_engine_meets_pam_where_it_is() {
+            // a screen back while PAM checks an answer: nothing is open, nothing is sent
+            authenticator.busy = true;
+            authenticator.asks = false;           // kscreenlocker ignores a start while one is under way
+            Lock.Pam.attach(authenticator);
+            compare(Lock.Pam.waiting, false);
+            compare(Lock.Pam.conversing, true);
+            keyClick(Qt.Key_A);
+            keyClick(Qt.Key_Return);
+            compare(authenticator.answers, [], "kept, not queued for whatever PAM asks next");
+            authenticator.promptForSecret = "Verificatiecode: ";
+            authenticator.promptForSecretChanged();   // the second factor
+            compare(authenticator.answers, [], "a second factor never gets the password");
+            compare(Lock.Pam.message, "Verificatiecode: ", "and is said");
+            // a screen back with a question open: it is answered, and its words are shown
+            init();
+            authenticator.promptForSecret = "Verificatiecode: ";
+            Lock.Pam.attach(authenticator);
+            compare(Lock.Pam.waiting, true);
+            compare(Lock.Pam.message, "Verificatiecode: ");
+            // a screen back just after a refusal: PAM is not started inside its delay
+            init();
+            authenticator.state = 0;
+            Lock.Pam.attach(authenticator);
+            compare(Lock.Pam.waiting, false);
+            compare(Lock.Pam.retry.running, true);
+            Lock.Pam.retry.stop();
         }
     }
 }

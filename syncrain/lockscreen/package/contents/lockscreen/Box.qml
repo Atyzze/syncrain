@@ -17,6 +17,8 @@ Rectangle {
     property bool allowEmpty: false          // PAM needs no password: Unlock with an empty field
     property string shared: ""               // what is typed, on every screen
     property bool peeking: false             // the password shown, on every screen
+    property bool plain: false               // the answer shows (PAM asked a question that is not secret)
+    property bool awake: true                // the box is up; hidden, its buttons take no clicks
     signal submitted(string password)
     signal typed(string text)                // the person changed what is typed
     signal peekSet(bool on)
@@ -44,12 +46,22 @@ Rectangle {
     border.width: 1
 
     function send() {
-        if (password.text.length === 0 && !box.allowEmpty)
+        // an empty answer is a choice made at a box that is up (an empty answer to a one-time code
+        // counts as a refusal)
+        if (password.text.length === 0 && (!box.allowEmpty || !box.awake))
             return;
         const sent = password.text;
         password.text = "";
         box.typed("");
         box.submitted(sent);
+    }
+
+    // hidden (opacity 0 still takes clicks in Qt Quick): a press anywhere on the box only brings it up
+    MouseArea {
+        anchors.fill: parent
+        z: 10
+        visible: !box.awake
+        onPressed: box.activity()
     }
 
     ColumnLayout {
@@ -70,7 +82,7 @@ Rectangle {
             id: password
             objectName: "password"
             Layout.preferredWidth: 260
-            echoMode: box.peeking ? TextInput.Normal : TextInput.Password
+            echoMode: box.peeking || box.plain ? TextInput.Normal : TextInput.Password
             placeholderText: qsTr("Password")
             placeholderTextColor: Qt.rgba(232 / 255, 241 / 255, 1, 0.45)
             color: box.ink
@@ -91,14 +103,17 @@ Rectangle {
                     event.accepted = true;
                     return;
                 }
+                const wasUp = box.awake;
                 box.activity();                  // and the field still gets the key
-                event.accepted = false;
+                // but not an Enter that only wakes the screen: it answers nothing
+                event.accepted = !wasUp && (event.key === Qt.Key_Return || event.key === Qt.Key_Enter);
             }
 
             AbstractButton {
                 id: peek
                 objectName: "peek"
                 focusPolicy: Qt.NoFocus
+                enabled: box.awake                   // an eye nobody can see is clicked by nobody
                 onClicked: box.peekSet(!box.peeking)
                 anchors.right: parent.right
                 anchors.rightMargin: 6
@@ -122,6 +137,7 @@ Rectangle {
             Layout.fillWidth: true
             text: qsTr("Unlock")
             focusPolicy: Qt.NoFocus
+            enabled: box.awake
             onClicked: box.send()
             contentItem: Text {
                 text: unlock.text
