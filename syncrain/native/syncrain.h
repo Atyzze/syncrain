@@ -144,7 +144,9 @@ void render_surface_destroy(struct render_surface *rs);
  * below 0.999); the caller then asks for the compositor's callbacks and calls render_swap, which
  * says whether the frame went to the compositor (false: nothing was committed; the EGL error is in
  * *error). */
-void render_frame(struct render_surface *rs, double unix_time, double scale);
+/* false when this surface could not be made current (error: EGL's): nothing was drawn, so nothing
+ * is to be swapped */
+bool render_frame(struct render_surface *rs, double unix_time, double scale, unsigned *error);
 bool render_swap(struct render_surface *rs, unsigned *error);
 void render_shutdown(void);
 

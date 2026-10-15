@@ -90,9 +90,12 @@ def ffmpeg_command(path: str, w: int, h: int, fps: float) -> list[str]:
         raise FileNotFoundError("syncrain --video needs ffmpeg (pacman -S ffmpeg, apt install ffmpeg, "
                                 "dnf install ffmpeg, zypper install ffmpeg, nix shell nixpkgs#ffmpeg), or the web page's "
                                 "Video section")
+    # a file, said so: a name with a colon ("rain-12:00.mp4") is otherwise a protocol, one with a
+    # leading "-" an option
+    path = "file:" + os.path.abspath(path)
     head = [exe, "-hide_banner", "-loglevel", "error", "-y",
             "-f", "rawvideo", "-pix_fmt", "rgba", "-s", f"{w}x{h}", "-framerate", f"{fps:g}", "-i", "-"]
-    ext = kind(path)
+    ext = kind(path[len("file:"):])
     if ext == ".gif":
         # one palette for the whole video, made from its frames, then dithered to it; loops forever
         return head + ["-vf", "vflip,format=rgb24,split[a][b];[a]palettegen=stats_mode=full[p];[b][p]paletteuse=dither=sierra2_4a",
@@ -108,10 +111,11 @@ def ffmpeg_command(path: str, w: int, h: int, fps: float) -> list[str]:
 
 
 def blend(over: bytes, under: bytes, a: float) -> bytes:
-    """over with opacity a on under, as a canvas draws it (8 bits, rounded)."""
+    """over with opacity a on under, as a canvas draws it (8 bits, rounded: Image.blend truncates)."""
     from PIL import Image
     w = len(over) // 4                            # any shape will do: the sum is per byte
-    img = Image.blend(Image.frombytes("RGBA", (w, 1), under), Image.frombytes("RGBA", (w, 1), over), a)
+    mask = Image.new("L", (w, 1), round(a * 255))
+    img = Image.composite(Image.frombytes("RGBA", (w, 1), over), Image.frombytes("RGBA", (w, 1), under), mask)
     return img.tobytes()
 
 

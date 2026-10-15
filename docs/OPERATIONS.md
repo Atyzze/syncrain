@@ -42,8 +42,10 @@ git clone https://github.com/Atyzze/syncrain && cd syncrain   # or unpack SYNCRA
 * `--preset`, `--channel`, `--rainbow` and `--arg ...` (repeatable) are checked as the wallpaper
   reads them, then go into the autostart service, the lock screen's scene and the login screen's
   rain. The service is written again at every install where it is: with the options given now, or
-  with its own when none are given. Also `--prefix DIR` (or `SYNCRAIN_PREFIX`), `--no-deps`,
-  `--yes`; `./install.sh --help`.
+  with its own when none are given. The lock screen takes the look from them (colours, symbols,
+  logo, speed and the rest), not where or how often it is drawn: it draws at 30 fps, at full size,
+  with no `--offset`, whatever `--fps`, `--scale` and `--offset` say. Also `--prefix DIR` (or
+  `SYNCRAIN_PREFIX`), `--no-deps`, `--yes`; `./install.sh --help`.
 * `--config FILE`: a settings file from the web page, checked, then kept as
   `~/.config/syncrain/config.json` (one there before is kept as `config.json.before`). The service
   and the login screen's rain are written again with only the options of that run, so the file
@@ -188,7 +190,7 @@ A Plasma web-wallpaper plugin can host it, behind the desktop icons.
 | `--size WxH` | `1280x720` | Size for `--window` and `--record`; of `--video` (1920x1080, a GIF 640x360); for `--benchmark` (default: the first screen) |
 | `--offset S` | `0` | Add S seconds to the clock |
 | `--time T` | - | Freeze the clock at UNIX time T |
-| `--screenshot PNG` | - | Draw one frame, save it, exit |
+| `--screenshot PNG` | - | Draw one frame, save it, exit: on X11 the whole desktop as the wallpaper draws it; on Wayland or with `--window`, a window of about `--size` (default 1280x720; device pixels, and a tiling compositor sizes it its own way) |
 | `--record DIR` | - | Save `--record-seconds` (8) at `--record-fps` (30) as PNGs |
 | `--video FILE` | - | A video of the rain from `--time` or now: `.mp4`, `.mkv`, `.webm` or `.gif` (needs ffmpeg) |
 | `--seconds N` | `30` (a GIF 10) | How long `--video` is |

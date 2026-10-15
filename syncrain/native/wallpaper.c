@@ -58,6 +58,7 @@ static struct {
 	double time;
 	bool probe;
 	double debug_fps;                    /* SYNCRAIN_DEBUG_FPS */
+	char **fallback;                     /* the GTK host, for a scene that cannot be read */
 } opt = { .scene_fd = -1, .fps = 30.0, .scale = 1.0 };
 
 static void usage(void)
@@ -72,6 +73,36 @@ static double number(const char *s)
 	double v = c_strtod(s, &end);
 	if (end == s || *end)
 		usage();
+	return v;
+}
+
+/* The GTK host's command, for a scene this program cannot read, in SYNCRAIN_FALLBACK_ARGC and
+ * SYNCRAIN_FALLBACK_0 on: the environment, which a program of an earlier build ignores (one given the
+ * command on its command line refused the unknown option with status 2, and nothing drew). Taken out of
+ * the environment either way, so nothing this program starts inherits it. */
+static char **fallback_from_environment(void)
+{
+	const char *n = getenv("SYNCRAIN_FALLBACK_ARGC");
+	long argc = n ? strtol(n, NULL, 10) : 0;
+	char **v = argc >= 1 && argc <= 256 ? calloc((size_t)argc + 1, sizeof *v) : NULL;
+	bool whole = v != NULL;
+	for (long i = 0; i < (argc >= 1 && argc <= 256 ? argc : 0); i++) {
+		char name[48];
+		snprintf(name, sizeof name, "SYNCRAIN_FALLBACK_%ld", i);
+		const char *a = getenv(name);
+		if (v && a && !(v[i] = strdup(a)))
+			whole = false;
+		if (!a)
+			whole = false;
+		unsetenv(name);
+	}
+	unsetenv("SYNCRAIN_FALLBACK_ARGC");
+	if (!whole && v) {
+		for (long i = 0; i < argc; i++)
+			free(v[i]);
+		free(v);
+		v = NULL;
+	}
 	return v;
 }
 
@@ -211,6 +242,8 @@ static struct {
 	struct watch *watch;
 	bool watch_said, watch_retried;
 	int64_t watch_check;
+	int watch_attempts;                      /* starts tried; KWin can come to the bus after the wallpaper */
+	int64_t watch_again;                     /* when to try once more */
 	int signal_fd;
 	sigset_t old_mask;
 } W;
@@ -261,19 +294,15 @@ static int64_t output_refresh(const struct screen *s)
 }
 
 /* gdk/wayland/gdksurface-wayland.c, fill_presentation_time_from_frame_time: the callback's
- * millisecond timestamp plus a refresh, until the presentation feedback says better. */
+ * millisecond timestamp plus a refresh, until the presentation feedback says better. The two
+ * clocks' low 32 bits differ by a signed 32-bit difference, which wraps by itself: GDK's extra
+ * corrections at the 2^31 and 2^32 ms boundaries put the time 49.7 days off there. */
 static void guess_presentation(struct frame *f, uint32_t frame_time)
 {
 	int64_t now = monotonic_us();
 	uint32_t now_low = (uint32_t)(now / 1000);
-	if (frame_time - now_low < 1000 || frame_time - now_low > (uint32_t)-1000) {
-		int64_t last = now + (int64_t)1000 * (int32_t)(frame_time - now_low);
-		if ((int32_t)now_low < 0 && (int32_t)frame_time > 0)
-			last += (int64_t)1000 * 0x100000000LL;
-		else if ((int32_t)now_low > 0 && (int32_t)frame_time < 0)
-			last -= (int64_t)1000 * 0x100000000LL;
-		f->presentation = last + f->refresh;
-	}
+	if (frame_time - now_low < 1000 || frame_time - now_low > (uint32_t)-1000)
+		f->presentation = now + (int64_t)1000 * (int32_t)(frame_time - now_low) + f->refresh;
 }
 
 static void frame_done(void *data, struct wl_callback *callback, uint32_t time)
@@ -611,7 +640,8 @@ static void draw(struct screen *s)
 	int64_t now = monotonic_us();
 	s->drawn_for = s->pacer.has_target ? s->pacer.target : (double)now;      /* RainArea._moment */
 	double t = opt.has_time ? opt.time : realtime_s() + opt.offset + (s->drawn_for - (double)now) / 1e6;
-	render_frame(s->render, t, opt.scale);
+	unsigned error = 0;
+	bool drew = render_frame(s->render, t, opt.scale, &error);
 	note_presented(s);
 	report(s);
 	int64_t n = ++s->counter;
@@ -628,8 +658,8 @@ static void draw(struct screen *s)
 		wp_presentation_feedback_add_listener(f->feedback, &feedback_listener, f);
 	}
 	schedule(s);                                   /* before the commit, as the GTK host plans */
-	unsigned error = 0;
-	if (render_swap(s->render, &error)) {
+	/* an undrawn buffer is never swapped: on a lenient driver it would be shown */
+	if (drew && render_swap(s->render, &error)) {
 		W.drawn = true;
 		if (s->failing_since)
 			fprintf(stderr, "syncrain: frames are shown again\n");
@@ -711,6 +741,7 @@ static void start_watch(void)
 	W.watch_tried = true;
 	if (opt.pause_under == PAUSE_NEVER)
 		return;
+	W.watch_attempts++;
 	W.watch = watch_new(update_hidden);
 	const char *why = W.watch ? watch_start(W.watch, W.scene.kwin_script, opt.pause_under == PAUSE_MAXIMIZED)
 	                          : "out of memory";
@@ -720,7 +751,13 @@ static void start_watch(void)
 		return;
 	}
 	const char *desktop = getenv("XDG_CURRENT_DESKTOP");
-	if ((desktop && strstr(desktop, "KDE")) || !strstr(why, "not on the session bus"))
+	bool kde = desktop && strstr(desktop, "KDE");
+	/* on Plasma, KWin may not be on the bus yet: again after 5, 10 and 20 s. Not after a call that
+	 * timed out: each try blocks the frames for up to 3 s a call, and a hung KWin stays hung. */
+	bool again = kde && W.watch_attempts < 4 && strstr(why, "not on the session bus");
+	if (again)
+		W.watch_again = monotonic_us() + ((int64_t)5000000 << (W.watch_attempts - 1));
+	else if (kde || !strstr(why, "not on the session bus"))
 		printf("syncrain: %s; drawing goes on under covering windows\n", why);
 	watch_free(W.watch);
 	W.watch = NULL;
@@ -733,6 +770,9 @@ static void apply_size(struct screen *s)
 		bw = (w * s->scale120 + 60) / 120;         /* rounded half away from zero, as the protocol says */
 		bh = (h * s->scale120 + 60) / 120;
 		wp_viewport_set_destination(s->viewport, w, h);
+		/* the viewport scales; a buffer scale set before (an integer scale, then a fractional
+		 * one) would scale it again */
+		wl_surface_set_buffer_scale(s->surface, 1);
 	} else {
 		int scale = s->preferred_scale > 0 ? s->preferred_scale : s->output && s->output->scale > 0 ? s->output->scale : 1;
 		bw = w * scale;
@@ -959,7 +999,13 @@ static void registry_global(void *data, struct wl_registry *registry, uint32_t n
 {
 	(void)data;
 	if (strcmp(interface, wl_compositor_interface.name) == 0) {
+#ifdef WL_SURFACE_PREFERRED_BUFFER_SCALE_SINCE_VERSION
 		W.compositor_version = at_most(version, 6);
+#else
+		/* headers without version 6's events: a surface bound at 6 would get events it has no
+		 * listener for, and libwayland ends the connection */
+		W.compositor_version = at_most(version, 5);
+#endif
 		W.compositor = wl_registry_bind(registry, name, &wl_compositor_interface, W.compositor_version);
 	} else if (strcmp(interface, zwlr_layer_shell_v1_interface.name) == 0) {
 		W.layer_shell_version = at_most(version, 4);
@@ -1034,6 +1080,10 @@ static void run_timers(int64_t now)
 	}
 	if (W.watch_check && W.watch_check <= now)
 		watch_check();
+	if (W.watch_again && W.watch_again <= now) {
+		W.watch_again = 0;
+		W.watch_tried = false;                     /* the loop starts it again */
+	}
 }
 
 static int64_t next_deadline(void)
@@ -1045,6 +1095,8 @@ static int64_t next_deadline(void)
 			next = s->due;
 	if (W.watch_check && (!next || W.watch_check < next))
 		next = W.watch_check;
+	if (W.watch_again && (!next || W.watch_again < next))
+		next = W.watch_again;
 	return next;
 }
 
@@ -1185,6 +1237,7 @@ int main(int argc, char **argv)
 {
 	setvbuf(stdout, NULL, _IOLBF, 0);
 	parse_options(argc, argv);
+	opt.fallback = fallback_from_environment();
 	W.started = monotonic_us();
 	const char *trim = getenv("SYNCRAIN_MEMORY_SECONDS");     /* tests: a shorter round */
 	W.trim_us = trim && c_strtod(trim, NULL) > 0 ? (int64_t)(c_strtod(trim, NULL) * 1e6) : TRIM_US;
@@ -1193,6 +1246,15 @@ int main(int argc, char **argv)
 	char why[1024];
 	if (!scene_load(&W.scene, opt.scene_fd, why, sizeof why)) {
 		fprintf(stderr, "syncrain: the native wallpaper cannot read its scene: %s\n", why);
+		/* another build's program, say: the GTK host, named on the command line too, still draws */
+		if (opt.fallback && !opt.probe) {
+			fprintf(stderr, "syncrain: the GTK host takes over\n");
+			fflush(NULL);
+			close(opt.scene_fd);
+			restore_environment();
+			execvp(opt.fallback[0], opt.fallback);
+			fprintf(stderr, "syncrain: the GTK host did not start: %s\n", strerror(errno));
+		}
 		return 70;
 	}
 	close(opt.scene_fd);

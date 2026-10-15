@@ -80,15 +80,18 @@ static DBusMessage *call(struct watch *w, const char *dest, const char *path, co
 	return reply;
 }
 
-static void unload(struct watch *w, const char *plugin)
+/* whether KWin answered: a call that timed out may leave the script loaded */
+static bool unload(struct watch *w, const char *plugin)
 {
 	DBusError err;
 	dbus_error_init(&err);
 	DBusMessage *r = call(w, KWIN, "/Scripting", "org.kde.kwin.Scripting", "unloadScript", &err,
 	                      DBUS_TYPE_STRING, &plugin, DBUS_TYPE_INVALID);
+	bool answered = r != NULL && !dbus_error_is_set(&err);
 	if (r)
 		dbus_message_unref(r);
 	dbus_error_free(&err);
+	return answered;
 }
 
 static int find_screen(struct watch *w, const char *name)
@@ -228,8 +231,8 @@ static void unload_leftovers(struct watch *w, const char *runtime)
 		char plugin[64], path[PATH_MAX];
 		snprintf(plugin, sizeof plugin, "syncrain-watch-%d", pid);
 		snprintf(path, sizeof path, "%s/%s", runtime, e->d_name);
-		unload(w, plugin);
-		unlink(path);
+		if (unload(w, plugin))                     /* else tried again at the next start */
+			unlink(path);
 	}
 	closedir(d);
 }
@@ -237,7 +240,9 @@ static void unload_leftovers(struct watch *w, const char *runtime)
 static bool write_script(struct watch *w, const char *template)
 {
 	const char *service = dbus_bus_get_unique_name(w->bus);
-	int fd = open(w->path, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0600);
+	/* a file of its own, made new: never one someone put there, nor a link to another */
+	unlink(w->path);
+	int fd = open(w->path, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0600);
 	if (fd < 0 || !service)
 		return false;
 	FILE *f = fdopen(fd, "w");
@@ -306,9 +311,10 @@ const char *watch_start(struct watch *w, const char *script_template, bool maxim
 		return failed(w, &err);
 	}
 	w->registered = true;
-	dbus_bus_add_match(w->bus, MATCH, &err);
-	if (dbus_error_is_set(&err))
-		return failed(w, &err);
+	/* without an error to fill, the match is sent and not waited for: a bus slow to answer does
+	 * not hold the frames back (a match the bus refuses only means no signals, which the check
+	 * after 1.5 s sees) */
+	dbus_bus_add_match(w->bus, MATCH, NULL);
 	w->matched = true;
 	if (!dbus_connection_add_filter(w->bus, on_signal, w, NULL)) {
 		dbus_set_error_const(&err, DBUS_ERROR_NO_MEMORY, "the signal filter could not be added");
@@ -332,9 +338,12 @@ const char *watch_start(struct watch *w, const char *script_template, bool maxim
 		dbus_message_unref(r);
 	}
 	dbus_error_free(&err);
+	/* only this user's runtime folder: in /tmp anyone could have put a script there first */
 	const char *runtime = getenv("XDG_RUNTIME_DIR");
-	if (!runtime || !*runtime)
-		runtime = "/tmp";
+	if (!runtime || !*runtime) {
+		watch_stop(w);
+		return "no XDG_RUNTIME_DIR for the script KWin runs";
+	}
 	unload_leftovers(w, runtime);
 	snprintf(w->path, sizeof w->path, "%s/%s.js", runtime, w->plugin);
 	if (!write_script(w, script_template)) {
@@ -386,9 +395,9 @@ void watch_stop(struct watch *w)
 {
 	if (!w->bus)
 		return;
+	bool unloaded = false;
 	if (dbus_connection_get_is_connected(w->bus)) {
-		if (w->path[0])
-			unload(w, w->plugin);
+		unloaded = !w->path[0] || unload(w, w->plugin);
 		if (w->matched)
 			dbus_bus_remove_match(w->bus, MATCH, NULL);
 	}
@@ -397,8 +406,11 @@ void watch_stop(struct watch *w)
 	if (w->registered)
 		dbus_connection_unregister_object_path(w->bus, WATCH_PATH);
 	w->matched = w->filtered = w->registered = false;
+	/* not unloaded (the bus went first, or KWin did not answer): the file stays, so the next start
+	 * finds the script by it and unloads it then */
 	if (w->path[0]) {
-		unlink(w->path);
+		if (unloaded)
+			unlink(w->path);
 		w->path[0] = '\0';
 	}
 	dbus_connection_close(w->bus);

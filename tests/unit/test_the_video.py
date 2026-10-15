@@ -1,4 +1,5 @@
 """syncrain --video: what it is asked, the frames it plans, and what it hands ffmpeg."""
+import os
 import shutil
 
 import pytest
@@ -33,6 +34,8 @@ def test_a_frame_in_the_fade_is_drawn_as_a_canvas_draws_it():
     over, under = bytes([200, 0, 100, 255]), bytes([0, 200, 100, 255])
     assert video.blend(over, under, 0.25) == bytes([50, 150, 100, 255])
     assert video.blend(over, under, 0.0) == under and video.blend(over, under, 1.0) == over
+    # rounded, as the page's canvas rounds: 255 * 0.5 is 127.5, which truncating made 127
+    assert video.blend(bytes([255, 0, 0, 255]), bytes([0, 0, 0, 255]), 0.5)[0] == 128
 
 
 @pytest.mark.parametrize("name, size, seconds, fps", [("a.mp4", (1920, 1080), 30, 30), ("a.webm", (1920, 1080), 30, 30),
@@ -80,7 +83,8 @@ def test_a_number_too_high_says_so():
 def test_ffmpeg_reads_the_frames_as_they_are_drawn(name, says, monkeypatch):
     monkeypatch.setattr(shutil, "which", lambda exe: "/usr/bin/" + exe)
     cmd = video.ffmpeg_command(name, 640, 360, 30)
-    assert cmd[-1] == name and cmd[cmd.index("-i") + 1] == "-" and "640x360" in cmd and "rgba" in cmd
+    assert cmd[-1] == "file:" + os.path.abspath(name), "a file, whatever its name holds"
+    assert cmd[cmd.index("-i") + 1] == "-" and "640x360" in cmd and "rgba" in cmd
     assert all(word in cmd for word in says)
     assert any(arg.startswith("vflip") for arg in cmd)              # OpenGL's rows run bottom to top
     if name.endswith(".gif"):

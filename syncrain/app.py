@@ -94,6 +94,18 @@ def _channel(text):
     return text
 
 
+def _size(text):
+    """WIDTHxHEIGHT, each 1 to 16384: checked here for every use (a window, --record, --benchmark),
+    not first inside the window where a wrong one raised."""
+    try:
+        w, h = (int(v) for v in text.lower().split("x"))
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"a size is WIDTHxHEIGHT, e.g. 1920x1080: {text!r}") from None
+    if not (1 <= w <= 16384 and 1 <= h <= 16384):
+        raise argparse.ArgumentTypeError(f"a size is 1 to 16384 pixels each way: {text!r}")
+    return f"{w}x{h}"
+
+
 def _theme(text):
     """A theme there is: refused here (status 2, which the service does not restart on), not when
     the wallpaper starts (status 1, which it restarts on, for good)."""
@@ -399,7 +411,7 @@ def parse_args(argv=None):
                     help="add this many seconds to the clock")
     ap.add_argument("--time", type=_number(low=0, high=1e11),
                     help="freeze the clock at this UNIX time (screenshots, tests)")
-    ap.add_argument("--screenshot", metavar="PNG", help="render one frame, save it, exit")
+    ap.add_argument("--screenshot", metavar="PNG", help="render one frame and save it, then exit: on X11 the whole desktop as the wallpaper draws it; on Wayland, or with --window, a window of about --size (default 1280x720; device pixels, as the compositor sizes it)")
     ap.add_argument("--record", metavar="DIR", help="render a clip as numbered PNGs into DIR (from --time or now), exit")
     ap.add_argument("--record-seconds", type=_number(above=0), default=8.0, help="how long --record is (default 8)")
     ap.add_argument("--record-fps", type=_number(above=0, high=1000), default=30.0,
@@ -413,7 +425,7 @@ def parse_args(argv=None):
                     help="frames per second of --video (default 30, a GIF 15)")
     ap.add_argument("--loop", choices=("on", "off"), default="on",
                     help="--video ends where it begins, so a player repeating it shows no seam (default on)")
-    ap.add_argument("--size", help="window size for --window / --record (default 1280x720), the size of --video, "
+    ap.add_argument("--size", type=_size, help="window size for --window / --record (default 1280x720), the size of --video, "
                                    "or the size --benchmark draws at (default: the first screen), e.g. 1920x1080")
     ap.add_argument("--list-themes", action="store_true", help="list the presets and exit")
     ap.add_argument("--benchmark", action="store_true",
@@ -442,6 +454,7 @@ def parse_args(argv=None):
             path = None
     args = ap.parse_args(settings + argv)        # the command line's last, so it goes over the file
     args.config_file = path
+    args.typed = argv                             # the command line alone (--power-sweep passes it on)
     if args.theme is None:                        # the preset with nothing said
         from .engine import default_preset, load_meta
         args.theme = default_preset(load_meta())
@@ -668,11 +681,11 @@ def main(argv=None):
     if args.check_config:
         from . import glyphs
         from .engine import DATA_DIR, load_meta
-        from .renderer import from_args
+        from .renderer import compose_for, from_args
         if isinstance(args.glyphs, dict):         # the wallpaper would fall back to the preset's: say it
             meta = load_meta()
-            try:
-                glyphs.resolve(meta, meta["themes"][args.theme], DATA_DIR, args.glyphs, str(args.config_file),
+            try:                                  # counted with the words the file names, as drawn
+                glyphs.resolve(meta, compose_for(meta, args), DATA_DIR, args.glyphs, str(args.config_file),
                                args.hieroglyphs)
             except glyphs.GlyphsError as e:
                 print(f"syncrain: {e}", file=sys.stderr)
@@ -740,7 +753,9 @@ def main(argv=None):
     from .renderer import from_args as renderer_from_args
 
     LayerShell = None
-    if "Wayland" in backend and not (args.window or args.record or args.video):
+    # a still, frames or a video are drawn in a window of their own size here: as a wallpaper, two
+    # screens wrote one file twice, and GNOME (no wallpaper layer) none
+    if "Wayland" in backend and not (args.window or args.record or args.video or args.screenshot):
         try:
             gi.require_version("Gtk4LayerShell", "1.0")
             from gi.repository import Gtk4LayerShell as LayerShell
@@ -838,8 +853,16 @@ def main(argv=None):
             self._off = {}
             self.renderer = None
 
-        def _offscreen(self, w, h):                # one reduced-size target per viewport size (--scale)
-            if (w, h) not in self._off:
+        def _offscreen(self, w, h, keep=2):        # one reduced-size target per viewport size (--scale)
+            if (w, h) in self._off:
+                self._off[(w, h)] = self._off.pop((w, h))      # the latest used last
+            else:
+                # a window resized again and again keeps the sizes it uses last (one per monitor it
+                # covers, at least two), not every size it ever had (each a texture on the card)
+                while len(self._off) >= keep:
+                    old_fbo, old_tex = self._off.pop(next(iter(self._off)))
+                    gl.delete_framebuffers([old_fbo])
+                    gl.delete_textures([old_tex])
                 fbo, tex = gl.gen_framebuffer(), gl.gen_texture()
                 gl.glBindTexture(gl.GL_TEXTURE_2D, tex)
                 gl.glTexImage2D(gl.GL_TEXTURE_2D, 0, gl.GL_RGBA8, w, h, 0, gl.GL_RGBA, gl.GL_UNSIGNED_BYTE, None)
@@ -962,10 +985,11 @@ def main(argv=None):
                 return False
             out = gl.get_integer(gl.GL_FRAMEBUFFER_BINDING)
             t = self._moment()
-            for (x, y, w, h) in (self.rects(W, H) if self.rects else [(0, 0, W, H)]):
+            areas = self.rects(W, H) if self.rects else [(0, 0, W, H)]
+            for (x, y, w, h) in areas:
                 if args.scale < 0.999:
                     sw, sh = max(64, round(w * args.scale)), max(36, round(h * args.scale))
-                    off = self._offscreen(sw, sh)
+                    off = self._offscreen(sw, sh, keep=max(2, len(areas)))
                     self.renderer.render(t, off, 0, 0, sw, sh)
                     gl.glBindFramebuffer(gl.GL_READ_FRAMEBUFFER, off)
                     gl.glBindFramebuffer(gl.GL_DRAW_FRAMEBUFFER, out)
@@ -996,6 +1020,15 @@ def main(argv=None):
                 except (OSError, ValueError, RuntimeError) as e:     # a folder it cannot write, ffmpeg's no
                     print(f"\nsyncrain: not saved: {e}", file=sys.stderr, flush=True)
                     app.exit_code = app.exit_code or 1
+                except Exception as e:  # noqa: BLE001 - anything else ends this video too, said, not again each frame
+                    print(f"\nsyncrain: not saved: {type(e).__name__}: {e}", file=sys.stderr, flush=True)
+                    app.exit_code = app.exit_code or 1
+                if app.video is not None:            # stopped part way: no half video left behind
+                    try:
+                        app.video.abort()
+                    except Exception:  # noqa: BLE001
+                        pass
+                    app.video = None
                 self.renderer = None                 # one video only; then out
                 GLib.idle_add(app.quit, priority=GLib.PRIORITY_HIGH)
             elif args.screenshot or args.record:
@@ -1078,7 +1111,10 @@ def main(argv=None):
         def do_activate(self):
             self.hold()
             self.build()
-            display.get_monitors().connect("items-changed", lambda *_: self.rebuild_soon())
+            # a screen plugged in or out rebuilds the wallpaper's windows; a one-shot window (a still,
+            # frames, a video) keeps its own: rebuilt, it lost the renderer its video was drawing with
+            if not (args.video or args.screenshot or args.record):
+                display.get_monitors().connect("items-changed", lambda *_: self.rebuild_soon())
             if args.pacing == "timer":
                 GLib.timeout_add(max(1, int(round(1000.0 / max(1.0, args.fps)))), self.tick)
             self.start_watch()
@@ -1196,7 +1232,10 @@ def main(argv=None):
 
         def build(self):
             monitors = [display.get_monitors().get_item(i) for i in range(display.get_monitors().get_n_items())]
-            windowed = args.window or args.record or args.video or (args.screenshot and not monitors)
+            # a still on Wayland is drawn in a window (as layers, two screens wrote one file twice and
+            # GNOME none); on X11 the wallpaper is one window over every screen, and its still is the desktop
+            windowed = (args.window or args.record or args.video
+                        or (args.screenshot and ("Wayland" in backend or not monitors)))
             self.screens = 0 if windowed else len(monitors)
             if windowed:
                 # a video is drawn at its own size off the screen: its window only gives the drawing a context

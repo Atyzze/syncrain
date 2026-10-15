@@ -226,15 +226,25 @@ class Watch:
                                                        "(v)")[0])
             except GLib.Error:
                 self.showing_desktop = False
-            runtime = os.environ.get("XDG_RUNTIME_DIR") or "/tmp"
+            # only this user's runtime folder: in /tmp anyone could have put a script there first
+            runtime = os.environ.get("XDG_RUNTIME_DIR")
+            if not runtime:
+                self.stop()
+                return "no XDG_RUNTIME_DIR for the script KWin runs"
             for pid, path in leftovers(runtime):        # scripts of syncrains that died without unloading
-                self._unload(f"syncrain-watch-{pid}")
+                if not self._unload(f"syncrain-watch-{pid}"):
+                    continue                            # tried again at the next start
                 try:
                     os.unlink(path)
                 except OSError:
                     pass
-            self._path = os.path.join(runtime, f"{self.plugin}.js")
-            fd = os.open(self._path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+            path = os.path.join(runtime, f"{self.plugin}.js")
+            try:                                # a file of its own, made new: never a link to another
+                os.unlink(path)
+            except OSError:
+                pass
+            fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_CLOEXEC, 0o600)
+            self._path = path
             with os.fdopen(fd, "w") as f:
                 f.write(script_source(self._bus.get_unique_name(), self.maximized))
             self._unload()                      # a script of a process with this pid that never unloaded
@@ -247,24 +257,29 @@ class Watch:
         except GLib.Error as e:
             self.stop()
             return f"KWin's scripting did not answer ({e.message})"
+        except OSError as e:                    # the script could not be written
+            self.stop()
+            return f"KWin's scripting did not answer (the script could not be written: {e.strerror})"
         return None
 
     def stop(self):
         if self._bus is None:
             return
-        self._unload()
+        unloaded = self._unload()
         if self._registration:
             self._bus.unregister_object(self._registration)
             self._registration = None
         if self._subscription is not None:
             self._bus.signal_unsubscribe(self._subscription)
             self._subscription = None
-        if self._path:
+        # not unloaded (KWin did not answer): the file stays, so the next start finds the script by it
+        # and unloads it then, as the native wallpaper does
+        if self._path and unloaded:
             try:
                 os.unlink(self._path)
             except OSError:
                 pass
-            self._path = None
+        self._path = None
 
     def retry(self):
         """The script has not answered: perhaps `run` reached another script that had the same number
@@ -274,12 +289,14 @@ class Watch:
         except self._GLib.Error:
             pass
 
-    def _unload(self, plugin=None):
+    def _unload(self, plugin=None) -> bool:
+        """Whether KWin answered: a call that timed out may leave the script loaded."""
         try:
             self._call(self.KWIN, "/Scripting", "org.kde.kwin.Scripting", "unloadScript",
                        self._GLib.Variant("(s)", (plugin or self.plugin,)), "(b)")
         except self._GLib.Error:
-            pass
+            return False
+        return True
 
     def _call(self, name, path, interface, method, params, reply):
         result = self._bus.call_sync(name, path, interface, method, params,

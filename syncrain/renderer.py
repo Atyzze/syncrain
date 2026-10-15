@@ -336,9 +336,20 @@ class Shared:
         key = renderer.resource_key(use_es)
         shared = cls._made.get(key)
         if shared is None or not shared.usable_here():
+            # another look replaces the one before: its programs and textures (the atlas, a
+            # picture as the logo) go from the card when this context can reach them
+            for old_key in [k for k in cls._made if k != key]:
+                old = cls._made.pop(old_key)
+                if old.usable_here():
+                    old.release()
             shared = cls(renderer, use_es)
             cls._made[key] = shared
         return shared
+
+    def release(self):
+        for p in self.prog.values():
+            gl.glDeleteProgram(p.id)
+        gl.delete_textures(list(self.tex.values()))
 
     @classmethod
     def forget(cls):
@@ -386,6 +397,13 @@ class Shared:
 #: The Renderer's keywords that come straight from the command line's options of the same names.
 OPTIONS = ("theme", "channel", "logo", "background", "mask", "bg_gamma", "bg_gain", "rainbow", "spin", "drift",
            "speed", "density", "snow", "glow", "bloom", "hieroglyphs", "glyphs") + engine.LOOK_OPTIONS
+
+
+def compose_for(meta, args):
+    """The look a frame of these command-line options is drawn with (engine.compose, as Renderer
+    calls it): the preset with the settings over it, the hidden words included."""
+    return engine.compose(meta, getattr(args, "theme", None), rainbow=getattr(args, "rainbow", None),
+                          **{k: getattr(args, k, None) for k in engine.LOOK_OPTIONS})
 
 
 def from_args(args, **override):

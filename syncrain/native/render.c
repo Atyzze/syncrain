@@ -341,10 +341,16 @@ void render_surface_destroy(struct render_surface *rs)
 
 /* ------------------------------------------------------------------ a frame */
 
-void render_frame(struct render_surface *rs, double unix_time, double scale)
+bool render_frame(struct render_surface *rs, double unix_time, double scale, unsigned *error)
 {
 	if (R.current != rs) {
-		eglMakeCurrent(R.display, rs->surface, rs->surface, R.context);
+		/* cached only once it holds: a failed switch is tried again next frame, not taken for done
+		 * (drawing into another screen's surface meanwhile). EGL keeps what was current then, so the
+		 * record stays as it is: that surface is still unbound before it is destroyed. */
+		if (!eglMakeCurrent(R.display, rs->surface, rs->surface, R.context)) {
+			*error = (unsigned)eglGetError();
+			return false;
+		}
 		R.current = rs;
 	}
 	if (!rs->interval_set) {
@@ -352,6 +358,7 @@ void render_frame(struct render_surface *rs, double unix_time, double scale)
 		rs->interval_set = true;
 	}
 	passes_draw_scaled(R.passes, unix_time, 0, rs->width, rs->height, scale);
+	return true;
 }
 
 bool render_swap(struct render_surface *rs, unsigned *error)

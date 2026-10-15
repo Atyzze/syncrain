@@ -77,15 +77,28 @@ def test_every_phase_is_named_once_and_the_sweep_starts_from_nothing():
 
 
 def test_the_phases_run_with_the_wallpaper_s_own_options(tmp_path):
+    """What was typed, and the settings file by name (or none): never its values one by one (a
+    picture as the logo is too long for a command line) nor one at the default place when the
+    sweep was told --config none."""
     args = parse_args(["--power-sweep", "--config", "none", "--channel=-friends", "--rainbow", "all"])
-    assert power.base_args(args) == ["--channel=-friends", "--rainbow=all"]
-    assert power.base_args(parse_args(["--power-sweep", "--config", "none"])) == []
-    assert power.base_args(parse_args(["--power-sweep", "--config", "none", "--pause-under", "fullscreen"])) == \
-        ["--pause-under=fullscreen"]
-    assert power.base_args(parse_args(["--power-sweep", "--config", "none", "--host", "gtk"])) == ["--host=gtk"]
+    assert power.base_args(args) == ["--channel=-friends", "--rainbow", "all", "--config=none"]
+    assert power.base_args(parse_args(["--power-sweep", "--config", "none"])) == ["--config=none"]
+    assert power.base_args(parse_args(["--power-sweep", "--config=none", "--sweep-seconds", "9",
+                                       "--pause-under", "fullscreen", "--rain-colors", "#000000,#111111,#222222,#333333"])) \
+        == ["--pause-under", "fullscreen", "--rain-colors", "#000000,#111111,#222222,#333333", "--config=none"]
+    import base64
+    import io
+    import json
+    import os
+    from PIL import Image
+    picture = io.BytesIO()
+    Image.frombytes("RGBA", (64, 64), os.urandom(64 * 64 * 4)).save(picture, "PNG")
     settings = tmp_path / "config.json"
-    settings.write_text('{"contract": "syncrain-config-1", "glyphs": {"sets": [{"name": "a", "chars": "ab"}]}}')
-    assert power.base_args(parse_args(["--power-sweep", "--config", str(settings)])) == [f"--config={settings}"]
+    settings.write_text(json.dumps({"contract": "syncrain-config-1",
+                                    "logo": "data:image/png;base64," + base64.b64encode(picture.getvalue()).decode(),
+                                    "glyphs": {"sets": [{"name": "a", "chars": "ab"}]}}))
+    passed = power.base_args(parse_args(["--power-sweep", "--config", str(settings), "--host", "gtk"]))
+    assert passed == ["--host", "gtk", f"--config={settings}"]
 
 
 def test_each_phase_says_what_drew_it():

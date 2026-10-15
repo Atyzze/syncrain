@@ -282,7 +282,6 @@ def test_a_picture_picked_as_the_logo_goes_into_the_settings_file(page, tmp_path
     ({"words": [" HI", "THERE "]}, {"words": ["HI", "THERE"]}),
 ], ids=["build-21-matrix", "a-null-is-no-value", "rainbow-off", "rainbow-where-it-stands", "words-as-the-desktop-reads"])
 def test_the_page_reads_a_file_as_the_desktop_does(page, tmp_path, given, then):
-    from syncrain import engine
     from syncrain.app import parse_args
     from syncrain.renderer import from_args
     path = tmp_path / "config.json"

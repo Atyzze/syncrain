@@ -151,10 +151,16 @@ def gtk_host_command(user_args) -> list[str]:
     return program + list(user_args) + ["--host", "gtk"]
 
 
-def environment() -> dict:
+def environment(fallback: list[str] | None = None) -> dict:
     """The native program's environment: gtk4-layer-shell out of LD_PRELOAD (it would load GTK into
-    the process for nothing), kept in SYNCRAIN_LD_PRELOAD for the GTK host, should it take over."""
-    env = dict(os.environ)
+    the process for nothing), kept in SYNCRAIN_LD_PRELOAD for the GTK host, should it take over. And
+    the GTK host's command, for when the scene itself cannot be read (it is in the scene too, where
+    everything else finds it): in SYNCRAIN_FALLBACK_*, which a program of an earlier build ignores,
+    where an option it does not know stopped it."""
+    env = {k: v for k, v in os.environ.items() if not k.startswith("SYNCRAIN_FALLBACK_")}
+    if fallback:
+        env["SYNCRAIN_FALLBACK_ARGC"] = str(len(fallback))
+        env.update({f"SYNCRAIN_FALLBACK_{i}": a for i, a in enumerate(fallback)})
     preload = env.get("LD_PRELOAD", "")
     kept = [p for p in re.split(r"[\s:]+", preload) if p and "gtk4-layer-shell" not in os.path.basename(p)]
     if preload:
@@ -167,6 +173,7 @@ def environment() -> dict:
 
 
 def command(path: str, args, scene_fd: int) -> list[str]:
+    """The native program's command line."""
     layer = args.layer or ("bottom" if "KDE" in os.environ.get("XDG_CURRENT_DESKTOP", "") else "background")
     cmd = [path, "--scene", str(scene_fd), "--fps", repr(float(args.fps)), "--pause-under", args.pause_under,
            "--scale", repr(float(args.scale)), "--layer", layer, "--offset", repr(float(args.offset))]
@@ -203,7 +210,7 @@ def run(args, user_args, path: str) -> str:
         argv = command(path, args, fd)
         sys.stdout.flush()
         sys.stderr.flush()
-        os.execve(path, argv, environment())
+        os.execve(path, argv, environment(fallback))
     except OSError as e:
         return f"the native wallpaper did not start ({e})"
     except Exception as e:  # noqa: BLE001 - a picture or font the scene cannot use: the GTK host says why

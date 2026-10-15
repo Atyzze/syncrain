@@ -17,6 +17,8 @@
  */
 #define _GNU_SOURCE
 #include <errno.h>
+#include <limits.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -93,6 +95,29 @@ static char **split_arguments(struct blob b)
 #define FAIL(...) do { snprintf(why, why_size, __VA_ARGS__); goto fail; } while (0)
 #define MAX_WORDS (UNIFORM_VALUES + 8)
 
+/* A whole number or a finite real, all of the word and nothing else ("0,44" or "64junk" is no
+ * number): what Python wrote, or the scene is refused. */
+static bool whole(const char *s, long long lo, long long hi, long long *out)
+{
+	char *end;
+	errno = 0;
+	long long v = strtoll(s, &end, 10);
+	if (end == s || *end || errno || v < lo || v > hi)
+		return false;
+	*out = v;
+	return true;
+}
+
+static bool real(const char *s, double *out)
+{
+	char *end;
+	double v = c_strtod(s, &end);
+	if (end == s || *end || !isfinite(v))
+		return false;
+	*out = v;
+	return true;
+}
+
 bool scene_load(struct scene *scene, int fd, char *why, size_t why_size)
 {
 	memset(scene, 0, sizeof *scene);
@@ -126,6 +151,8 @@ bool scene_load(struct scene *scene, int fd, char *why, size_t why_size)
 	int capacity = 0;
 	char line[4096];
 	bool first = true;
+	bool seen_epoch = false, seen_cols = false, seen_keep = false, seen_bg = false;
+	long long whole_value;
 	for (const char *p = all; p < end - 4; ) {
 		const char *nl = memchr(p, '\n', (size_t)(end - p));
 		size_t len = (size_t)(nl - p);
@@ -151,38 +178,55 @@ bool scene_load(struct scene *scene, int fd, char *why, size_t why_size)
 		if (n == 0)
 			continue;
 		if (strcmp(word[0], "epoch0") == 0 && n == 2) {
-			scene->epoch0 = strtoll(word[1], NULL, 10);
+			if (seen_epoch || !whole(word[1], 0, LLONG_MAX, &whole_value))
+				FAIL("the scene's epoch0 is no number, or said twice");
+			scene->epoch0 = whole_value;
+			seen_epoch = true;
 		} else if (strcmp(word[0], "cols") == 0 && n == 2) {
-			scene->cols = atoi(word[1]);
+			if (seen_cols || !whole(word[1], 1, 4096, &whole_value))
+				FAIL("the scene's columns are no number, or said twice");
+			scene->cols = (int)whole_value;
+			seen_cols = true;
 		} else if (strcmp(word[0], "keep") == 0 && n >= 2) {
+			if (seen_keep)
+				FAIL("the scene says what to keep twice");
+			seen_keep = true;
 			if (strcmp(word[1], "logo") == 0 && n == 4) {
 				scene->keep = KEEP_LOGO;
-				scene->logo_size = c_strtod(word[2], NULL);
-				scene->drift = c_strtod(word[3], NULL);
+				if (!real(word[2], &scene->logo_size) || !real(word[3], &scene->drift))
+					FAIL("a keep line whose numbers are no numbers");
 			} else if (strcmp(word[1], "mask") == 0 && n == 7) {
 				scene->keep = KEEP_MASK;
 				for (int i = 0; i < 4; i++)
-					scene->mask_bbox[i] = c_strtod(word[2 + i], NULL);
-				scene->drift = c_strtod(word[6], NULL);
+					if (!real(word[2 + i], &scene->mask_bbox[i]))
+						FAIL("a keep line whose numbers are no numbers");
+				if (!real(word[6], &scene->drift))
+					FAIL("a keep line whose numbers are no numbers");
 			} else if (strcmp(word[1], "none") == 0) {
 				scene->keep = KEEP_NONE;
 			} else {
 				FAIL("a keep line the native wallpaper does not know");
 			}
 		} else if (strcmp(word[0], "bg") == 0 && n == 3) {
-			scene->bg_width = atoi(word[1]);
-			scene->bg_height = atoi(word[2]);
+			long long w, h;
+			if (seen_bg || !whole(word[1], 0, 65536, &w) || !whole(word[2], 0, 65536, &h))
+				FAIL("the background's size is no number, or said twice");
+			scene->bg_width = (int)w;
+			scene->bg_height = (int)h;
+			seen_bg = true;
 		} else if (strcmp(word[0], "shader") == 0 && n == 4) {
 			struct blob b;
 			if (!span(word[2], word[3], data, data_size, &b))
 				FAIL("shader %s lies outside the scene", word[1]);
 			if (strcmp(word[1], "vert") == 0) {
+				if (shader[PROGRAM_COUNT])
+					FAIL("the vertex shader twice");
 				scene->vertex = b;
 				shader[PROGRAM_COUNT] = true;
 			} else {
 				int k = lookup(word[1], PROGRAMS, PROGRAM_COUNT);
-				if (k < 0)
-					FAIL("an unknown shader %s", word[1]);
+				if (k < 0 || shader[k])
+					FAIL("an unknown shader, or one twice: %s", word[1]);
 				scene->fragment[k] = b;
 				shader[k] = true;
 			}
@@ -190,10 +234,13 @@ bool scene_load(struct scene *scene, int fd, char *why, size_t why_size)
 			int k = lookup(word[1], TEXTURES, TEXTURE_COUNT);
 			int f = lookup(word[4], FILTERS, 3);
 			struct texture_source *t = k >= 0 ? &scene->texture[k] : NULL;
-			if (!t || f < 0)
-				FAIL("an unknown texture line for %s", word[1]);
-			t->width = atoi(word[2]);
-			t->height = atoi(word[3]);
+			long long w, h;
+			if (!t || f < 0 || t->set)
+				FAIL("an unknown texture line for %s, or one twice", word[1]);
+			if (!whole(word[2], 1, 32768, &w) || !whole(word[3], 1, 32768, &h))
+				FAIL("texture %s's size is no number", word[1]);
+			t->width = (int)w;
+			t->height = (int)h;
 			t->filter = (enum filter)f;
 			if (!span(word[5], word[6], data, data_size, &t->pixels) || t->width <= 0 || t->height <= 0 ||
 			    t->pixels.size != (size_t)t->width * (size_t)t->height * 4)
@@ -217,16 +264,24 @@ bool scene_load(struct scene *scene, int fd, char *why, size_t why_size)
 			strcpy(u->name, word[2]);
 			strcpy(u->kind, word[3]);
 			u->count = n - 4;
+			bool integer = strcmp(u->kind, "i") == 0 || strcmp(u->kind, "ui") == 0;
 			for (int i = 0; i < u->count; i++) {
-				u->value[i] = c_strtod(word[4 + i], NULL);
-				u->integer[i] = strtoll(word[4 + i], NULL, 10);
+				if (integer ? !whole(word[4 + i], LLONG_MIN, LLONG_MAX, &u->integer[i])
+				            : !real(word[4 + i], &u->value[i]))
+					FAIL("uniform %s's value is no number: %.40s", u->name, word[4 + i]);
+				if (integer)
+					u->value[i] = (double)u->integer[i];
 			}
 		} else if (strcmp(word[0], "kwin-script") == 0 && n == 3) {
 			struct blob b;
+			if (scene->kwin_script)
+				FAIL("the KWin script twice");
 			if (!span(word[1], word[2], data, data_size, &b) || !(scene->kwin_script = copy_blob(b)))
 				FAIL("the KWin script lies outside the scene");
 		} else if (strcmp(word[0], "fallback") == 0 && n == 3) {
 			struct blob b;
+			if (scene->fallback)
+				FAIL("the fallback command twice");
 			if (!span(word[1], word[2], data, data_size, &b) || !(scene->fallback = split_arguments(b)))
 				FAIL("the fallback command lies outside the scene");
 		} else {

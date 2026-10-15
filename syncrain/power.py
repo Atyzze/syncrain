@@ -27,7 +27,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-from . import build, engine
+from . import build
 
 # ---------------------------------------------------------------- power sources
 
@@ -156,9 +156,12 @@ def detect_power_source(sysfs: str = "/sys/class/drm"):
         return Command(command)
     exe = shutil.which("nvidia-smi")
     if exe:
-        probe = subprocess.run([exe, "--query-gpu=power.draw", "--format=csv,noheader,nounits"],
-                               capture_output=True, text=True, timeout=10)
-        if probe.returncode == 0 and re.match(r"^\s*[0-9.]+", probe.stdout):
+        try:
+            probe = subprocess.run([exe, "--query-gpu=power.draw", "--format=csv,noheader,nounits"],
+                                   capture_output=True, text=True, timeout=10)
+        except (OSError, subprocess.SubprocessError):     # a driver that hangs it: the sensors may still say
+            probe = None
+        if probe is not None and probe.returncode == 0 and re.match(r"^\s*[0-9.]+", probe.stdout):
             return NvidiaSmi(exe)
     files = []
     for hw in sorted(glob.glob(os.path.join(sysfs, "card[0-9]*/device/hwmon/hwmon*"))):
@@ -270,26 +273,24 @@ def interrupted_by_hangup():
             signal.signal(sig, handler)
 
 
-#: The wallpaper options a sweep passes on to every phase (the rest are the phase's own).
-PASS_ON = ("theme", "channel", "logo", "background", "mask", "bg_gamma", "bg_gain", "rainbow", "spin", "drift",
-           "speed", "density", "glow", "bloom", "snow", "hieroglyphs", "glyphs", "layer", "scale", "fps", "pause_under",
-           "host")
+#: The sweep's own options (and how many words each takes): no phase is given them.
+SWEEP_OWN = {"--power-sweep": 0, "--sweep-seconds": 1, "--config": 1}
 
 
 def base_args(args) -> list[str]:
-    out = []
-    preset = engine.default_preset(engine.load_meta())
-    for key in PASS_ON:
-        value = getattr(args, key, None)
-        default = {"theme": preset, "channel": "public", "scale": 1.0, "fps": 30.0, "pause_under": "maximized",
-                   "host": "auto"}.get(key)
-        if key == "glyphs" and not isinstance(value, str):
-            continue                              # the settings file's sets: it is passed on below
-        if value is not None and value != default:
-            out.append(f"--{key.replace('_', '-')}={value}")
-    if getattr(args, "config_file", None):
-        out.append(f"--config={args.config_file}")
-    return out
+    """The wallpaper's options for every phase: what was typed on the command line (the sweep's own
+    left out), then the settings file by name, or none. Never the file's values one by one: a
+    picture as the logo is its whole image, too long for a command line; and a sweep told
+    `--config none` measures no settings file, whatever lies at the default place."""
+    typed, out, i = list(getattr(args, "typed", [])), [], 0
+    while i < len(typed):
+        name, joined = typed[i].split("=", 1)[0], "=" in typed[i]
+        if name in SWEEP_OWN:
+            i += 1 + (0 if joined else SWEEP_OWN[name])
+            continue
+        out.append(typed[i])
+        i += 1
+    return out + [f"--config={args.config_file}" if args.config_file else "--config=none"]
 
 
 class Child:
@@ -411,6 +412,7 @@ def run_sweep(args) -> int:
     results = []
     child = cover = None
     interrupted = False
+    failure = None
     with interrupted_by_hangup():
         try:
             for n, phase in enumerate(plan, 1):
@@ -464,6 +466,9 @@ def run_sweep(args) -> int:
                 child = cover = None
         except KeyboardInterrupt:
             interrupted = True
+        except Exception as e:  # noqa: BLE001 - what was measured before it is still reported
+            failure = f"{type(e).__name__}: {e}"
+            print(f"syncrain: the sweep stopped: {failure}", file=sys.stderr, flush=True)
         finally:
             hold_signals()
             for c in (cover, child):
@@ -471,7 +476,7 @@ def run_sweep(args) -> int:
                     c.stop()
             source.stop()
         report(results, described, interrupted)      # still held: the record is kept whatever comes now
-    return 0 if not interrupted else 130
+    return 130 if interrupted else 1 if failure else 0
 
 
 def drawn_by(startup: str) -> str:

@@ -158,7 +158,8 @@ def symbol_lines(args) -> list[str]:
     """Which symbols a wallpaper started now would draw, and what no font here can draw."""
     from . import engine, glyphs
     meta = engine.load_meta()
-    theme = meta["themes"].get(args.theme) or meta["themes"][engine.default_preset(meta)]
+    from .renderer import compose_for
+    theme = compose_for(meta, args)              # the settings' own words count, as drawn
     said = []
     if isinstance(args.glyphs, dict):            # a settings file's sets
         r = glyphs.resolve(meta, theme, engine.DATA_DIR, args.glyphs, "the settings file", args.hieroglyphs)
@@ -307,15 +308,37 @@ def run(args) -> int:
     verdict = None
     code = 0
 
-    def section(title, lines):
+    def section(title, make):
+        """A section's lines; one that fails says so in its place, and the rest are still said."""
+        try:
+            lines = make() if callable(make) else make
+        except Exception as e:  # noqa: BLE001 - a settings file the wallpaper falls back from, no Pillow
+            lines = [f"could not check ({type(e).__name__}: {e})"]
         out.append(f"{title}:")
         out.extend(f"  {line}" for line in lines)
 
-    section("session", session_lines())
-    section("running wallpaper", running_lines())
-    section("symbols", symbol_lines(args))
-    section("login screen", login_lines())
-    section("graphics cards", graphics_cards())
+    section("session", session_lines)
+    section("running wallpaper", running_lines)
+    section("symbols", lambda: symbol_lines(args))
+    section("login screen", login_lines)
+    section("graphics cards", graphics_cards)
+    try:
+        verdict, code = _drawing(args, section)
+    except Exception as e:  # noqa: BLE001 - whatever stops the check, what it found is still printed
+        verdict, code = f"the check stopped: {type(e).__name__}: {e}", 1
+    finally:
+        print(f"{build.describe()} --diagnose")
+        print(f"verdict: {verdict}")
+        print("\n".join(out))
+        sys.stdout.flush()
+    return code
+
+
+def _drawing(args, section) -> tuple[str, int]:
+    """GTK, the screens, OpenGL and a test frame, the covering windows, the native wallpaper:
+    (the verdict, the exit status)."""
+    verdict = None
+    code = 0
     from .app import avoid_the_explicit_sync_leak, use_gl_renderer
     use_gl_renderer()                        # what the wallpaper itself does, so the answer is about it
     avoid_the_explicit_sync_leak()
@@ -337,7 +360,7 @@ def run(args) -> int:
         backend = type(display).__name__.replace("Gdk", "").replace("Display", "") or "unknown"
         libs, layer = library_lines(Gtk)
         section("libraries", libs + [f"GDK backend: {backend}"])
-        section("screens", screen_lines(display))
+        section("screens", lambda: screen_lines(display))
         from . import gl
         from .app import EXIT_NO_GL, gl_context_problem
 
@@ -374,15 +397,11 @@ def run(args) -> int:
                             f"(GSK_RENDERER={os.environ.get('GSK_RENDERER', '')})")
             section("OpenGL", gl_lines)
         if backend == "Wayland" and layer:
-            section("covering windows", covering_lines(args))
-        section("native wallpaper", native_lines(args))
+            section("covering windows", lambda: covering_lines(args))
+        section("native wallpaper", lambda: native_lines(args))
         if verdict is None:
             kind = "OpenGL ES" if use_es else "OpenGL"
             verdict = f"OK, syncrain can draw here ({kind} {major}.{minor})"
             if backend == "Wayland" and not layer:
                 verdict += ", but only with --window: this compositor offers no wallpaper layer"
-    print(f"{build.describe()} --diagnose")
-    print(f"verdict: {verdict}")
-    print("\n".join(out))
-    sys.stdout.flush()
-    return code
+    return verdict, code

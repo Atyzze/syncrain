@@ -1,4 +1,4 @@
-# Where we are, at build 38
+# Where we are, at build 39
 
 The project on one page. Detail: `docs/agent/HANDOFF.md`.
 
@@ -37,13 +37,12 @@ plain text by design: the text means the machine is not up yet, the rain that it
 * **Your NixOS flavour** (build 33): `nix flake init -t github:Atyzze/syncrain` over your own
   `/etc/nixos`, kept whole, `nixos-rebuild switch`: Plasma 6 with the rain as wallpaper, login and lock screen.
   The whole system builds here; no machine has booted it yet.
-* **On GitHub**: github.com/Atyzze/syncrain, every build up to 38.
+* **On GitHub**: github.com/Atyzze/syncrain, every build up to 39.
 
 ## What comes next
 
-* **Next**: the rest of the review of build 33, the most critical first: the hosts (39), the page
-  and the release tool (41).
-* **Build 40**: the next consolidation (every number ending in 0).
+* **Next**: the consolidation (40), then the rest of the review of build 33: the page and the
+  release tool (41).
 
 ## The decision in front of you
 

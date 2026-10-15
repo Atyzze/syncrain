@@ -1,12 +1,14 @@
-# The next build is 39
+# The next build is 40
 
 The first line is parsed: `# The next build is <N>`, exactly one above `BUILD_NUMBER`.
 
-## Build 39: the native host and the Python host (14, 15, 29, 48 to 55, 57 to 64, 67, 68)
+## Build 40: the consolidation
 
 * Read what the operator sent last, and answer it in one plain sentence first.
-* Then the review of build 33, in order (`docs/ROADMAP.md`, "Planned builds"). None of the builds
-  after 35 changes the stream.
+* A consolidation (the `**Type:**` line says "consolidation"): fold the notes of builds 29 to 38
+  into `docs/HISTORY.md` and keep the notes of 39 and 40; make every document true of the tree;
+  change no behaviour and not the stream.
+* Then build 41: the page and the release tool, the last of the review of build 33 (`docs/ROADMAP.md`).
 * No boot splash: never touch the bootloader, initramfs or Plymouth.
 
 **Known blockers**: watts, NVIDIA's driver and Plasma's shell exist only on the operator's machine;

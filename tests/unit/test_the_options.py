@@ -343,3 +343,25 @@ def test_a_short_period_in_a_settings_file_is_the_shortest(tmp_path, capsys):
     args = parse_args(["--config", str(path)])
     assert (args.spin, args.cycle, args.logo_cycle) == (10.0, 0.0, 40.0)
     assert "spin 5 s is 10 s" in capsys.readouterr().err
+
+
+def test_a_part_of_the_diagnosis_that_fails_leaves_the_rest_said(monkeypatch, capsys):
+    """One exception (symbols the wallpaper would fall back from, a missing Pillow) printed only a
+    traceback: each part says it could not check, and the rest is printed."""
+    from syncrain import diagnose
+
+    def broken(_args):
+        raise ValueError("sixteen sets of two hundred symbols")
+    monkeypatch.setattr(diagnose, "symbol_lines", broken)
+    monkeypatch.setattr(diagnose, "_drawing", lambda args, section: ("as stood in for", 0))
+    assert diagnose.run(parse_args(["--config", "none", "--diagnose"])) == 0
+    out = capsys.readouterr().out
+    assert "symbols:\n  could not check (ValueError: sixteen sets of two hundred symbols)" in out
+    assert "session:" in out and "login screen:" in out and "verdict: as stood in for" in out
+
+    def stops(args, section):
+        raise RuntimeError("no Pillow")
+    monkeypatch.setattr(diagnose, "_drawing", stops)
+    assert diagnose.run(parse_args(["--config", "none", "--diagnose"])) == 1
+    out = capsys.readouterr().out
+    assert "verdict: the check stopped: RuntimeError: no Pillow" in out and "session:" in out

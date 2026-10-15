@@ -211,6 +211,38 @@ def test_a_scene_from_another_build_or_cut_short_is_refused(native_wallpaper, tm
     assert done.returncode == 70 and "outside the scene" in done.stderr, done.stderr
 
 
+def test_a_scene_s_numbers_are_numbers_and_said_once(native_wallpaper, tmp_path):
+    """"0,44" read as 0 and "64junk" as 64 before: a number is all of its word, and a line that can be
+    said once is said once."""
+    whole = native.scene_bytes(native_args(), None)
+    env = dict(os.environ, XDG_RUNTIME_DIR=str(tmp_path), WAYLAND_DISPLAY="nowhere")
+    head, rest = whole.split(b"\nend\n", 1)
+    lines = head.split(b"\n")
+    cols = next(i for i, line in enumerate(lines) if line.startswith(b"cols "))
+    keep = next(i for i, line in enumerate(lines) if line.startswith(b"keep "))
+    for bad in ([*lines[:cols], b"cols 64junk", *lines[cols + 1:]],
+                [*lines[:keep], b"keep logo 0,44 0x0p+0", *lines[keep + 1:]],
+                [*lines, lines[cols]]):
+        done = run_with_scene(native_wallpaper, b"\n".join(bad) + b"\nend\n" + rest, env)
+        assert done.returncode == 70 and "cannot read its scene" in done.stderr, done.stderr
+    done = run_with_scene(native_wallpaper, whole, env)
+    assert "cannot read its scene" not in done.stderr, done.stderr
+
+
+def test_a_scene_it_cannot_read_still_hands_over_to_the_gtk_host(native_wallpaper, tmp_path):
+    """Another build's program, say: the GTK host's command is in the environment too (where a
+    program of an earlier build, which knows nothing of it, passes it by), and goes no further."""
+    marker = tmp_path / "took-over"
+    host = [sys.executable, "-c", "import os, sys; open(sys.argv[1], 'w').write("
+            "str(sorted(k for k in os.environ if k.startswith('SYNCRAIN_FALLBACK'))))", str(marker)]
+    other = native.scene_bytes(native_args(), host).replace(native.SCENE_CONTRACT.encode(), b"syncrain-scene-0", 1)
+    env = dict(native.environment(host), XDG_RUNTIME_DIR=str(tmp_path), WAYLAND_DISPLAY="nowhere")
+    done = run_with_scene(native_wallpaper, other, env)
+    assert done.returncode == 0 and marker.read_text() == "[]", done.stderr
+    assert "the GTK host takes over" in done.stderr, done.stderr
+    assert "--" not in native.command("/x", native_args(), 3), "no option an earlier program refuses"
+
+
 def native_args(*extra):
     from syncrain.app import parse_args
     return parse_args(["--channel", "test", *extra])
