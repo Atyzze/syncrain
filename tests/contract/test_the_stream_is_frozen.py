@@ -21,10 +21,13 @@ def test_the_freeze_names_exactly_the_stream_files(root):
         assert (root / "syncrain" / name).is_file(), name
 
 
-def test_no_stream_file_moved_since_the_freeze(root):
-    was = recorded(root)["files"]
-    now = build.file_digests()
-    moved = [name for name in build.STREAM_FILES if was[name] != now[name]]
+def test_nothing_that_decides_the_stream_moved_since_the_freeze(root):
+    """The files, and what the code computes against stream-reference.json (seconds: scenes)."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("stream_freeze", root / "tools/stream_freeze.py")
+    tool = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(tool)
+    moved = tool.drift(recorded(root))
     assert not moved, ("the stream changed: " + ", ".join(moved) + ". If that is the intent, run "
                        "`python3 tools/stream_freeze.py --write` and say so in the build's notes.")
 

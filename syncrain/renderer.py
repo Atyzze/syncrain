@@ -283,19 +283,14 @@ def static_uniforms(r):
 
 
 def geometry(w, h, cols, r):
-    """Every value a frame sets that depends only on the viewport's size."""
-    g = SimpleNamespace(w=w, h=h, cols=cols)
-    g.cell = max(w / cols, 12.0)                 # narrow viewports show the middle of the stream
-    g.col0 = (cols - w / g.cell) / 2
-    g.rows = int(-(-h // g.cell))
-    g.qw, g.qh = max(16, round(w / 4)), max(9, round(h / 4))
+    """Every value a frame sets that depends only on the viewport's size (and the renderer's
+    cell_scale: --scale, drawn into fewer pixels)."""
+    g = SimpleNamespace(w=w, h=h, cols=cols, **engine.geometry(w, h, cols, r.cell_scale))
     if r.bg_size:
         g.scale, g.offset = engine.cover_fit(w, h, *r.bg_size)
     else:
         g.scale, g.offset = (1.0, 1.0), (0.0, 0.0)
     g.keep = tuple(float(v) for v in r._keep_rect(w, h, cols, g.scale, g.offset, g.cell, g.col0))
-    g.sigma = 0.2 * g.cell / 4
-    g.step_h, g.step_v = (1.0 / g.qw, 0.0), (0.0, 1.0 / g.qh)
     return g
 
 
@@ -501,7 +496,7 @@ class Renderer:
         self.ready = False
 
     def _targets(self, w, h):
-        key = (w, h)
+        key = (w, h, self.cell_scale)
         if key not in self.targets:
             if len(self.targets) > 8:
                 for t in self.targets.values():
@@ -524,6 +519,10 @@ class Renderer:
             m = 1 + self.motion["uDrift"] * h / cell * 2       # the image pans slowly
             return (col0 + sx0 / cell - m, sy0 / cell - m, col0 + sx1 / cell + m, sy1 / cell + m)
         return (-1, -1, -1, -1)
+
+    #: Of the screen's own pixels a frame is drawn at: below 1 only while the GTK host draws a
+    #: --scale frame offscreen (app.py), so a video, a still or a record keeps the screen's grid.
+    cell_scale = 1.0
 
     # ------------------------------------------------------------------ frame
     def _pass(self, name, fbo, w, h, x=0, y=0):

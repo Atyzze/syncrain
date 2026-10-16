@@ -158,9 +158,13 @@ which screens a maximized or full-screen window covers; those stop drawing until
 ## Builds and the stream (`syncrain/build.py`)
 
 * `BUILD_NUMBER` is the only identity; there are no versions.
-* The stream id is the start of a SHA-256 over `STREAM_FILES` (`syncrain/engine.py`,
-  `syncrain/glyphs.py`, `syncrain/data/`); `tests/fixtures/stream_freeze.json` freezes it. Not yet
-  covered: the hosts' geometry and the page (open item L20, `docs/ROADMAP.md`).
+* The stream id is the start of a SHA-256 over the files that decide the picture (`STREAM_FILES`:
+  presets, pictures, shaders, and `data/stream-reference.json`, what the code computes from them:
+  every preset's native scene with and without settings that change it, the grid at every size and
+  `--scale`, the clock, seeds, fits; `syncrain/stream.py`). Results, not text: a comment changes
+  nothing. The C host and the page are held to the Python host's frame by their tests.
+  `tests/fixtures/stream_freeze.json` freezes the files, `tools/stream_freeze.py` computes the
+  reference again and names the part that moved, and `--write` takes both again, on purpose.
 
 ## Packaging and release
 

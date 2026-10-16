@@ -115,6 +115,16 @@ def test_saved_settings_load_back_as_they_were(page, tmp_path):
             == json.loads(seen[name]["saved"]), name
 
 
+def test_a_wallpaper_page_at_a_low_scale_draws_the_same_grid(page):
+    """scale= in the address, as --scale: fewer pixels, the same rows (the desktop's engine.geometry)."""
+    from syncrain import engine
+    cols = engine.load_meta()["cols"]
+    one = page("state", 800, 450, f"t={MOMENT}&hud=0&scale=1")
+    low = page("state", 800, 450, f"t={MOMENT}&hud=0&scale=0.3")
+    assert (one["cols"], low["cols"]) == (cols, cols)
+    assert low["rows"] == engine.geometry(240, 135, cols, 0.3)["rows"] == one["rows"]
+
+
 def test_screens_of_one_shape_share_one_stream(page):
     small = page("state", 1280, 720, f"t={MOMENT}&hud=0")
     large = page("state", 1920, 1080, f"t={MOMENT}&hud=0")

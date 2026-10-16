@@ -54,7 +54,7 @@ picture_a = frame(a, target())
 second = context()
 b = Renderer(); b.init(use_es)
 picture_b = frame(b, target())
-own = list(b.targets[(W, H)].tex.values())
+own = list(b.targets[(W, H, 1.0)].tex.values())    # (size, cell_scale)
 out = {"shared": a.shared is b.shared, "same": picture_a == picture_b,
        "lit": sum(picture_a[0::4]) > 0, "own_before": all(gl.glIsTexture(t) for t in own)}
 b.release()

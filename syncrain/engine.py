@@ -39,6 +39,21 @@ def split_time(unix_seconds: float, epoch0: int):
     return (whole - epoch0) & 0xFFFFFFFF, (ms - whole * 1000) / 1000.0
 
 
+#: The smallest cell, in the screen's own pixels: a screen narrower than the stream's columns at this
+#: size shows the middle of the stream, as a narrow window on it.
+MIN_CELL = 12.0
+
+
+def geometry(w: int, h: int, cols: int, scale: float = 1.0) -> dict:
+    """The grid of a w x h viewport (pixels drawn) at `scale` of the screen's own pixels (--scale
+    below 1 draws fewer): the same columns at any scale, since the smallest cell is the screen's.
+    Every host computes this as it is here (renderer.py, native/timing.c, index.html)."""
+    cell = max(w / cols, MIN_CELL * scale)
+    qw, qh = max(16, round(w / 4)), max(9, round(h / 4))
+    return {"cell": cell, "col0": (cols - w / cell) / 2, "rows": int(-(-h // cell)), "qw": qw, "qh": qh,
+            "sigma": 0.2 * cell / 4, "step_h": (1.0 / qw, 0.0), "step_v": (0.0, 1.0 / qh)}
+
+
 def grid_rows(width: int, height: int, cols: int) -> int:
     return math.ceil(height / (width / cols))
 

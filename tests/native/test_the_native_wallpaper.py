@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import os
 import shutil
+import itertools
 import random
 import struct
 import subprocess
@@ -71,11 +72,12 @@ def test_the_geometry_is_the_python_host_s_to_the_last_bit(native_wallpaper):
                 keep = r.keep_mode()
                 size = keep[1] if keep[0] == "logo" else 0.0
                 box = keep[1] if keep[0] == "mask" else (0.0, 0.0, 0.0, 0.0)
-                for w, h in sizes:
+                for (w, h), scale in zip(sizes, itertools.cycle((1.0, 1.0, 0.5, 0.3, 0.25))):
+                    r.cell_scale = scale          # --scale: drawn into fewer pixels
                     cases.append(geometry(w, h, r.cols, r))
                     lines.append(" ".join([str(w), str(h), str(r.cols), keep[0], float(size).hex(), float(drift).hex(),
                                            *(float(v).hex() for v in box), str(bg[0] if bg else 0),
-                                           str(bg[1] if bg else 0)]))
+                                           str(bg[1] if bg else 0), float(scale).hex()]))
     out = selftest(native_wallpaper, "geometry", lines)
     assert len(out) == len(cases)
     for g, line, given in zip(cases, out, lines):

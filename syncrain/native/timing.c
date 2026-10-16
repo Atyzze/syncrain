@@ -75,12 +75,12 @@ static void cover_fit(int sw, int sh, int iw, int ih, double scale[2], double of
 	}
 }
 
-void geometry_compute(struct geometry *g, const struct scene *scene, int w, int h)
+void geometry_compute(struct geometry *g, const struct scene *scene, int w, int h, double scale)
 {
 	int cols = scene->cols;
-	double a = (double)w / cols;
-	double cell = 12.0 > a ? 12.0 : a;                 /* max(w / cols, 12.0) */
-	g->width = w, g->height = h, g->cols = cols;
+	double a = (double)w / cols, least = 12.0 * scale;
+	double cell = least > a ? least : a;               /* max(w / cols, MIN_CELL * scale) */
+	g->width = w, g->height = h, g->cols = cols, g->scale = scale;
 	g->cell = cell;
 	g->col0 = (cols - w / cell) / 2;
 	g->rows = (int)(-py_floordiv(-(double)h, cell));   /* int(-(-h // cell)) */

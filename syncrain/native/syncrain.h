@@ -78,11 +78,13 @@ double py_round(double x);                /* Python's round(): halves to even */
 
 struct geometry {
 	int width, height, cols, rows, qw, qh;
-	double cell, col0;
+	double cell, col0, scale;
 	double keep[4], bg_scale[2], bg_offset[2], sigma, step_h[2], step_v[2];
 };
 
-void geometry_compute(struct geometry *g, const struct scene *scene, int width, int height);
+/* scale: of the screen's own pixels the viewport is drawn at (--scale below 1), so the smallest cell
+ * is the screen's 12 pixels at any scale (engine.geometry) */
+void geometry_compute(struct geometry *g, const struct scene *scene, int width, int height, double scale);
 void split_time(double unix_seconds, long long epoch0, uint32_t *seconds, float *fraction);
 int64_t monotonic_us(void);
 double monotonic_s(void);

@@ -18,14 +18,14 @@ static int geometry_lines(void)
 	while (fgets(line, sizeof line, stdin)) {
 		struct scene s = { 0 };
 		int w, h;
-		double b[4];
-		if (sscanf(line, "%d %d %d %15s %lf %lf %lf %lf %lf %lf %d %d", &w, &h, &s.cols, keep, &s.logo_size, &s.drift,
-		           &b[0], &b[1], &b[2], &b[3], &s.bg_width, &s.bg_height) != 12)
+		double b[4], scale;
+		if (sscanf(line, "%d %d %d %15s %lf %lf %lf %lf %lf %lf %d %d %lf", &w, &h, &s.cols, keep, &s.logo_size,
+		           &s.drift, &b[0], &b[1], &b[2], &b[3], &s.bg_width, &s.bg_height, &scale) != 13)
 			return 2;
 		s.keep = strcmp(keep, "logo") == 0 ? KEEP_LOGO : strcmp(keep, "mask") == 0 ? KEEP_MASK : KEEP_NONE;
 		memcpy(s.mask_bbox, b, sizeof b);
 		struct geometry g;
-		geometry_compute(&g, &s, w, h);
+		geometry_compute(&g, &s, w, h, scale);
 		printf("%d %d %d %d %a %a %a %a %a %a %a %a %a %a %a %a %a %a %a\n", g.cols, g.rows, g.qw, g.qh, g.cell, g.col0,
 		       g.keep[0], g.keep[1], g.keep[2], g.keep[3], g.bg_scale[0], g.bg_scale[1], g.bg_offset[0], g.bg_offset[1],
 		       g.sigma, g.step_h[0], g.step_h[1], g.step_v[0], g.step_v[1]);

@@ -1,12 +1,12 @@
-# The next build is 44
+# The next build is 45
 
 The first line is parsed: `# The next build is <N>`, exactly one above `BUILD_NUMBER`.
 
-## Build 44: the stream id and small scales
+## Build 45: an SVG logo, more settings, the video file
 
 * Read what the operator sent last, and answer it in one plain sentence first.
-* Then `docs/ROADMAP.md`, "Planned builds": the stream id covers what decides the picture (L20), and
-  `--scale` below 0.4 (L11): a stream change, on purpose.
+* Then `docs/ROADMAP.md`, "Planned builds": an SVG as the desktop's logo; `scale`, `layer`,
+  `background` and `mask` in the settings file; a SeekHead in the page's WebM.
 * No boot splash: never touch the bootloader, initramfs or Plymouth.
 
 **Known blockers**: watts, NVIDIA's driver and Plasma's shell exist only on the operator's machine;
@@ -19,9 +19,9 @@ claude.ai viewer needs the `downloads` capability on the artifact (publish with 
 
 1. Make the change. Comments say why, not when; tests assert behaviour. To edit `index.html`,
    `python3 tools/build_web.py --strip` first (its data out of the way), then fill it again.
-2. A stream file changes (shader, theme, atlas, logo, `syncrain/engine.py`, `syncrain/glyphs.py`)
-   only on purpose: `python3 tools/stream_freeze.py --write`, and the notes say machines stop
-   matching.
+2. The stream (a shader, a preset, the atlas, a logo, or what `syncrain/stream.py` computes: the
+   grid, the clock, the looks, the symbol tables) changes only on purpose: `python3
+   tools/stream_freeze.py --write`, and the notes say machines stop matching.
 3. Notes in `docs/build_notes/BUILD<N>_NOTES.md`: `# Build <N>: <what>`, a `**Type: ...**` line
    (consolidation exactly at numbers ending in 0), the changes, what the operator does, and
    `## Verification` with the bare token GATE_RESULT.

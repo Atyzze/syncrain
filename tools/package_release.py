@@ -209,7 +209,8 @@ def validate_wheel(number: int) -> None:
             raise RuntimeError(f"expected syncrain-{number}-py3-none-any.whl, found {[w.name for w in wheels]}")
         with zipfile.ZipFile(wheels[0]) as wheel:
             names = set(wheel.namelist())
-        needed = {f"syncrain/{rel}" for rel in build.STREAM_FILES} | {"syncrain/diagnose.py", "syncrain/app.py"}
+        needed = {f"syncrain/{rel}" for rel in build.STREAM_FILES} | {f"syncrain/{f}.py" for f in (
+            "diagnose", "app", "engine", "glyphs", "stream", "renderer")}
         if needed - names:
             raise RuntimeError(f"the wheel lacks {sorted(needed - names)}")
         if [n for n in names if n.endswith((".pyc", ".pyo")) or "__pycache__/" in n]:

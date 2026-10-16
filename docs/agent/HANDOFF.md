@@ -1,4 +1,4 @@
-# Handoff: the state of syncrain at build 43
+# Handoff: the state of syncrain at build 44
 
 What is true now, for a context that has just opened this tree. Where this page and the code
 disagree, the code is right; fix the page in the same build. Each fact has one home; this page
@@ -44,11 +44,12 @@ This page, `docs/agent/NEXT_BUILD.md`, `docs/agent/WORKING_WITH_THE_OPERATOR.md`
   a second factor, take an empty answer to a visible prompt and ignore clicks while hidden.
 * **Boot stays plain text** (the operator, 2026-10-15): never the bootloader, the initramfs or a
   boot splash.
-* **Stream**: `1ad0a2dd` since build 35 (the new default, `composite.frag` to the spec, stricter
-  colours and periods); `822ea58a` 29 to 34 (sentences' gaps and trails in `state.frag`); `85ace386` in
+* **Stream**: `0aa22037` since build 44 (the id names what the code computes, not its text; the
+  same frame as 35 to 43 at a scale of 1); `1ad0a2dd` 35 to 43 (the new default, `composite.frag`
+  to the spec, stricter colours and periods); `822ea58a` 29 to 34 (sentences' gaps and trails in `state.frag`); `85ace386` in
   28; `a9c058f3` 24 to 27; `f98ef1ca` in 23; `25b02556` in 22; `def5684f` 15 to 21; `c18f8be2` in 12
   to 14; `48e6bf9c` 3 to 11.
-* **GitHub**: `main` holds builds 7 to 43, a commit `syncrain build <N>` each, and a few
+* **GitHub**: `main` holds builds 7 to 44, a commit `syncrain build <N>` each, and a few
   documents-only commits between them.
 
 ## Done last
@@ -61,6 +62,8 @@ Since then the open items of `docs/ROADMAP.md` that can be done here, one area a
   layout is named, Plasma's unseen lock wallpaper is a plain colour.
 * **43** the login screen: KDE's wallet opens after greetd's text login too (force_run), and with
   SELinux the login screen's files are labeled and its refusals named by --diagnose.
+* **44** the stream id: what the code computes (the grid, the clock, the looks and symbols) with the
+  data files, so a comment no longer changes it; --scale below 1 keeps the screen's grid (L20, L11).
 
 ## Waits on the operator
 

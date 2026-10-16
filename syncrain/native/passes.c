@@ -152,6 +152,7 @@ struct passes {
 	GLuint vao;
 	struct targets targets[MAX_TARGETS];
 	struct offscreen offscreen[MAX_OFFSCREEN];
+	double cell_scale;                         /* --scale below 1: drawn into fewer pixels */
 };
 
 static bool debug;
@@ -307,6 +308,7 @@ struct passes *passes_create(const struct scene *scene, bool es, char *why, size
 	}
 	P->scene = scene;
 	P->es = es;
+	P->cell_scale = 1.0;
 	for (int p = 0; p < PROGRAM_COUNT; p++)
 		if (!build_program(P, (enum program)p, why, why_size)) {
 			passes_destroy(P);
@@ -341,7 +343,8 @@ static struct targets *targets_for(struct passes *P, int w, int h)
 {
 	int used = 0;
 	for (int i = 0; i < MAX_TARGETS; i++) {
-		if (P->targets[i].used && P->targets[i].g.width == w && P->targets[i].g.height == h)
+		if (P->targets[i].used && P->targets[i].g.width == w && P->targets[i].g.height == h
+		    && P->targets[i].g.scale == P->cell_scale)
 			return &P->targets[i];
 		used += P->targets[i].used;
 	}
@@ -352,7 +355,7 @@ static struct targets *targets_for(struct passes *P, int w, int h)
 	for (int i = 0; i < MAX_TARGETS && !t; i++)
 		if (!P->targets[i].used)
 			t = &P->targets[i];
-	geometry_compute(&t->g, P->scene, w, h);
+	geometry_compute(&t->g, P->scene, w, h, P->cell_scale);
 	const struct geometry *g = &t->g;
 	const int size[T_COUNT][2] = { { g->cols, g->rows }, { g->cols, g->rows }, { g->qw, g->qh }, { g->qw, g->qh },
 	                               { g->qw, g->qh } };
@@ -482,7 +485,9 @@ void passes_draw_scaled(struct passes *P, double unix_time, unsigned out, int w,
 		sw = 64 > sw ? 64 : sw;
 		sh = 36 > sh ? 36 : sh;
 		GLuint off = offscreen_for(P, sw, sh);
+		P->cell_scale = scale;
 		passes_draw(P, unix_time, off, 0, 0, sw, sh);
+		P->cell_scale = 1.0;
 		glBindFramebuffer(GL_READ_FRAMEBUFFER, off);
 		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, out);
 		glBlitFramebuffer(0, 0, sw, sh, 0, 0, w, h, GL_COLOR_BUFFER_BIT, GL_LINEAR);

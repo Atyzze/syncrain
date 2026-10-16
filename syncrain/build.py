@@ -45,11 +45,10 @@ def _read_build_number() -> int:
 
 BUILD_NUMBER = _read_build_number()
 
-#: What decides the stream, relative to the package. A file that changes what a frame looks
-#: like at a given second belongs here; one that only changes how the app runs does not.
+#: What decides the stream, relative to the package: the presets, the pictures, the shaders, and
+#: what the code computes from them, written down in data/stream-reference.json
+#: (syncrain/stream.py) so a comment or a moved function changes nothing and a changed result does.
 STREAM_FILES = (
-    "engine.py",
-    "glyphs.py",
     "data/themes.json",
     "data/glyphs.png",
     "data/logo-white.png",
@@ -62,8 +61,9 @@ STREAM_FILES = (
     "data/shaders/blur.frag",
     "data/shaders/composite.frag",
     "data/shaders/fullscreen.vert",
+    "data/stream-reference.json",
 )
-STREAM_CONTRACT = b"syncrain-stream-1\n"
+STREAM_CONTRACT = b"syncrain-stream-2"
 
 
 def file_digests(package: Path = PACKAGE) -> dict[str, str]:

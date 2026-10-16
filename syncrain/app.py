@@ -1010,7 +1010,12 @@ def main(argv=None):
                 if args.scale < 0.999:
                     sw, sh = max(64, round(w * args.scale)), max(36, round(h * args.scale))
                     off = self._offscreen(sw, sh, keep=max(2, len(areas)))
-                    self.renderer.render(t, off, 0, 0, sw, sh)
+                    # drawn into fewer pixels: the grid is still the screen's (engine.geometry)
+                    self.renderer.cell_scale = args.scale
+                    try:
+                        self.renderer.render(t, off, 0, 0, sw, sh)
+                    finally:
+                        self.renderer.cell_scale = 1.0
                     gl.glBindFramebuffer(gl.GL_READ_FRAMEBUFFER, off)
                     gl.glBindFramebuffer(gl.GL_DRAW_FRAMEBUFFER, out)
                     gl.glBlitFramebuffer(0, 0, sw, sh, x, y, x + w, y + h, gl.GL_COLOR_BUFFER_BIT, gl.GL_LINEAR)
