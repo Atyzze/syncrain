@@ -1,14 +1,12 @@
-# The next build is 40
+# The next build is 41
 
 The first line is parsed: `# The next build is <N>`, exactly one above `BUILD_NUMBER`.
 
-## Build 40: the consolidation
+## Build 41: the page and the release tool
 
 * Read what the operator sent last, and answer it in one plain sentence first.
-* A consolidation (the `**Type:**` line says "consolidation"): fold the notes of builds 29 to 38
-  into `docs/HISTORY.md` and keep the notes of 39 and 40; make every document true of the tree;
-  change no behaviour and not the stream.
-* Then build 41: the page and the release tool, the last of the review of build 33 (`docs/ROADMAP.md`).
+* Then the last of the review of build 33 (`docs/ROADMAP.md`, "Planned builds"): items 13, 19, 24
+  to 26, 70 to 75 and 77 to 84. It does not change the stream.
 * No boot splash: never touch the bootloader, initramfs or Plymouth.
 
 **Known blockers**: watts, NVIDIA's driver and Plasma's shell exist only on the operator's machine;

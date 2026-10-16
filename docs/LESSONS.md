@@ -60,6 +60,8 @@ Rules learned by shipping their opposite, one line each. When and how: `docs/HIS
   after it, or the box loops and wipes the field.
 * **Each screen of a lock screen is its own QML root**: what all screens share (PAM, the typed
   text) lives in a singleton, or a screen plugged in again cannot unlock.
+* **A locker's conversation outlives its screens**: ask kscreenlocker whether PAM is asking
+  (`state`, `busy`), never only what the last screen remembered.
 
 ## The login screen
 
@@ -72,6 +74,10 @@ Rules learned by shipping their opposite, one line each. When and how: `docs/HIS
   the rest, in its own words.
 * **Change only your part of someone else's config** (greetd's `[default_session]`), and write to
   the PAM service it names, not the one you expect.
+* **Read a config as its program reads it**: greetd's is no TOML (the last section and key win,
+  values on one line, its own unquoting); a TOML reader changed sections greetd never read.
+* **Debian records the display manager by its daemon's path**: a package's postinst points
+  `display-manager.service` back at it, whatever was changed by hand.
 * **root copying a user's file follows the user's links**, and `chmod -R` follows a link it is
   given by name: the user reads, root only writes, into a folder root made.
 * **A shared folder such as /tmp is no fallback for state**: any user can leave a file there.
@@ -95,6 +101,15 @@ Rules learned by shipping their opposite, one line each. When and how: `docs/HIS
   which a frame drawn under Xvfb never asks for: test the code path the user will take.
 * **The lanes run a newer Python than pyproject.toml promises**: f-strings changed in 3.12, so a
   test reads the app as 3.10 and 3.11 do.
+* **A shell's `cmd &` starts it with SIGINT ignored**, and children inherit that: give a child that
+  must be interrupted the default back.
+* **A program from an earlier build reads what this one passes it**: put new things where an old
+  one passes them by (the environment), never an option it refuses.
+* **A lock, not a process id, keeps two runs apart**: the second one read the first's journal as
+  an interrupted run's.
+* **Never delete what an installer did not make**: mark its folders, and refuse any other.
+* **Check options as the program reads them before anything keeps them**: a service that keeps a
+  misspelling fails at every login, not once.
 
 ## Rendering and sync
 
@@ -109,5 +124,9 @@ Rules learned by shipping their opposite, one line each. When and how: `docs/HIS
   has 36 rows. Test what a user sees, not only what the data holds.
 * **A new default can make old tests pass without testing anything** (snow on, a black
   background): run them where the option still shows.
+* **One grammar, written down, for what two readers share**: Python's float took `1_0` and
+  full-width digits, JavaScript's Number `0x10`; a settings file drew on one and not the other.
+* **Draw on the clock's own grid**: a moment between milliseconds drew other heads on the page
+  than the desktop, which floors to the millisecond.
 
 The traps of the sandbox itself: `docs/agent/ENVIRONMENT.md`, "Traps".

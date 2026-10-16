@@ -45,8 +45,10 @@ logo turns, drifts and cycles colour, against burn-in; nothing flashes.
   `execve`s the program: same pid, no Python or GTK left. One EGL context for every screen,
   layer-shell surfaces, frames paced like GTK's (presentation feedback and frame callbacks). What a
   frame computes on the processor is ported from Python bit for bit (`tests/native/`). A failure
-  before the first frame hands over to the GTK host; a lost compositor, or 5 s of frames that
-  cannot be shown, exits with status 1 so the service restarts it.
+  before the first frame hands over to the GTK host, and so does a scene the program cannot read
+  (another build's: the GTK host's command is in its environment too, `SYNCRAIN_FALLBACK_*`, which an
+  earlier program passes by); a lost compositor, or 5 s of frames that cannot be shown, exits with
+  status 1 so the service restarts it (slowing to one try in two minutes, 30 in ten minutes at most).
 * **GTK host** (`syncrain/app.py`, `syncrain/renderer.py`): X11, windows, `--screenshot`,
   `--record`, `--video`, and the fallback. A GLArea per viewport, OpenGL through libepoxy (`syncrain/gl.py`),
   `GSK_RENDERER=gl` and `GDK_DISABLE=dmabuf`.

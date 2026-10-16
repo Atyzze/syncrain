@@ -1,6 +1,6 @@
 # History
 
-A few lines per build, and the operator's words. The last two builds' notes (29 and 30) are in
+A few lines per build, and the operator's words. The last two builds' notes (39 and 40) are in
 `docs/build_notes/`; the rules they taught are in `docs/LESSONS.md`.
 
 ## Before build 1 (2026-10-06)
@@ -110,6 +110,33 @@ showed within seconds, which is why syncrain draws every frame from the clock.
   432 passed.
 * **30** (2026-10-15): consolidation. Builds 19 to 28 folded in here; the documents checked against
   the code; the README says what syncrain is now (syncrain backdrop) and why boot stays plain text.
+* **31** (2026-10-15): `install.sh` for four families (Arch, Debian and Ubuntu, Fedora, openSUSE),
+  the rest invited to hand the repo to their own agent; tried on each family's container. Gate:
+  474 passed.
+* **32** (2026-10-15): the NixOS module for the login and lock screens, the first step to a NixOS
+  flavour anyone applies in one go. Gate: 476 passed.
+* **33** (2026-10-15): syncrain backdrop as a NixOS flavour, one flake template away (not an
+  installer ISO, as the operator chose). Gate: 477 passed. The operator's in-depth review of it
+  found 84 items, fixed from build 34 on, the most critical first.
+* **34** (2026-10-15): the review's lock screen items (1, 3, 27, 28, 30, 56): the box answers PAM
+  whatever happens to the screens, through Plasma 6.7's and 6.8's prompts alike. Gate: 483 passed.
+* **35** (2026-10-15): the operator's new settings file as the default; `composite.frag` within the
+  GLSL spec; values that passed and then broke the picture refused on the desktop and the page
+  alike (65, 66, 69, 76). Stream `1ad0a2dd`. Gate: 499 passed.
+* **36** (2026-10-15): the login screen (4 to 7, 23, 31 to 38): greetd's config read as greetd 0.10
+  reads it, the way back changing only what syncrain set, the text login always there, Debian's
+  display-manager record kept. Gate: 517 passed.
+* **37** (2026-10-15): the installer (8 to 11, 39 to 46): options checked before the service keeps
+  them, the service written at every install, one Python, never a folder emptied that is not its
+  own. Gate: 534 passed.
+* **38** (2026-10-15): Nix and the tests (2, 12, 16 to 18, 20 to 22, 47): the NixOS template keeps
+  the machine's own configuration, the flake locked to the tested nixpkgs, a test that would hang
+  fails instead. Gate: 536 passed.
+* **39** (2026-10-16): the hosts (14, 15, 29, 48 to 55, 57 to 64, 67, 68): a fractional scale
+  drawn once, a scene another build cannot read handed to the GTK host, KWin's script file private
+  and kept until KWin confirms, the scene's numbers read whole. Gate: 541 passed.
+* **40** (2026-10-16): consolidation. Builds 29 to 38 folded in here; the rules builds 34 to 39
+  taught in `docs/LESSONS.md`; the documents checked against the code.
 
 ## The review of build 17 (2026-10-14)
 
@@ -122,6 +149,19 @@ The operator's Claude doc "Syncrain build 17 code review": 9 middling findings (
   black screen; M7 the page's `--spin` rounding; M9 one dark screen stopped the trim; L5 to L7, L9,
   L10, L13 to L19.
 * **Open**: L8, L11, L12, L20, L21 (`docs/ROADMAP.md`, "Open items").
+
+## The review of build 33 (2026-10-15)
+
+The operator's Claude doc "syncrain build 33: code review": 84 items, 15 to fix first (one critical:
+the lock screen lost PAM when every screen went), fixed most critical first, one area a build.
+
+* **34**: the lock screen (1, 3, 27, 28, 30, 56). **35**: the new default and every stream-file
+  fix (65, 66, 69, 76). **36**: the login screen (4 to 7, 23, 31 to 38). **37**: the installer (8
+  to 11, 39 to 46). **38**: Nix and the tests (2, 12, 16 to 18, 20 to 22, 47). **39**: the hosts
+  (14, 15, 29, 48 to 55, 57 to 64, 67, 68). **41**: the page and the release tool (13, 19, 24 to
+  26, 70 to 75, 77 to 84).
+* Each build was read by an agent that did not write it before it was released; what it found went
+  into that build.
 
 ## The operator's words
 
@@ -189,4 +229,12 @@ The operator's Claude doc "Syncrain build 17 code review": 9 middling findings (
   to "copy/hand this repo to your ai-agent"; boot "pure text based" by design, "the moment our rain
   is up we know w'ere in"; "syncrain backdrop ... its more than jsut a wallapepr, its also a
   lockscreen, a screensaver"; NixOS "the 5th paradigm of course, the default/base".
+* **After 31** (2026-10-15): NixOS as "a nix flavor that anyone can 1 click image apply to their
+  box".
+* **After 32** (2026-10-15): the flavour as a flake template ("1-click apply") first, not an
+  installer image.
+* **After 33** (2026-10-15): "full in depth code review please"; then, with a new settings file,
+  "heres the new default config to adopt as new standard/default values, and, fix all the found
+  issues, split it up in multiple builds of course, start with addressing the most critical ones and
+  work down the list until all are addressed".
 * **Standing**: no long dashes in anything written to them.

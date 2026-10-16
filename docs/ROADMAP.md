@@ -48,7 +48,7 @@ critical first, one area a build:
 3. **37** (done): the installer (8 to 11, 39 to 46).
 4. **38** (done): Nix and the test harness (2, 12, 16 to 18, 20 to 22, 47).
 5. **39** (done): the native host and the Python host (14, 15, 29, 48 to 55, 57 to 64, 67, 68).
-6. **40**: the consolidation.
+6. **40** (done): the consolidation.
 7. **41**: the page and the release tool (13, 19, 24 to 26, 70 to 75, 77 to 84).
 8. **An installer ISO** of the flavour, if wanted (the operator chose the template first,
    2026-10-15): several GB to build, and tried only where a VM runs.
