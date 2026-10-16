@@ -7,9 +7,10 @@
     PAM is Pam.qml's, and what the boxes show is Shared.qml's, one for all the screens: the box comes
     up on a key or a moved pointer, goes after a minute without either, and shows on every screen
     what is typed on any. Nothing here can unlock but PAM saying yes.
-    The rain (Rain.qml), the Caps Lock note (CapsLock.qml) and the suspend hook (Suspend.qml) come
-    through Loaders: if one cannot load, the screen is black behind the box (or the note or the
-    hook is missing) and unlocking works as before. If this file itself cannot load, kscreenlocker
+    The rain (Rain.qml), the Caps Lock note (CapsLock.qml), the keyboard layout's name
+    (KeyboardName.qml) and the suspend hook (Suspend.qml) come through Loaders: if one cannot load,
+    the screen is black behind the box (or the note, the name or the hook is missing) and unlocking
+    works as before. If this file itself cannot load, kscreenlocker
     draws its own built-in lock screen.
 */
 import QtQuick
@@ -44,6 +45,11 @@ Item {
     Loader {
         id: caps
         source: Qt.resolvedUrl("CapsLock.qml")
+    }
+
+    Loader {
+        id: keyboard
+        source: Qt.resolvedUrl("KeyboardName.qml")
     }
 
     Loader {
@@ -116,6 +122,7 @@ Item {
         awake: Shared.shown
         shared: Shared.typed
         peeking: Shared.peek
+        layoutName: keyboard.item ? keyboard.item.name : ""
         // away, the box still has the keyboard: the first key brings it up and goes into the field
         opacity: Shared.shown ? 1 : 0
         Behavior on opacity { NumberAnimation { duration: 250 } }
@@ -126,8 +133,10 @@ Item {
             root.woke();
         }
         onActivity: root.woke()
+        onLayoutNext: { if (keyboard.item) keyboard.item.switchToNextLayout(); root.woke(); }
         onPeekSet: on => { Shared.peek = on; root.woke(); }
-        onDismissed: Shared.sleep()        // and an unsent password goes with it (Pam.forget)
+        // and an unsent password goes with it (Pam.forget); a key, so the rain's full rate is back
+        onDismissed: { Shared.wake(); Shared.sleep(); }
         onSubmitted: password => {
             if (Pam.passwordless) {            // PAM has already said yes, without a password
                 Pam.auth.stopAuthenticating();

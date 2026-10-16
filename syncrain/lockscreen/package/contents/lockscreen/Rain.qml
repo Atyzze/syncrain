@@ -8,4 +8,5 @@ import org.syncrain
 
 SyncRain {
     objectName: "rain"
+    fps: Shared.fps
 }

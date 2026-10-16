@@ -19,11 +19,13 @@ Rectangle {
     property bool peeking: false             // the password shown, on every screen
     property bool plain: false               // the answer shows (PAM asked a question that is not secret)
     property bool awake: true                // the box is up; hidden, its buttons take no clicks
+    property string layoutName: ""           // the keyboard layout, when there is more than one
     signal submitted(string password)
     signal typed(string text)                // the person changed what is typed
     signal peekSet(bool on)
     signal activity()                        // any key
     signal dismissed()                       // Escape
+    signal layoutNext()                      // the layout's name clicked: the next one
 
     function focusPassword() { password.forceActiveFocus(); }
 
@@ -151,6 +153,23 @@ Rectangle {
                 color: unlock.hovered ? Qt.rgba(90 / 255, 150 / 255, 240 / 255, 0.95)
                                       : Qt.rgba(70 / 255, 130 / 255, 220 / 255, 0.85)
             }
+        }
+
+        AbstractButton {
+            id: layout
+            objectName: "layout"
+            Layout.alignment: Qt.AlignHCenter
+            visible: box.layoutName.length > 0
+            focusPolicy: Qt.NoFocus
+            enabled: box.awake
+            onClicked: box.layoutNext()
+            contentItem: Text {
+                text: "\u2328 " + box.layoutName       // a keyboard
+                color: Qt.rgba(207 / 255, 227 / 255, 1, layout.hovered ? 0.95 : 0.7)
+                font.pixelSize: 13
+                horizontalAlignment: Text.AlignHCenter
+            }
+            background: null
         }
 
         Label {

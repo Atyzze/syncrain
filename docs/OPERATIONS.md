@@ -76,7 +76,9 @@ git clone https://github.com/Atyzze/syncrain && cd syncrain   # or unpack SYNCRA
   own locker syncrain's screen: the rain, live, and syncrain's box (your name, the password, Unlock,
   PAM's words) on every screen. The box comes up on a key or a moved pointer, goes after a minute
   without either and forgets what was typed (Escape sends it away at once); every screen shows the
-  same box, so it never matters which one you type on. It builds a QML module (with the lock screen's packages above) into
+  same box, so it never matters which one you type on. With more than one keyboard layout the box
+  names the one in use (click it for the next). After five minutes without a key or a move the rain
+  rests at 10 frames a second, and the first key or move brings back 30. It builds a QML module (with the lock screen's packages above) into
   `~/.local/lib/syncrain/`, puts the shell package `org.syncrain.lockscreen` in
   `~/.local/share/plasma/shells/`, writes the scene to `~/.local/state/syncrain/lock-screen.scene`
   (each start of the native wallpaper keeps it current), and gives KWin's unit alone a drop-in
@@ -85,8 +87,10 @@ git clone https://github.com/Atyzze/syncrain && cd syncrain   # or unpack SYNCRA
   and a lock screen that cannot load is Plasma's built-in one. Should it ever not unlock:
   Ctrl+Alt+F3, log in, `loginctl unlock-sessions`. A plasmashellrc that spells out Plasma's own shell
   package has that line taken out (it would win over the drop-in), and one naming another package
-  stops `--lock-screen` with nothing changed. `--lock-screen-off` takes those files away and puts
-  the line back; `--uninstall` too. What KWin starts (Xwayland, an input method) also sees the drop-in's
+  stops `--lock-screen` with nothing changed. Plasma's locker would still load its own lock-screen
+  wallpaper under syncrain's, unseen, so `kscreenlockerrc` names Plasma's plain colour, black,
+  instead (once: a wallpaper chosen in Plasma's settings afterwards stays). `--lock-screen-off` takes
+  those files away and puts both lines back; `--uninstall` too. What KWin starts (Xwayland, an input method) also sees the drop-in's
   variables, and its `QML_IMPORT_PATH` replaces one the session had; Plasma's shell, started by
   systemd, does not see them (were it to, it would open a fresh desktop layout).
 * Upgrading: run the newer `./install.sh`; it names the build it replaces and restarts the

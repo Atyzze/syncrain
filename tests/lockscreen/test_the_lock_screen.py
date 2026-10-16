@@ -209,12 +209,14 @@ def test_two_screens_show_one_box_that_comes_and_goes_with_the_person(built):
     away until a key or a moved pointer (KWin's first placing of the pointer not counted), goes after
     the idle time and forgets what was typed, and every screen shows the same text and eye."""
     qd = built["qtdeclarative"]
+    # standin/: Plasma's keyboard layout module as KeyboardName.qml uses it
     done = subprocess.run([str(qd / "bin/qmltestrunner"), "-input", str(HERE / "tst_two_screens.qml")],
-                          env=clean_env(QT_QPA_PLATFORM="offscreen", QML_IMPORT_PATH=str(qd / "lib/qt-6/qml")),
+                          env=clean_env(QT_QPA_PLATFORM="offscreen",
+                                        QML_IMPORT_PATH=f"{qd / 'lib/qt-6/qml'}:{HERE / 'standin'}"),
                           capture_output=True, text=True, timeout=180)
     said = done.stdout + done.stderr
     assert done.returncode == 0 and "0 failed" in said, said[-4000:]
-    assert said.count("PASS   : qmltestrunner::TwoScreens::test_") == 17, said[-4000:]
+    assert said.count("PASS   : qmltestrunner::TwoScreens::test_") == 19, said[-4000:]
 
 
 def test_without_the_rain_s_module_the_box_still_unlocks(greeter, tmp_path):

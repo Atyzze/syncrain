@@ -1,4 +1,4 @@
-# Where we are, at build 41
+# Where we are, at build 42
 
 The project on one page. Detail: `docs/agent/HANDOFF.md`.
 
@@ -37,19 +37,17 @@ plain text by design: the text means the machine is not up yet, the rain that it
 * **Your NixOS flavour** (build 33): `nix flake init -t github:Atyzze/syncrain` over your own
   `/etc/nixos`, kept whole, `nixos-rebuild switch`: Plasma 6 with the rain as wallpaper, login and lock screen.
   The whole system builds here; no machine has booted it yet.
-* **On GitHub**: github.com/Atyzze/syncrain, every build up to 41.
+* **On GitHub**: github.com/Atyzze/syncrain, every build up to 42.
 
 ## What comes next
 
-* **Next**: what the operator asks; the review of build 33 is done (all 84 items, builds 34 to 41).
+* **Next**: the roadmap's open items that can be done here, one area a build: the login screen (43),
+  the stream id (44), the logo and settings (45), the lanes' last two (46).
 * **Build 50**: the next consolidation (every number ending in 0).
 
 ## The decision in front of you
 
-1. **Default frame rate**: 30 fps (+11.9 W, now), 20 (+7.3 W) or 15 (+3.5 W). Below about 21 fps
-   the fastest streams skip a row now and then. Recommended: try `syncrain --fps 20` for a day.
-2. **Pause behind maximized windows too, or only full-screen ones?** Both now; behind a see-through
-   window the rain then stands still. Recommended: both.
+None open: 30 fps and pausing behind maximized windows are the default the operator chose.
 
 ## Words
 

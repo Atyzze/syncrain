@@ -6,6 +6,7 @@
 import QtQuick
 import QtTest
 import "../../syncrain/lockscreen/package/contents/lockscreen" as Lock
+import org.kde.plasma.workspace.keyboardlayout as Keyboards
 
 Item {
     id: top
@@ -74,6 +75,9 @@ Item {
             Lock.Pam.retry.stop();
             Lock.Pam.retry.interval = 3000;
             Lock.Shared.idleMs = 60000;
+            Lock.Shared.restMs = 300000;
+            Keyboards.LayoutState.layouts = [{ shortName: "us", displayName: "", longName: "English (US)" }];
+            Keyboards.LayoutState.current = 0;
             Lock.Shared.sleep();
             authenticator.answers = [];
             find(left, "password").forceActiveFocus();
@@ -262,6 +266,36 @@ Item {
             compare(Lock.Pam.waiting, false);
             compare(Lock.Pam.retry.running, true);
             Lock.Pam.retry.stop();
+        }
+
+        function test_18_several_layouts_name_the_one_in_use_and_switch_on_every_screen() {
+            const one = find(left, "layout");
+            verify(one && !one.visible, "one layout: nothing to say");
+            Keyboards.LayoutState.layouts = [{ shortName: "us", displayName: "", longName: "English (US)" },
+                                             { shortName: "de", displayName: "", longName: "German" }];
+            keyClick(Qt.Key_A);
+            tryCompare(find(left, "layout"), "visible", true);
+            compare(find(left, "layout").contentItem.text, "\u2328 English (US)");
+            mouseClick(find(right, "layout"));
+            tryCompare(find(left, "layout").contentItem, "text", "\u2328 German");
+            compare(find(right, "layout").contentItem.text, "\u2328 German");
+            compare(find(left, "password").text, "a", "what was typed stays");
+            Keyboards.LayoutState.layouts = [];                 // KWin's list gone for a moment
+            tryCompare(find(left, "layout"), "visible", false);
+        }
+
+        function test_19_the_rain_rests_while_nobody_is_there() {
+            Lock.Shared.restMs = 200;
+            Lock.Shared.wake();
+            compare(Lock.Shared.fps, 30);
+            tryCompare(Lock.Shared, "resting", true, 3000);
+            compare(Lock.Shared.fps, 10);
+            keyClick(Qt.Key_B);
+            compare(Lock.Shared.resting, false, "a key brings the full rate back");
+            compare(Lock.Shared.fps, 30);
+            tryCompare(Lock.Shared, "resting", true, 3000);
+            keyClick(Qt.Key_Escape);
+            compare(Lock.Shared.resting, false, "Escape is a key too");
         }
     }
 }

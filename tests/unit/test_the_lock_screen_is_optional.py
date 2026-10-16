@@ -43,8 +43,12 @@ def plasma(tmp_path):
                            '  : > "$d/libsyncrainplugin.so"; fi\nexit 0')
     shell = tmp_path / "shellpackage"                  # what kreadconfig6 says plasmashellrc names
     shell.write_text("")
-    stub(bin_dir, "kreadconfig6", f'cat "{shell}"')
-    stub(bin_dir, "kwriteconfig6", f'echo "kwriteconfig6 $*" >> "{calls}"')
+    locker = tmp_path / "lockwallpaper"                # and kscreenlockerrc's wallpaper plugin
+    locker.write_text("org.kde.image")
+    stub(bin_dir, "kreadconfig6", f'case "$*" in *WallpaperPlugin*) cat "{locker}" ;; *) cat "{shell}" ;; esac')
+    stub(bin_dir, "kwriteconfig6", f'echo "kwriteconfig6 $*" >> "{calls}"\n'
+                                   f'case "$*" in *WallpaperPlugin*--delete*) : > "{locker}" ;;\n'
+                                   f'  *WallpaperPlugin*) for a; do last=$a; done; printf %s "$last" > "{locker}" ;; esac')
     env = {"HOME": str(tmp_path), "XDG_CONFIG_HOME": str(tmp_path / "config"), "LANG": "C.UTF-8",
            "PATH": f"{bin_dir}:{os.path.dirname(sys.executable)}:/usr/bin:/bin"}
     for key in ("DISPLAY", "GI_TYPELIB_PATH", "LD_LIBRARY_PATH", "PKG_CONFIG_PATH"):
@@ -160,3 +164,54 @@ def test_the_wallpaper_keeps_the_lock_screen_s_scene_current(tmp_path, monkeypat
     path.write_bytes(b"old")
     native.refresh_lock_scene(b"new")
     assert path.read_bytes() == b"new" and list(path.parent.iterdir()) == [path]
+
+
+def test_plasma_s_unseen_lock_wallpaper_is_a_plain_colour_and_comes_back(root, plasma):
+    """Plasma's locker loads kscreenlockerrc's wallpaper under any shell package: with syncrain's,
+    nothing shows it, so it is Plasma's plain colour while the lock screen is syncrain's."""
+    tmp, env, calls, _ = plasma
+    locker = tmp / "lockwallpaper"
+    assert install(root, env, "--lock-screen").returncode == 0
+    assert locker.read_text() == "org.kde.color"
+    assert install(root, env, "--lock-screen").returncode == 0, "again: the first value is kept"
+    assert install(root, env, "--lock-screen-off").returncode == 0
+    assert locker.read_text() == "org.kde.image"
+    locker.write_text("")                                  # none named: none named again
+    assert install(root, env, "--lock-screen").returncode == 0
+    assert install(root, env, "--lock-screen-off").returncode == 0
+    assert locker.read_text() == "" and "WallpaperPlugin --delete" in read(calls)
+    locker.write_text("org.kde.image")                      # chosen in Plasma's settings since: stays
+    assert install(root, env, "--lock-screen").returncode == 0
+    assert "Color 0,0,0" in read(calls), "black, not the plain colour's blue"
+    locker.write_text("org.kde.potd")
+    assert install(root, env, "--lock-screen").returncode == 0 and locker.read_text() == "org.kde.potd", \
+        "a second --lock-screen leaves their choice"
+    assert install(root, env, "--lock-screen-off").returncode == 0
+    assert locker.read_text() == "org.kde.potd"
+    assert not (tmp / ".local/state/syncrain/kscreenlockerrc-WallpaperPlugin.before-syncrain").exists()
+
+
+def test_a_lock_screen_from_before_gets_the_plain_wallpaper_with_a_plain_install(root, plasma):
+    """The operator's upgrade: the lock screen set up by an earlier build, then ./install.sh."""
+    tmp, env, calls, _ = plasma
+    locker = tmp / "lockwallpaper"
+    assert install(root, env, "--lock-screen").returncode == 0
+    (tmp / ".local/state/syncrain/kscreenlockerrc-WallpaperPlugin.before-syncrain").unlink()
+    locker.write_text("org.kde.image")                      # as an earlier build left it
+    done = install(root, env)
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert locker.read_text() == "org.kde.color" and "plain black now" in done.stdout
+
+
+def test_uninstall_puts_the_lock_wallpaper_back_even_after_a_half_way_off(root, plasma):
+    tmp, env, calls, _ = plasma
+    locker = tmp / "lockwallpaper"
+    assert install(root, env, "--lock-screen").returncode == 0
+    (tmp / DROPIN).unlink()                                 # what a --lock-screen-off stopped half way leaves
+    import shutil
+    shutil.rmtree(tmp / SHELL)
+    import subprocess
+    gone = subprocess.run(["bash", str(root / "install.sh"), "--uninstall"], cwd=root, env=env,
+                          capture_output=True, text=True, timeout=60)
+    assert gone.returncode == 0, gone.stdout + gone.stderr
+    assert locker.read_text() == "org.kde.image"

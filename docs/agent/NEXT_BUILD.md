@@ -1,12 +1,12 @@
-# The next build is 42
+# The next build is 43
 
 The first line is parsed: `# The next build is <N>`, exactly one above `BUILD_NUMBER`.
 
-## Build 42: what the operator asks next
+## Build 43: the login screen
 
 * Read what the operator sent last, and answer it in one plain sentence first.
-* The review of build 33 is done (all 84 items, builds 34 to 41). What is left is in
-  `docs/ROADMAP.md`: the open items, and an installer image of the flavour if the operator wants one.
+* Then `docs/ROADMAP.md`, "Planned builds": KDE's wallet after greetd's text login (L8), Fedora's
+  SELinux labels.
 * No boot splash: never touch the bootloader, initramfs or Plymouth.
 
 **Known blockers**: watts, NVIDIA's driver and Plasma's shell exist only on the operator's machine;

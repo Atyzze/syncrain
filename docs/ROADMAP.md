@@ -4,14 +4,15 @@ Open questions, planned builds, the cadence and the constraints. What shipped: `
 
 ## Questions for the operator
 
-* **Default frame rate** (asked 2026-10-07; numbers from their sweep of build 8): 30 fps +11.9 W
-  (now), 20 fps +7.3 W, 15 fps +3.5 W. Below about 21 fps the fastest streams skip a row now and
-  then. Recommended: `syncrain --fps 20` for a day, then judge by eye.
-* **Pause behind maximized windows too, or only full-screen ones?** (2026-10-07) Both now; behind a
-  see-through window the rain then stands still. Recommended: both.
+None open.
 
 ## Decisions answered
 
+* **2026-10-16**: the roadmap's open items next, the most useful first; no installer image of the
+  NixOS flavour for now. Builds 42 and on.
+* **2026-10-15, their settings file**: 30 frames a second, and pausing behind maximized windows as
+  well as full-screen ones (`"fps": 30`, `"pause_under": "maximized"`): the two questions asked on
+  2026-10-07, answered by the default they chose. Build 35.
 * **2026-10-15, after build 33's review**: "fix all the found issues", split over several builds,
   the most critical first; and their new settings file as the default. Builds 34 and on.
 * **2026-10-15, after build 32**: the NixOS image as a flake template ("1-click apply": `nix flake init -t`,
@@ -38,20 +39,19 @@ Open questions, planned builds, the cadence and the constraints. What shipped: `
 
 ## Planned builds
 
-The review of build 33 (84 items, numbered, in the operator's review document), fixed most
-critical first, one area a build:
+The review of build 33 is done (all 84 items, builds 34 to 41: `docs/HISTORY.md`). Next, the open
+items below that can be done here, the most useful first, one area a build:
 
-1. **35** (done): the operator's new default, `composite.frag` to its spec (69), and the values
-   that passed and then broke the picture (65, 66, 76, on the desktop and the page alike): the one
-   stream change.
-2. **36** (done): the login screen (4 to 7, 23, 31 to 38).
-3. **37** (done): the installer (8 to 11, 39 to 46).
-4. **38** (done): Nix and the test harness (2, 12, 16 to 18, 20 to 22, 47).
-5. **39** (done): the native host and the Python host (14, 15, 29, 48 to 55, 57 to 64, 67, 68).
-6. **40** (done): the consolidation.
-7. **41** (done): the page and the release tool (13, 19, 24 to 26, 70 to 75, 77 to 84).
-8. **An installer ISO** of the flavour, if wanted (the operator chose the template first,
-   2026-10-15): several GB to build, and tried only where a VM runs.
+1. **42**: the lock screen: the rain rests when nobody is there, the keyboard layout, Plasma's
+   unseen lock wallpaper.
+2. **43**: the login screen: KDE's wallet after greetd's text login (L8), Fedora's SELinux labels.
+3. **44**: the stream id covers what decides the picture (L20), and `--scale` below 0.4 (L11): a
+   stream change, on purpose.
+4. **45**: an SVG as the desktop's logo; `scale`, `layer`, `background` and `mask` in the settings
+   file; a SeekHead in the page's WebM.
+5. **46**: the lock screen's 2% darker frame; the GTK host at a fractional scale.
+
+What only the operator's machine can show (booting the flavours, watts, Safari) stays below.
 
 ## Open items
 
@@ -64,10 +64,7 @@ What the documents and the review of build 17 leave to a build that changes code
 | L20: the stream id does not cover `renderer.py`'s geometry, `native/timing.c` or `index.html` | `syncrain/build.py` (`STREAM_FILES`) |
 | The GTK host at a fractional scale (1.25) draws at the next whole scale and the compositor scales it down (GTK 4.14's GtkGLArea framebuffer), so it is a little softer than the native wallpaper, Wayland's default, which draws at the screen's pixels | GTK's own, or the GTK host drawing its own surface; `tests/wayland/test_the_wallpaper_layer.py` compares it at whole scales only |
 | An SVG as the logo: the page takes one, the desktop's `--logo` does not (Pillow draws no SVG) | `syncrain/logo.py`, with GTK's loader (librsvg) |
-| The lock screen draws at 30 fps on every screen while locked and lit (NVIDIA's explicit-sync growth is not turned off in KWin's greeter) | measure there; a lower rate after a while without input, `syncrain/lockscreen/rainitem.cpp` |
-| The lock screen shows no keyboard layout (Plasma's does) | `syncrain/lockscreen/package/` |
 | The lock screen's frame is about 2% darker than the desktop's in the lockscreen lane (llvmpipe), in proportion to brightness; the cause is not found | `syncrain/lockscreen/rainitem.cpp`, `tests/lockscreen/test_the_lock_screen.py` |
-| Plasma still loads its lock-screen wallpaper under syncrain's, unseen | `kscreenlockerrc`, only with `--lock-screen` |
 | The login and lock screens on NixOS (build 32): evaluated, built, the login screen run in a headless KWin; never booted, and no VM here (no KVM) | someone booting it, or the image's VM test |
 | Debian, Fedora and openSUSE: installed in roots, never booted; Fedora's SELinux may stop greetd running the login screen from `/usr/local/lib` | someone booting one; `restorecon` or a policy note in `install.sh` |
 | Ubuntu 24.04 and openSUSE Leap 16.0: no gtk4-layer-shell (the native wallpaper draws), Qt below 6.5 (no lock screen) | nothing to do until they update |
@@ -102,6 +99,7 @@ Next consolidation: 50
 
 ## Not scheduled
 
+* An installer image (ISO) of the NixOS flavour: not for now (2026-10-16); the template stays.
 * A public randomness beacon (drand) in the seed: truly random, still in sync.
 * Two screens in the Sway lane (the KWin lane has two).
 * Pausing on wlroots compositors that keep asking a hidden wallpaper for frames, if one turns up.

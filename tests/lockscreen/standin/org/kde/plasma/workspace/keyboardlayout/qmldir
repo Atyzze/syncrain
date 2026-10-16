@@ -1,0 +1,3 @@
+module org.kde.plasma.workspace.keyboardlayout
+KeyboardLayout 1.0 KeyboardLayout.qml
+singleton LayoutState 1.0 LayoutState.qml

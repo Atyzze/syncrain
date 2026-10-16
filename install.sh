@@ -790,6 +790,8 @@ LOCK_SCENE="$LOCK_STATE/lock-screen.scene"
 # plasmashellrc's ShellPackage when it said org.kde.plasma.desktop outright (the default spelled out,
 # which some global themes write): taken out so the variable decides, put back by --lock-screen-off
 LOCK_SHELL_BEFORE="$LOCK_STATE/plasmashellrc-ShellPackage.before-syncrain"
+# kscreenlockerrc's wallpaper plugin before --lock-screen (empty: none was named), to put back
+LOCK_WALLPAPER_BEFORE="$LOCK_STATE/kscreenlockerrc-WallpaperPlugin.before-syncrain"
 LOCK_DROPIN_DIR="$UNITDIR/plasma-kwin_wayland.service.d"
 LOCK_DROPIN="$LOCK_DROPIN_DIR/syncrain-lock-screen.conf"
 lock_screen_installed() { [ -f "$LOCK_DROPIN" ]; }
@@ -830,6 +832,25 @@ lock_screen_build() {
   fi
 }
 
+# Plasma's locker loads the wallpaper kscreenlockerrc names (an image, decoded at the screen's size)
+# under any shell package, where syncrain's never shows it: a plain black costs nothing, and should
+# syncrain's lock screen not load, Plasma's own then shows black. Done once (the record says so): a
+# wallpaper chosen in Plasma's settings afterwards is the operator's, and stays.
+lock_wallpaper_plain() {
+  [ -f "$LOCK_WALLPAPER_BEFORE" ] && return 0
+  command -v kreadconfig6 >/dev/null && command -v kwriteconfig6 >/dev/null || return 0
+  mkdir -p "$LOCK_STATE" || return 0
+  kreadconfig6 --file kscreenlockerrc --group Greeter --key WallpaperPlugin > "$LOCK_WALLPAPER_BEFORE" 2>/dev/null \
+    || : > "$LOCK_WALLPAPER_BEFORE"
+  if kwriteconfig6 --file kscreenlockerrc --group Greeter --key WallpaperPlugin org.kde.color \
+      && kwriteconfig6 --file kscreenlockerrc --group Greeter --group Wallpaper --group org.kde.color --group General \
+           --key Color 0,0,0; then
+    info "the lock screen: Plasma's own lock wallpaper, unseen under syncrain's, is plain black now"
+  else
+    rm -f -- "$LOCK_WALLPAPER_BEFORE"
+  fi
+}
+
 lock_screen_on() {
   bold "Setting up the lock screen"
   if ! { have_user_systemd && systemctl --user cat plasma-kwin_wayland.service >/dev/null 2>&1; }; then
@@ -849,6 +870,7 @@ lock_screen_on() {
     kwriteconfig6 --file plasmashellrc --group Shell --key ShellPackage --delete
     info "plasmashellrc spelled out Plasma's default shell; taken out (--lock-screen-off puts it back)"
   fi
+  lock_wallpaper_plain
   mkdir -p "$LOCK_DROPIN_DIR"
   cat > "$LOCK_DROPIN" <<EOF
 # Written by syncrain's install.sh --lock-screen (./install.sh --lock-screen-off removes it): KWin
@@ -867,6 +889,7 @@ EOF
 lock_screen_refresh() {
   lock_screen_installed || return 0
   local said
+  lock_wallpaper_plain                      # an install from before this was done
   if said="$(lock_screen_build 2>&1)"; then info "the lock screen: build $BUILD too"
   else
     printf '%s\n' "$said"
@@ -889,6 +912,20 @@ lock_screen_off() {
   if [ -f "$LOCK_SHELL_BEFORE" ]; then
     kwriteconfig6 --file plasmashellrc --group Shell --key ShellPackage "$(cat "$LOCK_SHELL_BEFORE")" \
       && rm -f -- "$LOCK_SHELL_BEFORE"
+  fi
+  if [ -f "$LOCK_WALLPAPER_BEFORE" ]; then
+    local was now
+    was="$(cat "$LOCK_WALLPAPER_BEFORE")"
+    now="$(kreadconfig6 --file kscreenlockerrc --group Greeter --key WallpaperPlugin 2>/dev/null || true)"
+    # put back only what syncrain set: one chosen since in Plasma's settings stays
+    if [ "$now" = org.kde.color ]; then
+      if [ -n "$was" ]; then kwriteconfig6 --file kscreenlockerrc --group Greeter --key WallpaperPlugin "$was"
+      else kwriteconfig6 --file kscreenlockerrc --group Greeter --key WallpaperPlugin --delete; fi
+      kwriteconfig6 --file kscreenlockerrc --group Greeter --group Wallpaper --group org.kde.color --group General \
+        --key Color --delete || true
+    fi
+    rm -f -- "$LOCK_WALLPAPER_BEFORE"
+    had=1
   fi
   if [ "$had" = 1 ]; then
     bold "The lock screen is Plasma's own again"
@@ -914,7 +951,7 @@ if [ "$LOCK_OFF" = 1 ] || [ "$LOGIN_OFF" = 1 ] || [ "$UNINSTALL" = 1 ]; then
     if [ -f "$HANDOVER_STATE" ]; then handover_off; fi
   fi
   remove_plasma_wallpaper
-  if lock_screen_installed || [ -e "$LOCK_SHELL" ]; then lock_screen_off; fi
+  if lock_screen_installed || [ -e "$LOCK_SHELL" ] || [ -f "$LOCK_WALLPAPER_BEFORE" ]; then lock_screen_off; fi
   bold "Removing syncrain"
   if [ -f "$UNIT" ]; then
     if have_user_systemd; then systemctl --user disable --now syncrain.service >/dev/null 2>&1 || true; fi
@@ -930,7 +967,7 @@ if [ "$LOCK_OFF" = 1 ] || [ "$LOGIN_OFF" = 1 ] || [ "$UNINSTALL" = 1 ]; then
   for f in "$state/handover.json" "$state"/*.before-syncrain; do
     if [ -e "$f" ]; then kept=1; fi
   done
-  if [ -n "$kept" ]; then info "kept $state: it holds what --login-screen-off needs to put Plasma's wallpapers back"
+  if [ -n "$kept" ]; then info "kept $state: it holds what --login-screen-off or --lock-screen-off needs to put Plasma's settings back"
   else gone+=("$state"); fi
   for f in "${gone[@]}"; do
     if [ -e "$f" ] || [ -L "$f" ]; then rm -rf -- "$f"; info "removed $f"; fi
