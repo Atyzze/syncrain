@@ -10,6 +10,8 @@
 //   node page.js studio                                the settings panel used as a person would, and saved
 //   node page.js video <webm> <w> <h> <seconds> <fps> <loop> <t0>  a video made by the page's Save video
 //   node page.js dropdowns                             the colours a dropdown's options are drawn in
+//   node page.js states <w> <h> <json>               the rain-cell grid's hash after drawing each moment (ms) listed
+//   node page.js reads <json>                          each text of that list loaded as a settings file: '' or why not, and the settings then
 'use strict';
 const { chromium } = require('playwright');
 const crypto = require('crypto');
@@ -21,12 +23,16 @@ const PAGE = 'file://' + path.resolve(__dirname, '..', '..', 'index.html');
   const [mode, ...rest] = process.argv.slice(2);
   const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
   const errors = [];
+  // the page is one file that works offline: any request beyond itself is a failure, not a wait
+  const alone = page => page.route(/^(?!(file|data|blob):)/, r => {
+    errors.push('outside ' + r.request().url());
+    return r.abort();
+  });
   const open = async (w, h, query) => {
     const page = await browser.newPage({ viewport: { width: w, height: h }, deviceScaleFactor: 1 });
     page.on('pageerror', e => errors.push('pageerror ' + e.message));
     page.on('console', m => { if (m.type() === 'error') errors.push('console ' + m.text()); });
-    // the page's web fonts are decoration; a sandbox cannot fetch them and must not wait for them
-    await page.route(/fonts\.(googleapis|gstatic)\.com/, r => r.fulfill({ status: 200, contentType: 'text/css', body: '' }));
+    await alone(page);
     await page.goto(PAGE + (query ? '?' + query : ''), { waitUntil: 'domcontentloaded', timeout: 120000 });
     await page.waitForFunction(() => window.__syncrainReady === true, null, { timeout: 120000 });
     return page;
@@ -36,6 +42,7 @@ const PAGE = 'file://' + path.resolve(__dirname, '..', '..', 'index.html');
     // the canvas itself, drawn at the page's frozen moment (capture=1 keeps its drawing buffer)
     const [png, w, h, query] = rest;
     const page = await open(Number(w), Number(h), query + '&capture=1&scale=1&fps=1');
+    await page.evaluate(() => window.__syncrainSettled());
     const data = await page.evaluate(() => {
       window.__syncrainDraw(Number(new URLSearchParams(location.search).get('t')) * 1000);
       return document.getElementById('c').toDataURL('image/png');
@@ -60,6 +67,24 @@ const PAGE = 'file://' + path.resolve(__dirname, '..', '..', 'index.html');
       { size: [Number(w), Number(h)], seconds: Number(seconds), fps: Number(fps), loop: loop === '1', t0: Number(t0) });
     require('fs').writeFileSync(file, Buffer.from(b64, 'base64'));
     out.bytes = Buffer.from(b64, 'base64').length;
+  } else if (mode === 'states') {
+    // the raw rain-cell grid's hash after drawing each of these moments (ms, fractions too)
+    const [w, h, list] = rest;
+    const page = await open(Number(w), Number(h), 'hud=0&fps=1&t=0');
+    await page.evaluate(() => window.__syncrainSettled());
+    out.hashes = await page.evaluate(ms => ms.map(m => {
+      window.__syncrainDraw(m);
+      return window.__syncrainState().data;
+    }), JSON.parse(list));
+    out.hashes = out.hashes.map(d => crypto.createHash('sha256').update(Buffer.from(d)).digest('hex'));
+  } else if (mode === 'reads') {
+    const texts = JSON.parse(require('fs').readFileSync(rest[0], 'utf8'));
+    const page = await open(800, 450, 'hud=0&fps=1');
+    out.reads = [];
+    for (const text of texts) {
+      const said = await page.evaluate(t => window.__syncrainLoad(t), text);
+      out.reads.push({ said, exported: JSON.parse(await page.evaluate(() => window.__syncrainExport())) });
+    }
   } else if (mode === 'dropdowns') {
     const page = await open(1280, 720, 'fps=1');
     await page.click('#open');
@@ -113,7 +138,7 @@ const PAGE = 'file://' + path.resolve(__dirname, '..', '..', 'index.html');
       const page = await browser.newPage({ viewport: { width: w, height: h }, deviceScaleFactor: 1, acceptDownloads: true });
       page.on('pageerror', e => errors.push('pageerror ' + e.message));
       page.on('console', m => { if (m.type() === 'error') errors.push('console ' + m.text()); });
-      await page.route(/fonts\.(googleapis|gstatic)\.com/, r => r.fulfill({ status: 200, contentType: 'text/css', body: '' }));
+      await alone(page);
       await page.goto(PAGE + '?fps=2', { waitUntil: 'domcontentloaded', timeout: 120000 });
       await page.waitForFunction(() => window.__syncrainReady === true, null, { timeout: 120000 });
       await page.mouse.move(w / 2, h / 2);
@@ -125,12 +150,12 @@ const PAGE = 'file://' + path.resolve(__dirname, '..', '..', 'index.html');
       await page.click('#add');
       await page.fill('#channel', 'friends');
       await page.waitForTimeout(400);
-      const seen = await page.evaluate(() => {
+      const seen = await page.evaluate(async () => {
         const r = e => e.getBoundingClientRect(), s = r(document.getElementById('studio')), c = r(document.getElementById('c'));
         const apart = s.top >= c.bottom - 1 || s.left >= c.right - 1;
         return { overflow: document.documentElement.scrollWidth > window.innerWidth, shown: !document.getElementById('studio').hidden,
                  inside: s.left >= 0 && s.right <= window.innerWidth + 0.5 && s.bottom <= window.innerHeight + 0.5, apart,
-                 symbols: window.__syncrainSymbols() };
+                 symbols: await window.__syncrainSymbols() };
       });
       const [download] = await Promise.all([page.waitForEvent('download'), page.click('#save')]);
       seen.saved = require('fs').readFileSync(await download.path(), 'utf8');

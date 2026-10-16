@@ -1,12 +1,12 @@
-# The next build is 41
+# The next build is 42
 
 The first line is parsed: `# The next build is <N>`, exactly one above `BUILD_NUMBER`.
 
-## Build 41: the page and the release tool
+## Build 42: what the operator asks next
 
 * Read what the operator sent last, and answer it in one plain sentence first.
-* Then the last of the review of build 33 (`docs/ROADMAP.md`, "Planned builds"): items 13, 19, 24
-  to 26, 70 to 75 and 77 to 84. It does not change the stream.
+* The review of build 33 is done (all 84 items, builds 34 to 41). What is left is in
+  `docs/ROADMAP.md`: the open items, and an installer image of the flavour if the operator wants one.
 * No boot splash: never touch the bootloader, initramfs or Plymouth.
 
 **Known blockers**: watts, NVIDIA's driver and Plasma's shell exist only on the operator's machine;

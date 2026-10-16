@@ -66,6 +66,9 @@ REQUIRED_RELEASE_PATHS = {
 NOTES_DIR = "docs/build_notes"
 GATE_RESULT_TOKEN = "GATE_RESULT"
 JOURNAL = ROOT / "var" / "release_journal.json"
+#: Held (flock) for a whole run: a second run in the same tree took the first's journal for an
+#: interrupted run's, or removed it on its own failure, and a number could be spent twice.
+LOCK = ROOT / "var" / "release.lock"
 JOURNAL_CONTRACT = "syncrain-release-journal-1"
 #: The files a release changes before it knows whether it will succeed.
 TRACKED = ("BUILD_NUMBER", "index.html")
@@ -241,9 +244,32 @@ def partial_path(output: Path) -> Path:
     return output.with_name(f".{output.name}.partial")
 
 
-def _normalised(info: tarfile.TarInfo) -> tarfile.TarInfo:
+def archive_mtime() -> int:
+    """One time for every file: SOURCE_DATE_EPOCH when set, else the commit's, so the same tree packs
+    to the same bytes (a checkout's own times, to the nanosecond, made each archive different)."""
+    given = os.environ.get("SOURCE_DATE_EPOCH", "")
+    if given.isdigit():
+        return int(given)
+    try:
+        done = subprocess.run(["git", "-C", str(ROOT), "log", "-1", "--format=%ct"], capture_output=True,
+                              text=True, timeout=30)
+        if done.returncode == 0 and done.stdout.strip().isdigit():
+            return int(done.stdout.strip())
+    except (OSError, subprocess.SubprocessError):
+        pass
+    return 0
+
+
+def _normalised(info: tarfile.TarInfo, mtime: int = 0) -> tarfile.TarInfo:
     info.uid = info.gid = 0
     info.uname = info.gname = ""
+    # whole seconds (a fraction goes into a PAX header of its own), and the modes the umask did not pick
+    info.mtime = mtime
+    info.pax_headers = {}
+    if info.isdir() or info.mode & 0o111:
+        info.mode = 0o755
+    else:
+        info.mode = 0o644
     return info
 
 
@@ -256,13 +282,15 @@ def write_archive(number: int, output: Path) -> Path:
     partial = partial_path(output)
     partial.unlink(missing_ok=True)
     prefix = archive_root(number)
+    mtime = archive_mtime()
     with tempfile.TemporaryDirectory(prefix="syncrain-release-archive-", dir=output.parent) as raw:
         tar_path = Path(raw) / f"{prefix}.tar"
         with tarfile.open(tar_path, "w", format=tarfile.PAX_FORMAT, dereference=True) as tf:
             for rel, path in shipped().items():
                 if path.resolve() in (output.resolve(), partial.resolve()):
                     continue
-                tf.add(path, arcname=f"{prefix}/{rel}", recursive=False, filter=_normalised)
+                tf.add(path, arcname=f"{prefix}/{rel}", recursive=False,
+                       filter=lambda info: _normalised(info, mtime))
         compressed = Path(raw) / f"{prefix}.tar.zst"
         subprocess.run([zstd, "-19", "-T0", "-q", "-f", str(tar_path), "-o", str(compressed)], check=True)
         subprocess.run([zstd, "-t", "-q", str(compressed)], check=True)
@@ -376,6 +404,31 @@ def restore_from_journal() -> int | None:
 
 # ---------------------------------------------------------------- the run
 
+def hold_release_lock() -> int:
+    """The lock on this tree's releases, held until the process ends (the descriptor is not passed
+    on to the gate's processes). A second run stops at once and touches nothing."""
+    import fcntl
+    LOCK.parent.mkdir(parents=True, exist_ok=True)
+    fd = os.open(LOCK, os.O_RDWR | os.O_CREAT | os.O_CLOEXEC, 0o644)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        os.close(fd)
+        raise SystemExit(f"a release is running in this tree already ({LOCK.relative_to(ROOT)}); "
+                         "wait for it to end") from None
+    return fd
+
+
+def drop_own_journal() -> None:
+    """The journal goes only when this run wrote it."""
+    try:
+        record = json.loads(JOURNAL.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return
+    if record.get("pid") == os.getpid():
+        JOURNAL.unlink(missing_ok=True)
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--output", type=Path, help=f"a directory for {archive_name(0).replace('0', '<N>')}, or a file path")
@@ -386,6 +439,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--skip-wheel", action="store_true", help="no wheel build and clean install")
     args = ap.parse_args(argv)
 
+    hold_release_lock()
     restore_from_journal()
     if args.number is not None and args.number <= current_build():
         raise SystemExit(f"--number {args.number} is not above the current build {current_build()}; "
@@ -438,7 +492,7 @@ def main(argv: list[str] | None = None) -> int:
                 path.unlink(missing_ok=True)
             else:
                 path.write_text(content, encoding="utf-8")
-        JOURNAL.unlink(missing_ok=True)
+        drop_own_journal()
         print(f"release failed; the tree is back at build {current_build()} and no number was spent")
         raise
     finally:
@@ -447,7 +501,7 @@ def main(argv: list[str] | None = None) -> int:
                 signal.signal(sig, handler)
             except (ValueError, OSError):
                 pass
-    JOURNAL.unlink(missing_ok=True)
+    drop_own_journal()
     print(f"build {number}: {output}")
     return 0
 

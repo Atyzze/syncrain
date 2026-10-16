@@ -6,6 +6,7 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 import tarfile
 
 import pytest
@@ -32,6 +33,7 @@ def pr(root, tmp_path, monkeypatch):
     (tree / "syncrain/__pycache__/app.cpython-313.pyc").write_bytes(b"cache")
     monkeypatch.setattr(module, "ROOT", tree)
     monkeypatch.setattr(module, "JOURNAL", tree / "var/release_journal.json")
+    monkeypatch.setattr(module, "LOCK", tree / "var/release.lock")
     monkeypatch.setattr(module, "REQUIRED_RELEASE_PATHS", {"BUILD_NUMBER", "README.md", "install.sh"})
     monkeypatch.setattr(module, "ROOT_DIRS", {"docs", "syncrain"})
     return module
@@ -102,3 +104,37 @@ def test_a_running_release_s_journal_is_left_alone(pr):
                                       "originals": {"BUILD_NUMBER": "4\n"}}))
     assert pr.restore_from_journal() is None
     assert pr.current_build() == 5 and pr.JOURNAL.exists()
+
+
+def test_the_same_tree_packs_to_the_same_bytes(pr, tmp_path, monkeypatch):
+    """Whatever the checkout's file times and the umask were: fixed times, normalised modes."""
+    need(shutil.which("zstd") is not None, "no zstd")
+    monkeypatch.setenv("SOURCE_DATE_EPOCH", "1791331207")
+    first = pr.write_archive(5, tmp_path / "a" / "SYNCRAIN5.tar.zst").read_bytes()
+    os.utime(pr.ROOT / "README.md", (1.25e9 + 0.123456, 1.25e9 + 0.123456))
+    (pr.ROOT / "syncrain/app.py").chmod(0o600)
+    second = pr.write_archive(5, tmp_path / "b" / "SYNCRAIN5.tar.zst").read_bytes()
+    assert first == second
+    found = members(tmp_path / "b" / ".SYNCRAIN5.tar.zst.partial", tmp_path)
+    assert found["syncrain_build_5/syncrain/app.py"].mode == 0o644
+    assert found["syncrain_build_5/install.sh"].mode == 0o755
+    assert {m.mtime for m in found.values()} == {1791331207}
+
+
+def test_a_second_release_in_the_tree_stops_and_touches_nothing(pr):
+    """It used to take the running release's journal for an interrupted one's."""
+    held = pr.hold_release_lock()
+    try:
+        pr.JOURNAL.write_text(json.dumps({"contract": pr.JOURNAL_CONTRACT, "number": 6, "pid": 1,
+                                          "originals": {"BUILD_NUMBER": "4\n"}}))
+        done = subprocess.run([sys.executable, "-c", (
+            "import importlib.util, sys, pathlib\n"
+            f"spec = importlib.util.spec_from_file_location('p', {str(pr.__file__)!r})\n"
+            "m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)\n"
+            f"m.ROOT = pathlib.Path({str(pr.ROOT)!r}); m.LOCK = m.ROOT / 'var/release.lock'\n"
+            "m.JOURNAL = m.ROOT / 'var/release_journal.json'\n"
+            "m.main(['--skip-tests', '--skip-wheel'])\n")], capture_output=True, text=True, timeout=60)
+        assert done.returncode != 0 and "a release is running" in done.stderr, done.stdout + done.stderr
+        assert pr.JOURNAL.exists() and pr.current_build() == 5
+    finally:
+        os.close(held)

@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=64"]
+requires = ["setuptools>=77"]                 # license as an SPDX expression
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -9,7 +9,8 @@ dynamic = ["version"]
 description = "Never-repeating, clock-synchronised code-rain live wallpaper (GTK4 + OpenGL; Wayland layer-shell and X11)"
 readme = "README.md"
 requires-python = ">=3.10"
-license = { text = "MIT" }
+license = "MIT"
+license-files = ["LICENSE"]
 dependencies = ["PyGObject", "Pillow"]
 
 [project.urls]
@@ -19,8 +20,11 @@ Documentation = "https://github.com/Atyzze/syncrain/blob/main/docs/OPERATIONS.md
 [project.scripts]
 syncrain = "syncrain.app:main"
 
-[tool.setuptools]
-packages = ["syncrain"]
+# The data folders (shaders, the lock screen's QML, the login screen's script) are namespace packages
+# of their own to setuptools: found as such, rather than named by hand and warned about at every build.
+[tool.setuptools.packages.find]
+include = ["syncrain", "syncrain.*"]
+namespaces = true
 
 [tool.setuptools.dynamic]
 version = { file = "BUILD_NUMBER" }

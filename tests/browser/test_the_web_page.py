@@ -82,6 +82,39 @@ def test_with_the_bloom_off_the_page_and_the_app_agree_closely(page, app, tmp_pa
     assert mean_abs_diff(web, native) < 0.15
 
 
+def test_a_screen_whose_quarter_is_no_whole_number_draws_as_the_desktop_does(page, app, tmp_path):
+    """1050 rows: a quarter is 262.5, which Python rounds to 262 and Math.round to 263; the blur
+    passes then had other sizes on the page than on the desktop."""
+    web, native = tmp_path / "web.png", tmp_path / "native.png"
+    page("shot", web, 1680, 1050, f"t={MOMENT}&hud=0&bloom=0.25")
+    done = app(["--window", "--size", "1680x1050", "--time", str(MOMENT), "--screenshot", str(native), "--bloom", "0.25"])
+    assert done.returncode == 0, done.stderr
+    assert mean_abs_diff(web, native) < 1.0
+
+
+def test_a_moment_between_milliseconds_is_drawn_as_its_millisecond(page):
+    """A video at 30 fps has frames between milliseconds; the desktop draws each at the millisecond it
+    falls in (engine.split_time), and the page did not: one in six frames had other heads."""
+    t0 = int(MOMENT) * 1000
+    frames = [t0 + k * 1000 / 30 for k in range(90)]
+    drawn = page("states", 640, 360, json.dumps(frames))["hashes"]
+    floored = page("states", 640, 360, json.dumps([t0 + (k * 1000) // 30 for k in range(90)]))["hashes"]
+    assert drawn == floored
+    assert len(set(floored)) > 30, "the rain moves from frame to frame"
+
+
+def test_saved_settings_load_back_as_they_were(page, tmp_path):
+    """What the settings panel saves, loaded again: the same file, word for word."""
+    seen = page("studio")
+    for name in ("desk", "phone"):
+        saved = tmp_path / f"{name}.json"
+        saved.write_text(seen[name]["saved"], encoding="utf-8")
+        again = page("symbols", saved)
+        assert again["loaded"] == "", again["loaded"]
+        assert json.loads(again["exported"] if isinstance(again["exported"], str) else json.dumps(again["exported"])) \
+            == json.loads(seen[name]["saved"]), name
+
+
 def test_screens_of_one_shape_share_one_stream(page):
     small = page("state", 1280, 720, f"t={MOMENT}&hud=0")
     large = page("state", 1920, 1080, f"t={MOMENT}&hud=0")
@@ -362,3 +395,65 @@ def test_the_desktop_makes_the_video_the_page_does(page, app, tmp_path):
             subprocess.run([ffmpeg, "-v", "error", "-y", "-i", str(src), "-vf", f"select=eq(n\\,{k})", "-vsync", "0",
                             "-frames:v", "1", str(dst)], check=True)
         assert mean_abs_diff(a, b) < 7.0, k            # two lossy encoders
+
+
+#: Settings files at the edges of the grammar: what one side takes, the other takes, and reads the same.
+#: (Before, 18 of 41 such files were taken by one and refused by the other.)
+EDGES = [
+    {"speed": 1.5}, {"speed": "1.5"}, {"speed": " 1.5 "}, {"speed": "0x10"}, {"speed": "1_0"},
+    {"speed": "\uff11"}, {"speed": "Infinity"}, {"speed": "nan"}, {"speed": ""}, {"speed": "1e0"},
+    {"speed": ".5"}, {"speed": "1."}, {"speed": "+1"}, {"speed": "\ufeff1"}, {"speed": "1\u00a0"},
+    {"speed": True}, {"speed": None}, {"speed": [1]}, {"speed": "0b1"},
+    {"channel": "friends"}, {"channel": 5}, {"channel": "\ud800"}, {"channel": "-x"}, {"channel": True},
+    {"snow": True}, {"snow": "on"}, {"snow": "yes"}, {"snow": 1},
+    {"preset": "matrix"}, {"preset": "MATRIX"}, {"preset": " matrix"},
+    {"spin": 5}, {"spin": "5"}, {"spin": 0}, {"spin": -15},
+    {"flavours": 2}, {"flavours": 2.5}, {"flavours": "2"},
+    {"fps": "60"}, {"fps": 0},
+    {"words": ["A", "B"]}, {"words": ["A,B"]}, {"words": "A"},
+    {"glow_color": "#ff0000"}, {"glow_color": [1, 0, 0]}, {"glow_color": [True, 0, 0]}, {"glow_color": "red"},
+    {"logo": "nixos"}, {"logo": "NixOS"},
+    {"no_such": 1},
+]
+#: The settings compared where both take the file: what the desktop's options become, on the page.
+SAME = {"speed": "speed", "channel": "channel", "spin": "spin", "flavours": "flavours", "fps": "fps"}
+
+
+def _texts():
+    head = '{"contract": "syncrain-config-1", '
+    texts = [head + json.dumps(e)[1:] for e in EDGES]
+    texts.append("\ufeff" + head + '"speed": 1.25}')                     # a byte order mark first
+    texts.append(head + '"speed": 1, "speed": 2}')                       # a key twice: the last
+    texts.append(head + '"cycle": 1e400}')                               # past what a double holds
+    texts.append(head + '"speed": "1.5", "channel": "\\ud83d\\ude00"}')  # a whole character, escaped
+    return texts
+
+
+def test_the_page_and_the_desktop_read_the_same_settings_files(page, tmp_path):
+    from syncrain.app import parse_args
+    texts = _texts()
+    (tmp_path / "texts.json").write_text(json.dumps(texts), encoding="utf-8")
+    on_page = page("reads", tmp_path / "texts.json")["reads"]
+    differ = []
+    for i, (text, web) in enumerate(zip(texts, on_page)):
+        path = tmp_path / f"{i}.json"
+        path.write_bytes(text.encode("utf-8", "surrogatepass"))
+        try:
+            import contextlib
+            import io
+            with contextlib.redirect_stderr(io.StringIO()):
+                args = parse_args(["--config", str(path)])
+        except SystemExit:
+            args = None
+        if (args is None) != bool(web["said"]):
+            differ.append(f"{text!r}: desktop {'refuses' if args is None else 'takes'} it, page {web['said']!r}")
+            continue
+        if args is None:
+            continue
+        given = json.loads(text.lstrip("\ufeff"))
+        for key, dest in SAME.items():
+            if key in given and given[key] is not None:
+                ours, theirs = getattr(args, dest), web["exported"][key]
+                if (float(ours) if isinstance(theirs, (int, float)) else ours) != theirs:
+                    differ.append(f"{text!r}: {key} is {ours!r} on the desktop, {theirs!r} on the page")
+    assert not differ, "\n".join(differ)

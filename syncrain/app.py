@@ -12,6 +12,7 @@ import ctypes
 import gc
 import math
 import os
+import re
 import signal
 import sys
 import time
@@ -50,12 +51,27 @@ JS_SPACE = ("\t\n\v\f\r \u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u
             "\u200a\u2028\u2029\u202f\u205f\u3000\ufeff")
 
 
+#: A number as an option or the settings file gives it, the same grammar as the page's (index.html,
+#: DECIMAL): decimal digits, a point, an exponent, spaces at the ends. Python's float also took
+#: "1_0", "\uff11" and " \u2003 1", the page's Number "0x10" and "0b1": one side drew what the
+#: other refused.
+DECIMAL = re.compile(r"[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?")
+
+
+def _decimal(text: str) -> float:
+    """The number text says, or ValueError (inf and nan are no such text)."""
+    word = text.strip(" \t\n\r") if isinstance(text, str) else ""
+    if not DECIMAL.fullmatch(word):
+        raise ValueError(text)
+    return float(word)
+
+
 def _number(low=None, high=None, above=None):
     """An option's number: finite (never nan or inf, which every frame would carry), and within
     what the option can use. A value outside ends with argparse's status 2, said at once."""
     def parse(text):
         try:
-            value = float(text)
+            value = _decimal(text)
         except ValueError:
             raise argparse.ArgumentTypeError(f"not a number: {text!r}") from None
         if not math.isfinite(value):
@@ -126,7 +142,7 @@ def _colours(count):
         out = []
         for w in words:
             try:
-                out.append(colour([float(x) for x in w.split("/")] if "/" in w else w))
+                out.append(colour([_decimal(x) for x in w.split("/")] if "/" in w else w))
             except ValueError as e:
                 raise argparse.ArgumentTypeError(str(e)) from None
         return out if count > 1 else out[0]
@@ -143,7 +159,7 @@ def _logo_colour(text):
 def _flavours(text):
     """How many colours at once, 1 to 64 (a whole number; 3.0 is 3)."""
     try:
-        value = float(text)
+        value = _decimal(text)
     except ValueError:
         raise argparse.ArgumentTypeError(f"not a number: {text!r}") from None
     if not value.is_integer() or not 1 <= value <= 64:
@@ -257,7 +273,9 @@ def _read_settings(ap, path):
     def wrong(why):
         ap.error(f"{path}: {why}")
     try:
-        with open(path, encoding="utf-8") as fh:
+        # utf-8-sig: a byte order mark first (some editors write one) is no reason to refuse the
+        # file, and the page, reading it as text, never saw one
+        with open(path, encoding="utf-8-sig") as fh:
             cfg = json.load(fh)
     except OSError as e:
         wrong(e.strerror or str(e))
@@ -278,6 +296,8 @@ def _read_settings(ap, path):
             wrong(f"no setting {key!r} (the settings: {', '.join(CONFIG_KEYS)}, glyphs)")
         if value is None:                         # as the preset or the sets have it
             continue
+        if key == "channel" and not isinstance(value, str):
+            wrong("channel is a name in quotes")       # 5 was the channel "5.0" here, refused on the page
         if key in COLOUR_KEYS:
             value = _colour_words(value, COLOUR_KEYS[key], wrong, key)
         elif key == "words":

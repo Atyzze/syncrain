@@ -1,4 +1,4 @@
-# Handoff: the state of syncrain at build 40
+# Handoff: the state of syncrain at build 41
 
 What is true now, for a context that has just opened this tree. Where this page and the code
 disagree, the code is right; fix the page in the same build. Each fact has one home; this page
@@ -48,16 +48,16 @@ This page, `docs/agent/NEXT_BUILD.md`, `docs/agent/WORKING_WITH_THE_OPERATOR.md`
   colours and periods); `822ea58a` 29 to 34 (sentences' gaps and trails in `state.frag`); `85ace386` in
   28; `a9c058f3` 24 to 27; `f98ef1ca` in 23; `25b02556` in 22; `def5684f` 15 to 21; `c18f8be2` in 12
   to 14; `48e6bf9c` 3 to 11.
-* **GitHub**: `main` holds builds 7 to 40, a commit `syncrain build <N>` each, and a few
+* **GitHub**: `main` holds builds 7 to 41, a commit `syncrain build <N>` each, and a few
   documents-only commits between them.
 
-## Under way
+## Done last
 
-The review of build 33 (84 numbered items, in the operator's review document) is fixed one area a
+The review of build 33 (84 numbered items, in the operator's review document) was fixed one area a
 build, the most critical first (`docs/ROADMAP.md`, "Planned builds"):
 
 * **34** the lock screen (1, 3, 27, 28, 30, 56); **35** the operator's new default with every
-  stream-file fix (65, 66, 69, 76), so the builds after it leave the stream alone.
+  stream-file fix (65, 66, 69, 76), so the builds after it leave the stream alone. Build 41 did the page and the release tool (13, 19, 24 to 26, 70 to 75, 77 to 84), the last of the review: all 84 items are done.
 * **36** the login screen (4 to 7, 23, 31 to 38): `--login-screen-off` takes out only what it put
   in, and greetd's config is read as greetd reads it.
 * **37** the installer (8 to 11, 39 to 46): options checked before the service keeps them, the
@@ -65,7 +65,7 @@ build, the most critical first (`docs/ROADMAP.md`, "Planned builds"):
 * **38** Nix and the tests (2, 12, 16 to 18, 20 to 22, 47): the template keeps the machine's own
   `/etc/nixos`, the flake is locked to the tested nixpkgs, a test that would hang fails instead.
 * **39** the hosts (14, 15, 29, 48 to 55, 57 to 64, 67, 68).
-* **40** the consolidation; **41**, next, the page and the release tool, the last of it.
+* **40** the consolidation; **41** the page and the release tool, the last of it: all 84 done.
 
 ## Waits on the operator
 

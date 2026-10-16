@@ -17,7 +17,7 @@ esac
 
 if [ -n "$VENV" ]; then
   [ -x "$VENV/bin/python" ] || python3 -m venv "$VENV" || exit 1
-  "$VENV/bin/pip" install -q PyGObject Pillow pycairo pytest pyflakes "setuptools>=64" wheel cairosvg || exit 1
+  "$VENV/bin/pip" install -q PyGObject Pillow pycairo pytest pyflakes "setuptools>=77" "packaging>=24.2" wheel cairosvg || exit 1
   export PATH="$VENV/bin:$PATH"
 fi
 
@@ -49,6 +49,12 @@ for module, lane in (("PIL", "every lane"), ("cairo", "installer"), ("pytest", "
                      ("setuptools", "release"), ("wheel", "release")):
     check(module, lambda m=module: importlib.import_module(m), lane)
 check("gtk4-layer-shell typelib (GI_TYPELIB_PATH)", layer, "wayland")
+def setuptools_77():                      # pyproject.toml's license is an SPDX expression from 77 on
+    import setuptools
+    if int(setuptools.__version__.split(".")[0]) < 77:
+        raise ImportError(f"setuptools {setuptools.__version__} is older than 77")
+    import packaging.licenses  # noqa: F401 - setuptools 77 needs it (packaging 24.2 on)
+check("setuptools 77 or newer", setuptools_77, "release")
 sys.exit(bad)
 PYCHECK
 

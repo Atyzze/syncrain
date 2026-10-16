@@ -17,7 +17,7 @@ from syncrain import glyphs
 from tests.conftest import ROOT, need
 
 #: The page's pieces these need, by how each starts in index.html.
-PIECES = ("const own = ", "const PY_SPACE = ", "const PY_BLANK = ", "const charsOf = ",
+PIECES = ("const own = ", "const ownCopy = ", "const PY_SPACE = ", "const PY_BLANK = ", "const charsOf = ",
           "function pyRepr(", "function checkGlyphs(", "function setShares(")
 
 CASES = [
@@ -44,6 +44,8 @@ CASES = [
     {"sets": [{"name": "x", "chars": "a", "mirror": "yes"}]},
     {"sets": [{"name": 5, "chars": "a"}]},
     {"sets": [{"name": "x", "chars": "a", "size": 3}]},
+    # a key a JS object would take as its prototype is one more key of the set, as in Python
+    {"sets": [{"name": "x", "chars": "a", "__proto__": {"chars": "zzz", "share": 0.9}}]},
     {"sets": [{"name": f"s{i}", "chars": "a"} for i in range(17)]},
 ]
 HIEROGLYPHS = [None, 0.0, 0.5, 1.0]

@@ -65,12 +65,13 @@ class Session(dict):
 
 
 @contextlib.contextmanager
-def headless_sway(run: Path, screen: str = "1280x720"):
-    """A headless Sway with one screen of `screen` (WxH), run from the new runtime directory `run`:
+def headless_sway(run: Path, screen: str = "1280x720", scale: float = 1):
+    """A headless Sway with one screen of `screen` (WxH, device pixels) at `scale`, run from the new
+    runtime directory `run`:
     yields the environment a client reaches it with (XDG_RUNTIME_DIR, WAYLAND_DISPLAY, SWAYSOCK), as a
     Session."""
     run.mkdir(mode=0o700, parents=True)
-    (run / "sway.conf").write_text(f"output * resolution {screen}\ndefault_border none\n")
+    (run / "sway.conf").write_text(f"output * resolution {screen} scale {scale:g}\ndefault_border none\n")
     env = dict(os.environ, XDG_RUNTIME_DIR=str(run), WLR_BACKENDS="headless", WLR_LIBINPUT_NO_DEVICES="1",
                WLR_RENDERER="pixman", WLR_HEADLESS_OUTPUTS="1")
     env.pop("WAYLAND_DISPLAY", None)

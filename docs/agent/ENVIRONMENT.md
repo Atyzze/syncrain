@@ -15,7 +15,7 @@ What every lane needs, how to bring a sandbox up, and its traps. `tools/prepare_
 | browser | node with Playwright and its Chromium |
 | nix | nix-build; nixpkgs and home-manager checkouts (`SYNCRAIN_NIXPKGS`, `SYNCRAIN_HOME_MANAGER`); a driver in `/run/opengl-driver` |
 | lockscreen | Nix and `SYNCRAIN_NIXPKGS` (Qt, Plasma's locker, libei), sway, KWin 6 (`SYNCRAIN_KWIN`), dbus-daemon, cc; root, for a PAM service `kde` of the test's own (only where `/etc/pam.d/kde` is not the machine's) |
-| release | all of the above, plus setuptools and wheel |
+| release | all of the above, plus setuptools 77 or newer (with packaging 24.2 or newer) and wheel |
 
 The release runs every lane with `--require-all`: a missing environment fails it.
 
@@ -23,7 +23,7 @@ The release runs every lane with `--require-all`: a missing environment fails it
 
 1. Packages: `libgtk-4-dev gobject-introspection libcairo2-dev meson xvfb sway grim shellcheck zstd
    gcc pkg-config libwayland-dev libdbus-1-dev`; node 22; Playwright's Chromium; Nix.
-2. A venv outside the tree: `pip install PyGObject Pillow pycairo pytest pyflakes "setuptools>=64" wheel cairosvg`
+2. A venv outside the tree: `pip install PyGObject Pillow pycairo pytest pyflakes "setuptools>=77" "packaging>=24.2" wheel cairosvg`
    (CairoSVG draws `logo-syncrain.svg` for `tools/build_logo.py` where there is no rsvg-convert).
 3. gtk4-layer-shell v1.3.0 from source (`meson setup build -Dintrospection=true`, `ninja -C build
    install`), then `export GI_TYPELIB_PATH=/usr/local/lib/x86_64-linux-gnu/girepository-1.0`.
@@ -71,6 +71,10 @@ The other three families the same way, each in a root of its own (build 31 did a
 * Two cores and software rendering: a frame now and then takes three times as long, so timing
   tests stay small and judge medians.
 * Memory measured here is partly Mesa's llvmpipe; only the operator's machine shows NVIDIA's.
+* `pip` here is Python 3.13's, the lanes run 3.12 (`/opt/py312shim`): install for the lanes with
+  `/opt/py312shim/python3 -m pip install --break-system-packages ...`. Upgrading setuptools with the
+  bare `pip` took Debian's shared copy from 3.12 too. setuptools 77 needs packaging 24.2, newer
+  than Debian's, which pip cannot uninstall: `--ignore-installed packaging`.
 * Unix socket paths over 108 bytes fail: keep runtime directories short.
 * GitHub: a session cannot create a repository or push a tag. Attach the repository with push
   access before pushing, or the proxy answers 403.

@@ -140,6 +140,36 @@ def test_the_native_wallpaper_draws_the_gtk_host_s_frame(root, sway, tmp_path, l
     assert mean_abs_diff(shots["native"], shots["gtk"]) == 0
 
 
+@pytest.mark.parametrize("scale", [1.25, 2], ids=["fractional-1.25", "double"])
+def test_a_scaled_screen_shows_the_frame_a_scale_of_one_does(root, sway, tmp_path, scale):
+    """A screen at 1.25 or 2 has as many pixels as one at 1 here (1280x720), so it shows the same
+    frame: drawn at the screen's own pixels, not scaled up from fewer (or, as once at a fractional
+    scale after an integer one, scaled twice). The native wallpaper (Wayland's default) to the pixel,
+    against itself at 1; the GTK host at a whole scale too (at a fractional one GtkGLArea's
+    framebuffer follows the next whole scale and Sway scales it down: docs/ROADMAP.md, open items)."""
+    session, empty = sway
+    shots = {}
+    with headless_sway(tmp_path / "run", scale=scale) as scaled:
+        empty_scaled = tmp_path / "empty-scaled.png"
+        grab(scaled, empty_scaled)
+        for where, s, blank in (("one", session, empty), ("scaled", scaled, empty_scaled)):
+            for host in ("native", "gtk") if where == "scaled" and scale == int(scale) else ("native",):
+                proc, line = start(root, wallpaper_env(root, s), "--time", str(MOMENT), "--host",
+                                   "auto" if host == "native" else "gtk")
+                try:
+                    assert HOSTS[host] in line, line + said_when_stopped(proc)
+                    shots[where, host] = tmp_path / f"{where}-{host}.png"
+                    grab_settled(s, shots[where, host], unlike=blank)
+                finally:
+                    proc.send_signal(signal.SIGTERM)
+                    proc.communicate(timeout=30)
+    from PIL import Image
+    assert Image.open(shots["scaled", "native"]).size == (1280, 720)
+    assert mean_abs_diff(shots["scaled", "native"], shots["one", "native"]) == 0
+    if ("scaled", "gtk") in shots:
+        assert mean_abs_diff(shots["scaled", "gtk"], shots["one", "native"]) < 0.5
+
+
 def test_the_native_wallpaper_keeps_neither_python_nor_gtk(root, sway):
     """syncrain replaces its own process with the native program: the pid stays, the interpreter and
     the toolkit go."""
