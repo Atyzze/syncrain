@@ -250,7 +250,11 @@ a 16:9, 21:9 or other desktop. Then **Save config.json** (or **Copy**) and, in t
   when it keeps the file; a picture since moved is left out, said, and the rain still starts), `"scale"`
   and `"layer"` (as `--scale` and `--layer`). The page cannot show them: it keeps them, says so,
   and writes them back. The login screen's copy of the file leaves all four out (its user cannot
-  read your pictures, and the other two are the wallpaper's).
+  read the operator's pictures, and the other two are the wallpaper's).
+* A `"logo"` can be a picture file's path too (`"logo": "mine.png"`, beside the file; a name ending
+  .png, .jpg, .jpeg, .webp, .gif, .bmp, .tif, .tiff, .ico, .svg or .svgz). The page keeps it as it
+  keeps a background, while no other logo is picked there; the login screen's copy carries the
+  picture inside it. One since moved is left out, said, and the preset's logo is drawn.
 * Options on the command line go over the file. **Open a settings file** (or drop one on the page)
   shows one again; a symbols file (`glyphs.json`) loads as the sets.
 

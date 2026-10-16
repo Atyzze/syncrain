@@ -6,7 +6,8 @@ libei come from the same nixpkgs: SYNCRAIN_NIXPKGS), sway and grim, KWin 6 (SYNC
 the real lock, root to give PAM a service `kde` of the test's own (/etc/pam.d/kde, only where there
 is none, removed after). What is checked:
 
-* the item draws the desktop's frame (the GTK host's, to within a level, beside the box);
+* the item draws the desktop's frame: the native wallpaper's from the same nixpkgs (the same Mesa),
+  to the pixel, beside the box;
 * the box answers PAM as Plasma 6.7's own lock screen does: a wrong password is said and cleared,
   PAM is asked again only after its delay, a password typed during it is kept for the next question,
   PAM's Dutch prompt does not hide the refusal, the right one quits the locker; and without the
@@ -48,7 +49,7 @@ def built(root, tmp_path_factory):
     need(bool(nixpkgs) and os.path.isdir(nixpkgs or ""), "SYNCRAIN_NIXPKGS does not name a nixpkgs checkout")
     need(shutil.which("sway") is not None, "no sway")
     out = {}
-    for name in ("lockscreen", "qtdeclarative", "plasma", "libei"):
+    for name in ("lockscreen", "qtdeclarative", "plasma", "libei", "wallpaper"):
         link = tmp_path_factory.mktemp("lock") / name
         done = subprocess.run(["nix-build", str(HERE / "lockscreen.nix"), "-A", name, "--arg", "src", str(root),
                                "--arg", "nixpkgs", nixpkgs, "-o", str(link)],
@@ -108,16 +109,50 @@ def outside_the_box(a: Path, b: Path) -> float:
     return total / n
 
 
-def test_the_lock_screen_draws_the_desktop_s_frame(greeter, app, tmp_path):
-    shot, gtk = tmp_path / "lock.png", tmp_path / "gtk.png"
+def native_frame(built, tmp_path: Path) -> Path:
+    """The native wallpaper from the same nixpkgs as the lock screen, on its own 640x360 screen at
+    MOMENT, as the compositor shows it (the desktop's frame there; the GTK host's is the same)."""
+    from tests.support import grab, grab_settled
+    need(shutil.which("grim") is not None, "no grim")
+    shot = tmp_path / "native.png"
+    with headless_sway(tmp_path / "run-native", screen="640x360") as session:
+        empty = Path(session["XDG_RUNTIME_DIR"]) / "empty.png"
+        grab(session, empty)
+        # as clean as the lock screen's own: nothing of this machine's GL in the way of Nix's
+        env = clean_env(**session, PYTHONPATH=str(ROOT), PYTHONDONTWRITEBYTECODE="1", XDG_CURRENT_DESKTOP="sway",
+                        SYNCRAIN_WALLPAPER=str(built["wallpaper"] / "libexec/syncrain/syncrain-wallpaper"))
+        proc = subprocess.Popen([sys.executable, "-m", "syncrain", "--config", "none", "--time", str(MOMENT)],
+                                cwd=ROOT, env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        try:
+            deadline, line = time.monotonic() + 60, ""
+            while time.monotonic() < deadline and not line.startswith("syncrain build"):
+                line = proc.stdout.readline()
+                if not line and proc.poll() is not None:
+                    break
+            if ", native wallpaper, " not in line:
+                proc.kill()
+                _, err = proc.communicate(timeout=30)
+                pytest.fail(f"the native wallpaper did not start: {line!r}\n{err[-3000:]}")
+            grab_settled(session, shot, unlike=empty)
+        finally:
+            if proc.poll() is None:
+                proc.send_signal(signal.SIGTERM)
+                try:
+                    proc.communicate(timeout=30)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+                    proc.communicate(timeout=10)
+    return shot
+
+
+def test_the_lock_screen_draws_the_desktop_s_frame(greeter, built, tmp_path):
+    shot = tmp_path / "lock.png"
     code, said = greeter("shot", shot)
     assert code == 0 and shot.exists(), said
     assert "flow: rain drawing" in said and "the lock screen draws the rain" in said, said
-    done = app(["--config", "none", "--window", "--size", "640x360", "--time", str(MOMENT), "--screenshot", str(gtk)])
-    assert done.returncode == 0, done.stderr
-    # about 2% darker than the desktop's in this lane, proportional to brightness (docs/ROADMAP.md,
-    # open items); the default's green middle (build 35) took the mean from 0.53 to 0.67
-    assert outside_the_box(shot, gtk) < 0.9
+    # the same Mesa as the lock screen's Qt: to the pixel. Against the GTK host on another Mesa
+    # (25.2 here, the lane's Qt has 26.2) it was 1.8% darker, the two llvmpipes' own difference.
+    assert outside_the_box(shot, native_frame(built, tmp_path)) == 0
 
 
 def steps(said: str) -> list[str]:

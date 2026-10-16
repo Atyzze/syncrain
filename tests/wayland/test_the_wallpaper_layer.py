@@ -145,15 +145,16 @@ def test_a_scaled_screen_shows_the_frame_a_scale_of_one_does(root, sway, tmp_pat
     """A screen at 1.25 or 2 has as many pixels as one at 1 here (1280x720), so it shows the same
     frame: drawn at the screen's own pixels, not scaled up from fewer (or, as once at a fractional
     scale after an integer one, scaled twice). The native wallpaper (Wayland's default) to the pixel,
-    against itself at 1; the GTK host at a whole scale too (at a fractional one GtkGLArea's
-    framebuffer follows the next whole scale and Sway scales it down: docs/ROADMAP.md, open items)."""
+    against itself at 1; the GTK host to the pixel at a whole scale, and at a fractional one within a
+    level (GtkGLArea's framebuffer follows the next whole scale, to GTK 4.22 at least, and Sway
+    scales it down; the GTK host draws the screen's own pixels into it)."""
     session, empty = sway
     shots = {}
     with headless_sway(tmp_path / "run", scale=scale) as scaled:
         empty_scaled = tmp_path / "empty-scaled.png"
         grab(scaled, empty_scaled)
         for where, s, blank in (("one", session, empty), ("scaled", scaled, empty_scaled)):
-            for host in ("native", "gtk") if where == "scaled" and scale == int(scale) else ("native",):
+            for host in ("native", "gtk") if where == "scaled" else ("native",):
                 proc, line = start(root, wallpaper_env(root, s), "--time", str(MOMENT), "--host",
                                    "auto" if host == "native" else "gtk")
                 try:
@@ -166,7 +167,11 @@ def test_a_scaled_screen_shows_the_frame_a_scale_of_one_does(root, sway, tmp_pat
     from PIL import Image
     assert Image.open(shots["scaled", "native"]).size == (1280, 720)
     assert mean_abs_diff(shots["scaled", "native"], shots["one", "native"]) == 0
-    if ("scaled", "gtk") in shots:
+    if scale == int(scale):
+        assert mean_abs_diff(shots["scaled", "gtk"], shots["one", "native"]) == 0
+    else:
+        # the compositor still shrinks GtkGLArea's framebuffer (a whole scale's) to the screen; the
+        # frame in it is the screen's, each pixel blown up whole, so that lands within a level (2.6 before)
         assert mean_abs_diff(shots["scaled", "gtk"], shots["one", "native"]) < 0.5
 
 

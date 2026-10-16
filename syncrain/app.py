@@ -233,6 +233,9 @@ CONFIG_KEYS = {"preset": "--preset", "theme": "--preset", "channel": "--channel"
                "background": "--background", "mask": "--mask", "scale": "--scale", "layer": "--layer"}
 #: Settings that name a file: one given relative is the settings file's neighbour, wherever it is read.
 PATH_KEYS = ("background", "mask")
+#: A logo that names a picture file, as the page tells one from a logo's name (index.html, PICTURE_NAME).
+PICTURE_ENDINGS = (".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".tif", ".tiff", ".ico", ".svg", ".svgz")
+PICTURE_NAME = re.compile(r"(^|[/\\])[^/\\]+\.(png|jpe?g|webp|gif|bmp|tiff?|ico|svgz?)\Z", re.IGNORECASE | re.ASCII)
 #: The settings whose values are colours: (how many, as a list).
 COLOUR_KEYS = {"rain_colors": 4, "background_colors": 3, "glow_color": 1, "logo_color": 1}
 
@@ -318,10 +321,16 @@ def _read_settings(ap, path):
                 continue
         elif key == "logo" and isinstance(value, str) and not value.startswith("data:") \
                 and value not in SHIPPED_LOGOS and value != "none":
-            # a picture beside the settings file, as the background is; a name stays a name
-            beside = os.path.join(os.path.dirname(os.path.realpath(path)), os.path.expanduser(value))
-            if os.path.isfile(beside):
-                value = beside
+            # a picture file by the name the page tells one by (it keeps such a logo, unseen), beside
+            # the settings file as the background is
+            if not PICTURE_NAME.search(value):
+                wrong("logo is syncrain, nixos, none, a picture the page made, or a picture file's path "
+                      f"(a name ending {', '.join(PICTURE_ENDINGS)})")
+            value = os.path.join(os.path.dirname(os.path.realpath(path)), os.path.expanduser(value))
+            if not os.path.isfile(value):
+                # moved since, as a background can be: the preset's logo, said
+                print(f"syncrain: {path}: no picture at {value}; the preset's logo instead", file=sys.stderr)
+                continue
         elif key == "words":
             if not isinstance(value, list) or not all(isinstance(w, str) and "," not in w for w in value):
                 wrong("words is a list of words in quotes, none with a comma")
@@ -1017,6 +1026,22 @@ def main(argv=None):
                 if self.renderer is not None:
                     self._schedule()
 
+        def _screen_pixels(self, W: int, H: int):
+            """The screen's own pixels under this area, where the framebuffer (W x H) has more: at a
+            fractional scale (GTK 4.12 on says it, gdk_surface_get_scale) GtkGLArea's follows the
+            next whole one. None at a whole scale, where GTK cannot say, or where the framebuffer
+            already has the screen's pixels. A still or a record keeps the framebuffer's: their
+            files are its size, and the scale may not be known yet at the first frame."""
+            if args.screenshot or args.record or self.rects:
+                return None
+            try:
+                exact = self.get_native().get_surface().get_scale()
+            except (AttributeError, TypeError):
+                return None
+            # rounded as the native wallpaper rounds a fractional scale's size (wallpaper.c)
+            sw, sh = int(self.get_width() * exact + 0.5), int(self.get_height() * exact + 0.5)
+            return (sw, sh) if 0 < sw < W and 0 < sh <= H else None
+
         def _draw(self):
             if self.fb:                              # GLArea does not reset the viewport between frames
                 W, H = self.fb
@@ -1028,19 +1053,28 @@ def main(argv=None):
             out = gl.get_integer(gl.GL_FRAMEBUFFER_BINDING)
             t = self._moment()
             areas = self.rects(W, H) if self.rects else [(0, 0, W, H)]
+            # At a fractional scale (1.25) GtkGLArea's framebuffer has the next whole scale's pixels and
+            # the compositor shrinks it to the screen's: the frame is drawn at the screen's own pixels,
+            # the grid the native wallpaper draws there, and each pixel of it blown up whole
+            screen = self._screen_pixels(W, H)
+            scale = min(args.scale, 1.0)             # above 1 draws as 1 does, on both hosts
             for (x, y, w, h) in areas:
-                if args.scale < 0.999:
-                    sw, sh = max(64, round(w * args.scale)), max(36, round(h * args.scale))
+                if scale < 0.999 or screen:
+                    bw, bh = screen or (w, h)
+                    sw, sh = (bw, bh) if scale >= 0.999 else (max(64, round(bw * scale)), max(36, round(bh * scale)))
                     off = self._offscreen(sw, sh, keep=max(2, len(areas)))
                     # drawn into fewer pixels: the grid is still the screen's (engine.geometry)
-                    self.renderer.cell_scale = args.scale
+                    self.renderer.cell_scale = scale
                     try:
                         self.renderer.render(t, off, 0, 0, sw, sh)
                     finally:
                         self.renderer.cell_scale = 1.0
                     gl.glBindFramebuffer(gl.GL_READ_FRAMEBUFFER, off)
                     gl.glBindFramebuffer(gl.GL_DRAW_FRAMEBUFFER, out)
-                    gl.glBlitFramebuffer(0, 0, sw, sh, x, y, x + w, y + h, gl.GL_COLOR_BUFFER_BIT, gl.GL_LINEAR)
+                    # nearest at the screen's pixels: the compositor's shrinking then lands on them
+                    # (linear here and there again would soften it twice); --scale's is softer anyway
+                    gl.glBlitFramebuffer(0, 0, sw, sh, x, y, x + w, y + h, gl.GL_COLOR_BUFFER_BIT,
+                                         gl.GL_LINEAR if scale < 0.999 else gl.GL_NEAREST)
                     gl.glBindFramebuffer(gl.GL_FRAMEBUFFER, out)
                 else:
                     self.renderer.render(t, out, x, y, w, h)

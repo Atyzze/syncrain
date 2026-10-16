@@ -309,6 +309,21 @@ def test_the_pictures_a_settings_file_names_are_beside_it(tmp_path, monkeypatch)
     assert parse_args(["--config", path, "--background", "b.png"]).background == "b.png", "the command line is its own"
 
 
+def test_a_logo_file_moved_since_leaves_the_preset_s_logo_and_a_name_stays_refused(tmp_path, capsys):
+    args = parse_args(["--config", settings(tmp_path, logo="gone.png")])
+    assert args.logo is None and "the preset's logo instead" in capsys.readouterr().err
+    with pytest.raises(SystemExit):
+        parse_args(["--config", settings(tmp_path, logo="NixOS")])
+
+
+def test_the_page_and_the_desktop_tell_a_logo_file_from_a_name_alike():
+    import re
+    from syncrain.app import PICTURE_NAME
+    from tests.conftest import ROOT
+    page = re.search(r"const PICTURE_NAME = /(.*)/i;", (ROOT / "index.html").read_text(encoding="utf-8")).group(1)
+    assert page.replace("\\/", "/").replace("$", "\\Z") == PICTURE_NAME.pattern
+
+
 def test_a_settings_file_through_a_link_finds_its_pictures_beside_itself(tmp_path, capsys):
     (tmp_path / "dotfiles").mkdir()
     (tmp_path / "dotfiles/wall.png").write_bytes(b"")

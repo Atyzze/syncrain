@@ -1,4 +1,4 @@
-# Where we are, at build 45
+# Where we are, at build 46
 
 The project on one page. Detail: `docs/agent/HANDOFF.md`.
 
@@ -37,7 +37,7 @@ plain text by design: the text means the machine is not up yet, the rain that it
 * **Your NixOS flavour** (build 33): `nix flake init -t github:Atyzze/syncrain` over your own
   `/etc/nixos`, kept whole, `nixos-rebuild switch`: Plasma 6 with the rain as wallpaper, login and lock screen.
   The whole system builds here; no machine has booted it yet.
-* **On GitHub**: github.com/Atyzze/syncrain, every build up to 45.
+* **On GitHub**: github.com/Atyzze/syncrain, every build up to 46.
 
 ## What comes next
 

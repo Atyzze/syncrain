@@ -1,12 +1,12 @@
-# The next build is 46
+# The next build is 47
 
 The first line is parsed: `# The next build is <N>`, exactly one above `BUILD_NUMBER`.
 
-## Build 46: the lock screen's frame and the GTK host's fractional scale
+## Build 47: the operator's machine
 
 * Read what the operator sent last, and answer it in one plain sentence first.
-* The lock screen's 2% darker frame (`rainitem.cpp`), and the GTK host at a fractional scale (1.25),
-  from the roadmap's open items.
+* What the roadmap still has needs the operator's machine (booting NixOS and the other
+  distributions, watts, Safari); ask them for what they see, or take what they ask next.
 * No boot splash: never touch the bootloader, initramfs or Plymouth.
 
 **Known blockers**: watts, NVIDIA's driver and Plasma's shell exist only on the operator's machine;

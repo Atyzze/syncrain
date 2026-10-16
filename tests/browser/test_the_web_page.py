@@ -459,7 +459,8 @@ EDGES = [
     {"fps": "60"}, {"fps": 0},
     {"words": ["A", "B"]}, {"words": ["A,B"]}, {"words": "A"},
     {"glow_color": "#ff0000"}, {"glow_color": [1, 0, 0]}, {"glow_color": [True, 0, 0]}, {"glow_color": "red"},
-    {"logo": "nixos"}, {"logo": "NixOS"},
+    {"logo": "nixos"}, {"logo": "NixOS"}, {"logo": "mine.png"}, {"logo": "gone.svg"}, {"logo": "pictures\\mine.PNG"},
+    {"logo": "mine.png\n"}, {"logo": ".png"}, {"logo": "mine.gif"}, {"logo": "mine"}, {"logo": "mine.\u017fvg"},
     {"scale": 0.75}, {"scale": "0.5"}, {"scale": 4}, {"scale": 5}, {"scale": 0}, {"scale": True},
     {"layer": "bottom"}, {"layer": "top"}, {"layer": 1},
     {"background": "wall.png"}, {"background": "pictures/wall.png"}, {"background": ""}, {"background": 5},
@@ -492,6 +493,10 @@ def test_the_page_and_the_desktop_read_the_same_settings_files(page, tmp_path):
     for picture in ("wall.png", "pictures/wall.png", "mask.png"):    # on the desktop's machine, beside the file
         (tmp_path / picture).parent.mkdir(exist_ok=True)
         (tmp_path / picture).write_bytes(b"")
+    from PIL import Image
+    Image.new("RGBA", (8, 8), (255, 0, 0, 255)).save(tmp_path / "mine.png")
+    Image.new("RGBA", (8, 8), (255, 0, 0, 255)).save(tmp_path / "mine.gif")
+    Image.new("RGBA", (8, 8), (255, 0, 0, 255)).save(tmp_path / "mine", "PNG")    # no name a picture has
     differ = []
     for i, (text, web) in enumerate(zip(texts, on_page)):
         path = tmp_path / f"{i}.json"
@@ -514,6 +519,9 @@ def test_the_page_and_the_desktop_read_the_same_settings_files(page, tmp_path):
                 ours, theirs = getattr(args, dest), web["exported"][key]
                 if (float(ours) if isinstance(theirs, (int, float)) else ours) != theirs:
                     differ.append(f"{text!r}: {key} is {ours!r} on the desktop, {theirs!r} on the page")
+        if isinstance(given.get("logo"), str) and given["logo"].lower().endswith((".png", ".svg", ".gif")):
+            if web["exported"].get("logo") != given["logo"]:      # kept as it was given, for the desktop
+                differ.append(f"{text!r}: the page wrote the logo as {web['exported'].get('logo')!r}")
         for key in PICTURES:
             if key in given:
                 ours, theirs = getattr(args, key), web["exported"].get(key)

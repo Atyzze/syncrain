@@ -8,6 +8,9 @@ let
 in
 {
   lockscreen = pkgs.callPackage (src + "/nix/lockscreen.nix") { };
+  # the native wallpaper from the same nixpkgs: the same Mesa as the lock screen's Qt, so the two
+  # frames can be compared to the pixel (two Mesa versions' llvmpipe differ by a percent or two)
+  wallpaper = pkgs.callPackage (src + "/nix/package.nix") { };
   qtdeclarative = pkgs.qt6.qtdeclarative;
   libei = pkgs.libei;
   plasma = pkgs.symlinkJoin {
