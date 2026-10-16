@@ -226,11 +226,109 @@ def test_build_21_s_matrix_files_still_have_no_snow(tmp_path):
 
 
 def test_a_logo_file_that_is_no_picture_is_refused_at_once(tmp_path, capsys):
-    svg = tmp_path / "logo.svg"
-    svg.write_text('<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>')
+    text = tmp_path / "logo.png"
+    text.write_text("no picture")
     with pytest.raises(SystemExit) as stop:
-        parse_args(["--config", "none", "--logo", str(svg)])
+        parse_args(["--config", "none", "--logo", str(text)])
     assert stop.value.code == 2 and "not a picture syncrain reads" in capsys.readouterr().err
+    broken = tmp_path / "logo.svg"
+    broken.write_text("<svg xmlns='http://www.w3.org/2000/svg'><rect")
+    with pytest.raises(SystemExit) as stop:
+        parse_args(["--config", "none", "--logo", str(broken)])
+    assert stop.value.code == 2 and "SVG" in capsys.readouterr().err
+
+
+SVG = ('<svg xmlns="http://www.w3.org/2000/svg" width="100" height="60">'
+       '<rect x="0" y="0" width="50" height="60" fill="#e63c28"/></svg>')
+
+
+def svg_loader():
+    try:
+        import gi
+        gi.require_version("GdkPixbuf", "2.0")
+        from gi.repository import GdkPixbuf
+    except (ImportError, ValueError):
+        return False
+    return "svg" in {f.get_name() for f in GdkPixbuf.Pixbuf.get_formats()}
+
+
+@pytest.mark.skipif(not svg_loader(), reason="no librsvg picture loader here")
+def test_an_svg_is_a_logo_as_the_page_takes_one(tmp_path):
+    from syncrain import logo
+    for name in ("logo.svg", "logo-saved-without-its-name"):          # by its name, or by its first bytes
+        svg = tmp_path / name
+        svg.write_text(SVG)
+        assert parse_args(["--config", "none", "--logo", str(svg)]).logo == str(svg)
+        im = logo.open_picture(str(svg))
+        assert im.size == (logo.SIDE * 2, round(logo.SIDE * 2 * 60 / 100)), "drawn sharp, not scaled up from 100"
+        assert im.getpixel((10, 10)) == (230, 60, 40, 255) and im.getpixel((im.width - 10, 10))[3] == 0
+        made = logo.prepare(im)
+        assert made.size == (logo.SIDE, logo.SIDE)
+        x0, y0, x1, y1 = made.getchannel("A").getbbox()
+        assert (x0, y0, y1) == (170, 307, 717) and abs(x1 - 512) <= 2, "its left half, in the middle two thirds"
+
+
+def test_an_svg_is_known_by_its_first_bytes_whatever_comes_before(tmp_path):
+    from syncrain import logo
+    for head in (b"\xef\xbb\xbf", b"<!DOCTYPE svg>\n", b"<!-- drawn by hand -->\n", b"<?xml version='1.0'?>\n"):
+        f = tmp_path / "picture"
+        f.write_bytes(head + SVG.encode())
+        assert logo.is_svg(str(f)), head
+    (tmp_path / "picture").write_bytes(b"\x89PNG\r\n")
+    assert not logo.is_svg(str(tmp_path / "picture"))
+
+
+def test_without_librsvg_an_svg_logo_says_what_to_install(tmp_path, monkeypatch, capsys):
+    from syncrain import logo
+    svg = tmp_path / "logo.svg"
+    svg.write_text(SVG)
+    GdkPixbuf = pytest.importorskip("gi.repository.GdkPixbuf")
+    monkeypatch.setattr(GdkPixbuf.Pixbuf, "get_formats", staticmethod(lambda: []))
+    with pytest.raises(logo.LogoError, match="librsvg2-common"):
+        logo.open_picture(str(svg))
+
+
+def test_the_pictures_a_settings_file_names_are_beside_it(tmp_path, monkeypatch):
+    (tmp_path / "pics").mkdir()
+    monkeypatch.chdir(tmp_path / "pics")                 # not where the file is: where it is read
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    (tmp_path / "home").mkdir()
+    for picture in ("wall.png", "home/mask.png", "pics/a.png", "pics/b.png"):
+        (tmp_path / picture).write_bytes(b"")
+    path = settings(tmp_path, background="wall.png", mask="~/mask.png", scale=0.75, layer="bottom")
+    args = parse_args(["--config", path])
+    assert args.background == str(tmp_path / "wall.png")
+    assert args.mask == str(tmp_path / "home/mask.png"), "the home is the home"
+    assert (args.scale, args.layer) == (0.75, "bottom")
+    from PIL import Image
+    Image.new("RGBA", (4, 4), (255, 0, 0, 255)).save(tmp_path / "mine.png")
+    assert parse_args(["--config", settings(tmp_path, logo="mine.png")]).logo == str(tmp_path / "mine.png")
+    assert parse_args(["--config", settings(tmp_path, logo="nixos")]).logo == "nixos"
+    path = settings(tmp_path, background=str(tmp_path / "pics/a.png"))
+    assert parse_args(["--config", path]).background == str(tmp_path / "pics/a.png"), "a whole path is as it is"
+    assert parse_args(["--config", path, "--background", "b.png"]).background == "b.png", "the command line is its own"
+
+
+def test_a_settings_file_through_a_link_finds_its_pictures_beside_itself(tmp_path, capsys):
+    (tmp_path / "dotfiles").mkdir()
+    (tmp_path / "dotfiles/wall.png").write_bytes(b"")
+    real = settings(tmp_path / "dotfiles", background="wall.png", logo="nixos", mask="gone.png")
+    (tmp_path / "dotfiles/nixos").write_bytes(b"")        # a file named as a logo: the logo's name wins
+    (tmp_path / "config.json").symlink_to(real)
+    args = parse_args(["--config", str(tmp_path / "config.json")])
+    assert args.background == str(tmp_path / "dotfiles/wall.png") and args.logo == "nixos"
+    assert args.mask is None, "a picture moved since is left out, and the wallpaper still starts"
+    assert "no picture at" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("values, says", [({"background": ""}, "path in quotes"), ({"mask": 5}, "path in quotes"),
+                                          ({"scale": 5}, "--scale"), ({"scale": 0}, "--scale"),
+                                          ({"layer": "top"}, "--layer")])
+def test_a_desktop_setting_it_cannot_use_says_so(tmp_path, capsys, values, says):
+    path = settings(tmp_path, **values)
+    with pytest.raises(SystemExit) as stop:
+        parse_args(["--config", path])
+    assert stop.value.code == 2 and says in capsys.readouterr().err
 
 
 def test_one_colour_over_the_logo_and_its_own_again(tmp_path):

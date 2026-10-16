@@ -1,12 +1,12 @@
-# The next build is 45
+# The next build is 46
 
 The first line is parsed: `# The next build is <N>`, exactly one above `BUILD_NUMBER`.
 
-## Build 45: an SVG logo, more settings, the video file
+## Build 46: the lock screen's frame and the GTK host's fractional scale
 
 * Read what the operator sent last, and answer it in one plain sentence first.
-* Then `docs/ROADMAP.md`, "Planned builds": an SVG as the desktop's logo; `scale`, `layer`,
-  `background` and `mask` in the settings file; a SeekHead in the page's WebM.
+* The lock screen's 2% darker frame (`rainitem.cpp`), and the GTK host at a fractional scale (1.25),
+  from the roadmap's open items.
 * No boot splash: never touch the bootloader, initramfs or Plymouth.
 
 **Known blockers**: watts, NVIDIA's driver and Plasma's shell exist only on the operator's machine;

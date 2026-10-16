@@ -18,6 +18,7 @@ import sys
 import time
 
 from . import build, hidden, native
+from .logo import SHIPPED as SHIPPED_LOGOS
 
 #: The exit status when no OpenGL context can be had. The autostart services list it under
 #: RestartPreventExitStatus, so a machine without working OpenGL is not covered by an endless
@@ -226,7 +227,12 @@ CONFIG_KEYS = {"preset": "--preset", "theme": "--preset", "channel": "--channel"
                "flavour_layout": "--flavour-layout", "logo": "--logo", "logo_color": "--logo-color", "logo_size": "--logo-size",
                "logo_cycle": "--logo-cycle", "spin": "--spin", "drift": "--drift", "speed": "--speed",
                "density": "--density", "glow": "--glow", "bloom": "--bloom", "bg_gain": "--bg-gain", "snow": "--snow",
-               "hieroglyphs": "--hieroglyphs", "words": "--words", "fps": "--fps", "pause_under": "--pause-under"}
+               "hieroglyphs": "--hieroglyphs", "words": "--words", "fps": "--fps", "pause_under": "--pause-under",
+               # the desktop's own, kept in the file the page saves (it shows none of them): a picture
+               # behind the rain, its mask, the drawing scale and the Wayland layer
+               "background": "--background", "mask": "--mask", "scale": "--scale", "layer": "--layer"}
+#: Settings that name a file: one given relative is the settings file's neighbour, wherever it is read.
+PATH_KEYS = ("background", "mask")
 #: The settings whose values are colours: (how many, as a list).
 COLOUR_KEYS = {"rain_colors": 4, "background_colors": 3, "glow_color": 1, "logo_color": 1}
 
@@ -300,6 +306,22 @@ def _read_settings(ap, path):
             wrong("channel is a name in quotes")       # 5 was the channel "5.0" here, refused on the page
         if key in COLOUR_KEYS:
             value = _colour_words(value, COLOUR_KEYS[key], wrong, key)
+        elif key in PATH_KEYS:
+            if not isinstance(value, str) or not value.strip():
+                wrong(f"{key} is a picture file's path in quotes")
+            # beside the file itself: through a link (dotfiles), where the pictures are kept with it
+            value = os.path.join(os.path.dirname(os.path.realpath(path)), os.path.expanduser(value))
+            if not os.path.isfile(value):
+                # a picture moved since: the wallpaper still starts, as without one (an option on
+                # the command line is the operator's at that moment, and is refused instead)
+                print(f"syncrain: {path}: no picture at {value}; the {key} is left out", file=sys.stderr)
+                continue
+        elif key == "logo" and isinstance(value, str) and not value.startswith("data:") \
+                and value not in SHIPPED_LOGOS and value != "none":
+            # a picture beside the settings file, as the background is; a name stays a name
+            beside = os.path.join(os.path.dirname(os.path.realpath(path)), os.path.expanduser(value))
+            if os.path.isfile(beside):
+                value = beside
         elif key == "words":
             if not isinstance(value, list) or not all(isinstance(w, str) and "," not in w for w in value):
                 wrong("words is a list of words in quotes, none with a comma")

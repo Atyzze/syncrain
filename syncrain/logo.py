@@ -59,17 +59,58 @@ def decode(choice: str):
     return im
 
 
+def is_svg(path: str) -> bool:
+    """An SVG by its name or its first bytes (an .svg named otherwise, or saved without a name)."""
+    if path.lower().endswith((".svg", ".svgz")):
+        return True
+    try:
+        with open(path, "rb") as fh:
+            head = fh.read(2048).lstrip()
+    except OSError:
+        return False
+    # a byte order mark, an XML declaration, a doctype or a comment can come first
+    head = head.removeprefix(b"\xef\xbb\xbf").lstrip()
+    return head.startswith(b"<") and b"<svg" in head
+
+
+#: Where each family has librsvg's picture loader, which GTK reads an SVG with.
+SVG_PACKAGES = "pacman -S librsvg, apt install librsvg2-common, dnf install librsvg2, zypper install gdk-pixbuf-loader-rsvg"
+
+
+def open_svg(path: str):
+    """An SVG drawn at SIDE * 2 on its longer side by GTK's picture loader (librsvg's), as a Pillow
+    image: Pillow draws no SVG, and the page's browser does, so the desktop takes one too."""
+    from PIL import Image
+    try:
+        import gi
+        gi.require_version("GdkPixbuf", "2.0")
+        from gi.repository import GdkPixbuf, GLib
+    except (ImportError, ValueError):
+        raise LogoError(f"{path} is an SVG, which syncrain draws with GTK's picture loader (not found)") from None
+    if "svg" not in {f.get_name() for f in GdkPixbuf.Pixbuf.get_formats()}:
+        raise LogoError(f"{path} is an SVG, which needs librsvg's picture loader ({SVG_PACKAGES})")
+    try:
+        pb = GdkPixbuf.Pixbuf.new_from_file_at_scale(path, SIDE * 2, SIDE * 2, True)
+    except GLib.Error as e:
+        raise LogoError(f"{path} is an SVG that cannot be drawn ({e.message})") from None
+    mode = "RGBA" if pb.get_has_alpha() else "RGB"
+    data = pb.read_pixel_bytes().get_data()
+    return Image.frombuffer(mode, (pb.get_width(), pb.get_height()), data, "raw", mode, pb.get_rowstride(), 1).copy()
+
+
 def open_picture(path: str):
     """A picture file as an image, upright as its camera meant it, decoded no larger than needed;
-    LogoError for a file Pillow cannot read (an SVG, say)."""
+    LogoError for a file neither Pillow nor (for an SVG) GTK's loader reads."""
     from PIL import Image, ImageOps
+    if is_svg(path):
+        return open_svg(path)
     try:
         im = Image.open(path)
         im.draft("RGB", (SIDE * 2, SIDE * 2))      # a large JPEG decodes at a fraction of its size
         im = ImageOps.exif_transpose(im)
         im.load()
     except Exception as e:  # noqa: BLE001 - Pillow's errors for what it cannot read are of every kind
-        raise LogoError(f"{path} is not a picture syncrain reads (PNG, JPEG, WebP; {type(e).__name__})") from None
+        raise LogoError(f"{path} is not a picture syncrain reads (PNG, JPEG, WebP, SVG; {type(e).__name__})") from None
     if max(im.size) > SIDE * 2:
         im.thumbnail((SIDE * 2, SIDE * 2))
     return im

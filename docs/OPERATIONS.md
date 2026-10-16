@@ -171,7 +171,7 @@ A Plasma web-wallpaper plugin can host it, behind the desktop icons.
 | `--cycle S` | preset's | Seconds a turn of the colour wheel, every flavour together (an RGB keyboard's rainbow); 0 = the colours stay, else 10 or more |
 | `--background-colors C,C,C` | preset's | The background gradient: top, bottom, centre glow |
 | `--vignette F` | preset's | How much darker the corners are, 0 to 1 |
-| `--logo` | preset's | `syncrain`, `nixos`, `none`, or a picture file (PNG, JPEG, WebP: what Pillow reads) |
+| `--logo` | preset's | `syncrain`, `nixos`, `none`, or a picture file (PNG, JPEG, WebP, or SVG: an SVG needs librsvg's picture loader, which most desktops have) |
 | `--logo-color C` | its own | One colour over the logo's shape, any logo or picture; `own` for its own colours |
 | `--logo-size F` | preset's | The logo's height in screen heights, 0.05 to 0.9 |
 | `--logo-cycle S` | preset's | Seconds a turn of the logo's rainbow (over its colour); 0 = its own colours, else 10 or more |
@@ -232,7 +232,9 @@ a 16:9, 21:9 or other desktop. Then **Save config.json** (or **Copy**) and, in t
   too, so a symbols file cannot draw others. Colours are `"#rrggbb"`, or three numbers 0 to 1.
 * A picture as the logo is made into the logo's texture by the page (a square, the picture in its
   middle two thirds) and kept in the file as a PNG (`data:image/png;base64,...`): the desktop draws
-  those very pixels. `--logo FILE` makes one the same way from a file. **Colour** puts one colour
+  those very pixels. `--logo FILE` makes one the same way from a file, an SVG too (drawn sharp at
+  the texture's size by GTK's picture loader; without it, syncrain names the package:
+  `librsvg`, `librsvg2-common`, `librsvg2` or `gdk-pixbuf-loader-rsvg`). **Colour** puts one colour
   over any logo's shape (a picture's too), and over its glow.
 * **Colours at once**: each column of rain takes one of that many hues, the gradient turned round
   the colour wheel; by the channel (the same columns on every machine) or as a wave across the
@@ -242,6 +244,13 @@ a 16:9, 21:9 or other desktop. Then **Save config.json** (or **Copy**) and, in t
   24 to 60 fps. Drawn frame by frame, so it takes a while; the rain is hidden and the other settings
   stand still meanwhile, and **Stop** ends it. Chrome, Edge and Firefox make it; Safari may not.
   The same as `syncrain --video` (below, "A video").
+* The desktop's own settings are in the file too, written by hand or kept from an earlier file:
+  `"background"` and `"mask"` (a picture behind the rain and its mask; a relative path is beside
+  the settings file, the file itself where it is a link, and `./install.sh --config` names it whole
+  when it keeps the file; a picture since moved is left out, said, and the rain still starts), `"scale"`
+  and `"layer"` (as `--scale` and `--layer`). The page cannot show them: it keeps them, says so,
+  and writes them back. The login screen's copy of the file leaves all four out (its user cannot
+  read your pictures, and the other two are the wallpaper's).
 * Options on the command line go over the file. **Open a settings file** (or drop one on the page)
   shows one again; a symbols file (`glyphs.json`) loads as the sets.
 

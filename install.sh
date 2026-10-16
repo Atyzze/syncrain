@@ -317,9 +317,40 @@ copy_kde_settings() {
   done
 }
 # The operator's settings file (the web page's export), for the login screen's rain to draw alike.
+# The login screen's copy of the settings, in $1. greetd's user cannot read this user's files: a
+# picture behind the rain and its mask stay the desktop's (a rain that cannot load its picture draws
+# nothing there), and a logo from a file goes along inside the copy, as the page keeps one. The
+# drawing scale and the Wayland layer are the wallpaper's alone.
 copy_settings() {
-  local settings="${XDG_CONFIG_HOME:-$HOME/.config}/syncrain/config.json"
-  if [ -f "$settings" ]; then copy_to_root "$settings" "$1/config.json"; fi
+  local settings="${XDG_CONFIG_HOME:-$HOME/.config}/syncrain/config.json" made shown
+  [ -f "$settings" ] || return 0
+  made="$(mktemp)"
+  # utf-8-sig: a byte order mark first, as some editors write and the app reads past; the picture
+  # is beside the file itself, through a link (dotfiles) too, as the app finds it
+  if shown="$(PYTHONPATH="$APPDIR" PYTHONSAFEPATH=1 "$PY" -c 'import base64, io, json, os, sys
+cfg = json.load(open(sys.argv[1], encoding="utf-8-sig"))
+for key in ("background", "mask", "scale", "layer"):
+    cfg.pop(key, None)
+choice = cfg.get("logo")
+names = ("syncrain", "nixos", "white", "none", "nixos-colours", "colours")
+if isinstance(choice, str) and not choice.startswith("data:") and choice not in names:
+    picture = os.path.join(os.path.dirname(os.path.realpath(sys.argv[1])), os.path.expanduser(choice))
+    try:
+        from syncrain import logo
+        buf = io.BytesIO()
+        logo.prepare(logo.open_picture(picture)).save(buf, "PNG")
+        cfg["logo"] = "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
+        print(os.path.normpath(picture))
+    except Exception:                      # noqa: BLE001 - no picture, no app, no loader: all the same here
+        cfg.pop("logo")                    # the logo of the preset, there
+json.dump(cfg, open(sys.argv[2], "w", encoding="utf-8"), indent=2, ensure_ascii=False)' "$settings" "$made" 2>/dev/null)"; then
+    copy_to_root "$made" "$1/config.json"
+    # it shows before anyone logs in: the operator should know which of their pictures that is
+    if [ -n "$shown" ]; then info "the login screen shows the logo from $shown (as the settings file names it)"; fi
+  else
+    copy_to_root "$settings" "$1/config.json"      # not JSON: as it is, and the login screen says why
+  fi
+  rm -f "$made"
 }
 # Whether the settings file names symbol sets of its own (they go over a symbols file).
 settings_have_sets() {
@@ -1161,8 +1192,28 @@ if [ -n "$CONFIG" ]; then
   # the file itself given again (edited where it is) is kept as it is; another one replaces it
   # whole, through a new file, so a link in its place (dotfiles) is replaced and not written through
   if ! [ "$CONFIG" -ef "$settings" ]; then
-    if [ -f "$settings" ] && [ "$(cat "$settings")" != "$(cat "$CONFIG")" ]; then cp "$settings" "$settings.before"; fi
-    cp "$CONFIG" "$settings.new"
+    # a picture it names beside itself (a relative path) is read beside the kept file from then on:
+    # the kept copy names it whole, where it is now (through a link, where the file itself is)
+    if ! PYTHONPATH="$APPDIR" PYTHONSAFEPATH=1 "$PY" -c 'import json, os, sys
+from syncrain.logo import SHIPPED
+src, out = sys.argv[1], sys.argv[2]
+cfg = json.load(open(src, encoding="utf-8-sig"))
+moved = False
+for key in ("background", "mask", "logo"):
+    v = cfg.get(key)
+    if isinstance(v, str) and v.strip() and not v.startswith("data:") and not os.path.isabs(os.path.expanduser(v)):
+        whole = os.path.join(os.path.dirname(os.path.realpath(src)), v)
+        if key != "logo" or (v not in SHIPPED and v != "none" and os.path.isfile(whole)):   # a name stays a name
+            cfg[key] = whole
+            moved = True
+if not moved:
+    sys.exit(1)
+json.dump(cfg, open(out, "w", encoding="utf-8"), indent=2, ensure_ascii=False)
+open(out, "a", encoding="utf-8").write("\n")' "$CONFIG" "$settings.new" 2>/dev/null; then
+      cp "$CONFIG" "$settings.new"
+    fi
+    # what was kept before, if this is another file: the same one given again keeps the first .before
+    if [ -f "$settings" ] && ! cmp -s "$settings" "$settings.new"; then cp "$settings" "$settings.before"; fi
     mv -f "$settings.new" "$settings"
   fi
   info "settings: $settings (from $CONFIG)"

@@ -230,11 +230,30 @@ def test_install_makes_the_rain_the_login_screen_and_puts_sddm_back_after(tmp_pa
     assert again.returncode == 0 and "the login screen: build" in again.stdout, again.stdout + again.stderr
     assert json.loads((lib / "login.json").read_text())["rain"][:1] == ["--preset=matrix"]
     page = tmp_path / "page.json"                     # a settings file from the page: it decides there too
-    page.write_text(json.dumps({"contract": "syncrain-config-1", "preset": "nixos"}))
+    (tmp_path / "wall.png").write_bytes(b"")
+    from PIL import Image
+    Image.new("RGBA", (40, 20), (200, 30, 30, 255)).save(tmp_path / "mine.png")
+    # a byte order mark first, as some editors write: read as the app reads it, not copied whole
+    page.write_text("\ufeff" + json.dumps({"contract": "syncrain-config-1", "preset": "nixos",
+                                           "background": "wall.png", "mask": "wall.png", "scale": 0.5,
+                                           "layer": "bottom", "speed": 1.5, "logo": "mine.png"}), encoding="utf-8")
+    earlier = '{"contract": "syncrain-config-1", "preset": "matrix"}\n'
+    (tmp_path / "config/syncrain/config.json").write_text(earlier)
     decided = login_install(tmp_path, "--config", str(page))
     assert decided.returncode == 0, decided.stdout + decided.stderr
     assert json.loads((lib / "login.json").read_text())["rain"] == ["--glyphs", f"{lib}/glyphs.json"]
-    assert json.loads((lib / "config.json").read_text())["preset"] == "nixos"
+    # the desktop's pictures and wallpaper options stay the desktop's; the look goes along, the logo inside it
+    copy = json.loads((lib / "config.json").read_text())
+    assert copy.pop("logo").startswith("data:image/png;base64,"), "greetd's user reads no file of this user's"
+    assert copy == {"contract": "syncrain-config-1", "preset": "nixos", "speed": 1.5}
+    kept = json.loads((tmp_path / "config/syncrain/config.json").read_text())
+    assert kept["background"] == kept["mask"] == str(tmp_path / "wall.png"), "named whole, where it was beside the file"
+    assert kept["logo"] == str(tmp_path / "mine.png")
+    assert f"the login screen shows the logo from {tmp_path / 'mine.png'}" in decided.stdout
+    assert (tmp_path / "config/syncrain/config.json.before").read_text() == earlier
+    again = login_install(tmp_path, "--config", str(page))   # the same file again: the first .before stays
+    assert again.returncode == 0, again.stdout + again.stderr
+    assert (tmp_path / "config/syncrain/config.json.before").read_text() == earlier
 
     off = login_install(tmp_path, "--login-screen-off")
     assert off.returncode == 0, off.stdout + off.stderr
@@ -627,3 +646,10 @@ def test_with_selinux_on_the_login_screen_s_files_are_labeled_and_its_refusals_s
     assert "could not be read" in unread[1], "never a false all-clear"
     (selinux / "enforce").unlink()
     assert diagnose.selinux_lines("x", "y", denials=lambda: refused) == [], "no SELinux, nothing said"
+
+
+def test_the_login_copy_knows_the_logo_names_the_app_knows():
+    from syncrain import logo
+    text = (ROOT / "install.sh").read_text()
+    names = text.split('names = (', 1)[1].split(")", 1)[0]
+    assert sorted(n.strip().strip('"') for n in names.split(",")) == sorted([*logo.SHIPPED, "none"])

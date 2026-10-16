@@ -1,4 +1,4 @@
-# Handoff: the state of syncrain at build 44
+# Handoff: the state of syncrain at build 45
 
 What is true now, for a context that has just opened this tree. Where this page and the code
 disagree, the code is right; fix the page in the same build. Each fact has one home; this page
@@ -49,7 +49,7 @@ This page, `docs/agent/NEXT_BUILD.md`, `docs/agent/WORKING_WITH_THE_OPERATOR.md`
   to the spec, stricter colours and periods); `822ea58a` 29 to 34 (sentences' gaps and trails in `state.frag`); `85ace386` in
   28; `a9c058f3` 24 to 27; `f98ef1ca` in 23; `25b02556` in 22; `def5684f` 15 to 21; `c18f8be2` in 12
   to 14; `48e6bf9c` 3 to 11.
-* **GitHub**: `main` holds builds 7 to 44, a commit `syncrain build <N>` each, and a few
+* **GitHub**: `main` holds builds 7 to 45, a commit `syncrain build <N>` each, and a few
   documents-only commits between them.
 
 ## Done last
@@ -64,6 +64,9 @@ Since then the open items of `docs/ROADMAP.md` that can be done here, one area a
   SELinux the login screen's files are labeled and its refusals named by --diagnose.
 * **44** the stream id: what the code computes (the grid, the clock, the looks and symbols) with the
   data files, so a comment no longer changes it; --scale below 1 keeps the screen's grid (L20, L11).
+* **45** an SVG as the desktop's logo; background, mask, scale and layer in the settings
+  file (a relative picture beside the file; the login screen's copy leaves them out and carries a
+  file logo inside); a SeekHead in the page's WebM.
 
 ## Waits on the operator
 

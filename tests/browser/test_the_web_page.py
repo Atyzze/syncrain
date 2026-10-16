@@ -396,6 +396,7 @@ def test_the_desktop_makes_the_video_the_page_does(page, app, tmp_path):
     t0, seconds, fps, w, h = int(MOMENT), 3, 10, 640, 360
     webm, mkv = tmp_path / "page.webm", tmp_path / "app.mkv"
     page("video", webm, w, h, seconds, fps, 1, t0)
+    _the_seek_head_finds(webm.read_bytes())
     done = app(["--time", str(t0), "--video", str(mkv), "--seconds", str(seconds), "--video-fps", str(fps),
                 "--size", f"{w}x{h}"], timeout=300)
     assert done.returncode == 0, done.stderr
@@ -405,6 +406,42 @@ def test_the_desktop_makes_the_video_the_page_does(page, app, tmp_path):
             subprocess.run([ffmpeg, "-v", "error", "-y", "-i", str(src), "-vf", f"select=eq(n\\,{k})", "-vsync", "0",
                             "-frames:v", "1", str(dst)], check=True)
         assert mean_abs_diff(a, b) < 7.0, k            # two lossy encoders
+
+
+def _ebml(data, at):
+    """An element at `at`: its id (with its length marker), its body's start and its body's length."""
+    def vint(i, keep):
+        first = data[i]
+        n = 8 - first.bit_length() + 1
+        v = first if keep else first & ((1 << (8 - n)) - 1)
+        for b in data[i + 1:i + n]:
+            v = v * 256 + b
+        return v, i + n
+    ident, i = vint(at, True)
+    size, i = vint(i, False)
+    return ident, i, size
+
+
+def _the_seek_head_finds(data):
+    """The page's WebM starts its segment with a SeekHead, and each place in it holds what it names."""
+    _, body, size = _ebml(data, 0)
+    segment, seg_body, _ = _ebml(data, body + size)
+    assert segment == 0x18538067
+    head, at, size = _ebml(data, seg_body)
+    assert head == 0x114D9B74, hex(head)
+    found, end = {}, at + size
+    while at < end:
+        _, seek_body, seek_size = _ebml(data, at)
+        fields, i = {}, seek_body
+        while i < seek_body + seek_size:
+            ident, b, n = _ebml(data, i)
+            fields[ident] = data[b:b + n]
+            i = b + n
+        found[int.from_bytes(fields[0x53AB], "big")] = int.from_bytes(fields[0x53AC], "big")
+        at = seek_body + seek_size
+    assert sorted(found) == sorted([0x1549A966, 0x1654AE6B, 0x1C53BB6B])
+    for ident, place in found.items():
+        assert _ebml(data, seg_body + place)[0] == ident, hex(ident)
 
 
 #: Settings files at the edges of the grammar: what one side takes, the other takes, and reads the same.
@@ -423,10 +460,18 @@ EDGES = [
     {"words": ["A", "B"]}, {"words": ["A,B"]}, {"words": "A"},
     {"glow_color": "#ff0000"}, {"glow_color": [1, 0, 0]}, {"glow_color": [True, 0, 0]}, {"glow_color": "red"},
     {"logo": "nixos"}, {"logo": "NixOS"},
+    {"scale": 0.75}, {"scale": "0.5"}, {"scale": 4}, {"scale": 5}, {"scale": 0}, {"scale": True},
+    {"layer": "bottom"}, {"layer": "top"}, {"layer": 1},
+    {"background": "wall.png"}, {"background": "pictures/wall.png"}, {"background": ""}, {"background": 5},
+    {"mask": "mask.png"}, {"mask": "  "}, {"background": "\u001c"}, {"mask": "\u2003"},
     {"no_such": 1},
 ]
 #: The settings compared where both take the file: what the desktop's options become, on the page.
-SAME = {"speed": "speed", "channel": "channel", "spin": "spin", "flavours": "flavours", "fps": "fps"}
+SAME = {"speed": "speed", "channel": "channel", "spin": "spin", "flavours": "flavours", "fps": "fps",
+        "scale": "scale", "layer": "layer"}
+#: Pictures on the desktop's machine: the desktop reads them beside the settings file, the page
+#: keeps them as written and writes them back so.
+PICTURES = ("background", "mask")
 
 
 def _texts():
@@ -444,6 +489,9 @@ def test_the_page_and_the_desktop_read_the_same_settings_files(page, tmp_path):
     texts = _texts()
     (tmp_path / "texts.json").write_text(json.dumps(texts), encoding="utf-8")
     on_page = page("reads", tmp_path / "texts.json")["reads"]
+    for picture in ("wall.png", "pictures/wall.png", "mask.png"):    # on the desktop's machine, beside the file
+        (tmp_path / picture).parent.mkdir(exist_ok=True)
+        (tmp_path / picture).write_bytes(b"")
     differ = []
     for i, (text, web) in enumerate(zip(texts, on_page)):
         path = tmp_path / f"{i}.json"
@@ -465,5 +513,10 @@ def test_the_page_and_the_desktop_read_the_same_settings_files(page, tmp_path):
             if key in given and given[key] is not None:
                 ours, theirs = getattr(args, dest), web["exported"][key]
                 if (float(ours) if isinstance(theirs, (int, float)) else ours) != theirs:
+                    differ.append(f"{text!r}: {key} is {ours!r} on the desktop, {theirs!r} on the page")
+        for key in PICTURES:
+            if key in given:
+                ours, theirs = getattr(args, key), web["exported"].get(key)
+                if theirs != given[key] or ours != str(path.parent / given[key]):
                     differ.append(f"{text!r}: {key} is {ours!r} on the desktop, {theirs!r} on the page")
     assert not differ, "\n".join(differ)
