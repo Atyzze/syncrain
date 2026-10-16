@@ -222,7 +222,7 @@ def test_install_makes_the_rain_the_login_screen_and_puts_sddm_back_after(tmp_pa
     assert record.read_text() == "sddm.service\n" and not (lib / "previous-display-manager").exists()
     added = (tmp_path / "etc/pam.d/greetd").read_text()
     assert added.startswith(pam) and "-auth       optional    pam_kwallet5.so" in added
-    assert "-session    optional    pam_kwallet5.so         auto_start" in added
+    assert "-session    optional    pam_kwallet5.so         auto_start force_run" in added
     assert "sudo systemctl enable --force sddm.service && sudo reboot" in done.stdout
     assert (tmp_path / "state").stat().st_mode & 0o777 == 0o700, "who logged in, and when, is greetd's user's alone"
 
@@ -243,6 +243,42 @@ def test_install_makes_the_rain_the_login_screen_and_puts_sddm_back_after(tmp_pa
     assert "agreety --cmd /bin/sh" in (tmp_path / "etc/greetd/config.toml").read_text()
     assert (tmp_path / "etc/pam.d/greetd").read_text() == pam
     assert not lib.exists() and not (tmp_path / "state").exists() and not record.exists()
+
+
+def test_the_wallet_lines_of_an_earlier_build_are_brought_up_to_date_and_still_go_back(tmp_path):
+    """Builds up to 42 added pam_kwallet5's session line without force_run, so the wallet stayed shut
+    after greetd's text login (no XDG_SESSION_TYPE when PAM opens the session). A plain install
+    makes those lines current and touches nothing else; --login-screen-off still takes them all out."""
+    (tmp_path / "etc/greetd").mkdir(parents=True)
+    (tmp_path / "etc/greetd/config.toml").write_text('[default_session]\ncommand = "agreety --cmd /bin/sh"\n')
+    (tmp_path / "etc/pam.d").mkdir(parents=True)
+    pam = "#%PAM-1.0\nauth       include      system-local-login\nsession    include      system-local-login\n"
+    (tmp_path / "etc/pam.d/greetd").write_text(pam)
+    (tmp_path / "display-manager.service").symlink_to("/usr/lib/systemd/system/sddm.service")
+    assert login_install(tmp_path, "--login-screen").returncode == 0
+    path = tmp_path / "etc/pam.d/greetd"
+    earlier = path.read_text().replace("auto_start force_run", "auto_start")      # as build 42 left it
+    earlier += "auth       required     pam_faillock.so\n"                         # theirs, added since
+    path.write_text(earlier)
+    done = login_install(tmp_path)
+    assert done.returncode == 0, done.stdout + done.stderr
+    now = path.read_text()
+    assert "pam_kwallet5.so         auto_start force_run" in now and now.count("pam_kwallet5.so") == 2
+    assert "pam_faillock.so" in now and "the wallet now opens after the text login too" in done.stdout
+    assert "force_run" not in (tmp_path / "etc/pam.d/greetd-greeter").read_text(), "not the greeter's"
+    assert login_install(tmp_path).stdout.count("the wallet now opens") == 0, "once"
+    # the guard: a file that would keep none of its own lines is not written (a failed read looks so)
+    bare = "\n".join(line for line in path.read_text().splitlines()
+                     if "pam_" in line and line.startswith("-") or line.startswith("# added by syncrain")) + "\n"
+    whole = path.read_text()
+    path.write_text(bare.replace("auto_start force_run", "auto_start"))
+    assert login_install(tmp_path).returncode == 0
+    assert "force_run" not in path.read_text(), "left as it was, not replaced by syncrain's lines alone"
+    path.write_text(whole)
+    path.write_text(path.read_text().replace("auto_start force_run", "auto_start"))   # and from before again
+    off = login_install(tmp_path, "--login-screen-off")
+    assert off.returncode == 0, off.stdout + off.stderr
+    assert path.read_text() == pam + "auth       required     pam_faillock.so\n"
 
 
 def test_the_way_back_keeps_what_was_changed_meanwhile(tmp_path):
@@ -427,6 +463,7 @@ def test_the_cache_stays_while_the_build_does(tmp_path):
 
 def test_the_diagnosis_says_which_login_screen_starts_and_what_it_said(tmp_path, monkeypatch):
     from syncrain.diagnose import login_lines
+    monkeypatch.setenv("SYNCRAIN_SELINUX", str(tmp_path / "no-selinux"))   # as here, whatever the machine
     (tmp_path / "dm").symlink_to("/usr/lib/systemd/system/greetd.service")
     (tmp_path / "lib").mkdir()
     (tmp_path / "lib/BUILD_NUMBER").write_text("16\n")
@@ -552,3 +589,41 @@ def test_without_anyone_to_ask_the_login_stops_and_says_to_use_the_text_login(tm
     assert not ok and "Token: (more than a password: use Text login)" in said
     assert fake.requests[-1] == {"type": "cancel_session"} and not fake.started()
     fake.close()
+
+
+def test_with_selinux_on_the_login_screen_s_files_are_labeled_and_its_refusals_said(tmp_path, monkeypatch):
+    """Fedora: greetd runs the login screen in its own SELinux domain. The installer has its files
+    labeled as their folders want (restorecon), and --diagnose names this boot's refusals."""
+    (tmp_path / "etc/greetd").mkdir(parents=True)
+    (tmp_path / "etc/greetd/config.toml").write_text('[default_session]\ncommand = "agreety --cmd /bin/sh"\n')
+    (tmp_path / "etc/pam.d").mkdir(parents=True)
+    (tmp_path / "etc/pam.d/greetd").write_text("#%PAM-1.0\nauth       include      system-local-login\n")
+    (tmp_path / "display-manager.service").symlink_to("/usr/lib/systemd/system/sddm.service")
+    stub(tmp_path / "bin", "selinuxenabled", "exit 0")
+    stub(tmp_path / "bin", "restorecon", f'echo "$@" >> {tmp_path}/restorecon.calls')
+    done = login_install(tmp_path, "--login-screen")
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert "SELinux is on here" in done.stdout
+    labeled = (tmp_path / "restorecon.calls").read_text()
+    assert labeled.startswith("-R ") and str(tmp_path / "lib") in labeled and str(tmp_path / "state") in labeled
+    again = login_install(tmp_path)
+    assert again.returncode == 0 and "SELinux is on here" not in again.stdout, "said once"
+    assert (tmp_path / "restorecon.calls").read_text().count("-R ") == 2, "and labeled at every install"
+
+    from syncrain import diagnose
+    selinux = tmp_path / "selinux"
+    selinux.mkdir()
+    (selinux / "enforce").write_text("1")
+    monkeypatch.setenv("SYNCRAIN_SELINUX", str(selinux))
+    refused = ['audit: type=1400 avc:  denied  { write } for pid=812 comm="python3" '
+               'path="/var/lib/syncrain-login/last.json" scontext=system_u:system_r:xdm_t:s0',
+               'audit: type=1400 avc:  denied  { read } for comm="firefox" scontext=user_u:user_r:mozilla_t']
+    lines = diagnose.selinux_lines("/usr/local/lib/syncrain", "/var/lib/syncrain-login", denials=lambda: refused)
+    assert lines[0] == "SELinux: enforcing" and any('last.json' in line for line in lines)
+    assert not any("firefox" in line for line in lines), "only the login screen's"
+    quiet = diagnose.selinux_lines("/usr/local/lib/syncrain", "/var/lib/syncrain-login", denials=lambda: [])
+    assert "no SELinux refusal" in quiet[1]
+    unread = diagnose.selinux_lines("/usr/local/lib/syncrain", "/var/lib/syncrain-login", denials=lambda: None)
+    assert "could not be read" in unread[1], "never a false all-clear"
+    (selinux / "enforce").unlink()
+    assert diagnose.selinux_lines("x", "y", denials=lambda: refused) == [], "no SELinux, nothing said"

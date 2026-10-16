@@ -67,6 +67,9 @@ Rules learned by shipping their opposite, one line each. When and how: `docs/HIS
 
 * **GTK waits seconds for the desktop portal** where there is none: `GDK_DEBUG=no-portals`.
 * **greetd's PAM does not open KDE's wallet**; SDDM's does. Add its lines, as SDDM has them.
+* **pam_kwallet5 opens the wallet only for a session it knows is graphical** (XDG_SESSION_TYPE when
+  PAM opens it): a login that cannot say so (greetd's text login) needs `force_run`.
+* **A pattern that starts with `-` is an option to grep**: `grep -e`.
 * **greetd joins a command's words with spaces and has sh run them**: send one word, quoted for sh.
 * **greetd signals the greeter alone**: a greeter that starts a compositor in its own session
   stops it on SIGTERM.

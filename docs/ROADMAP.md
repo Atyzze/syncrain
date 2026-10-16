@@ -42,9 +42,9 @@ None open.
 The review of build 33 is done (all 84 items, builds 34 to 41: `docs/HISTORY.md`). Next, the open
 items below that can be done here, the most useful first, one area a build:
 
-1. **42**: the lock screen: the rain rests when nobody is there, the keyboard layout, Plasma's
+1. **42** (done): the lock screen: the rain rests when nobody is there, the keyboard layout, Plasma's
    unseen lock wallpaper.
-2. **43**: the login screen: KDE's wallet after greetd's text login (L8), Fedora's SELinux labels.
+2. **43** (done): the login screen: KDE's wallet after greetd's text login (L8), Fedora's SELinux labels.
 3. **44**: the stream id covers what decides the picture (L20), and `--scale` below 0.4 (L11): a
    stream change, on purpose.
 4. **45**: an SVG as the desktop's logo; `scale`, `layer`, `background` and `mask` in the settings
@@ -59,14 +59,13 @@ What the documents and the review of build 17 leave to a build that changes code
 
 | Item | Where the fix goes |
 | --- | --- |
-| L8: KDE's wallet does not open after greetd's text login | not known yet; the wallet lines are `install.sh`'s, in greetd's PAM service |
 | L11: `--scale` below about 0.4 changes the picture (the page as a wallpaper does the same, so the two agree) | the cell size in `syncrain/renderer.py` (`geometry`), `syncrain/native/timing.c` (`geometry_compute`), `index.html` |
 | L20: the stream id does not cover `renderer.py`'s geometry, `native/timing.c` or `index.html` | `syncrain/build.py` (`STREAM_FILES`) |
 | The GTK host at a fractional scale (1.25) draws at the next whole scale and the compositor scales it down (GTK 4.14's GtkGLArea framebuffer), so it is a little softer than the native wallpaper, Wayland's default, which draws at the screen's pixels | GTK's own, or the GTK host drawing its own surface; `tests/wayland/test_the_wallpaper_layer.py` compares it at whole scales only |
 | An SVG as the logo: the page takes one, the desktop's `--logo` does not (Pillow draws no SVG) | `syncrain/logo.py`, with GTK's loader (librsvg) |
 | The lock screen's frame is about 2% darker than the desktop's in the lockscreen lane (llvmpipe), in proportion to brightness; the cause is not found | `syncrain/lockscreen/rainitem.cpp`, `tests/lockscreen/test_the_lock_screen.py` |
 | The login and lock screens on NixOS (build 32): evaluated, built, the login screen run in a headless KWin; never booted, and no VM here (no KVM) | someone booting it, or the image's VM test |
-| Debian, Fedora and openSUSE: installed in roots, never booted; Fedora's SELinux may stop greetd running the login screen from `/usr/local/lib` | someone booting one; `restorecon` or a policy note in `install.sh` |
+| Debian, Fedora and openSUSE: installed in roots, never booted; on Fedora, SELinux may still refuse greetd's domain the login screen (its files are labeled at install, `--diagnose` names the refusals, the text login asks meanwhile) | someone booting one, and the refusals `--diagnose` shows |
 | Ubuntu 24.04 and openSUSE Leap 16.0: no gtk4-layer-shell (the native wallpaper draws), Qt below 6.5 (no lock screen) | nothing to do until they update |
 | A video's watts against the live rain's: not measured (no graphics card in the sandbox) | measure on their machine before claiming it uses less |
 | The page's Video needs WebCodecs with a VP9 or VP8 encoder (Chrome, Edge, Firefox); Safari may say it cannot | `syncrain --video` instead |

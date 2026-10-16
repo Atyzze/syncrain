@@ -61,8 +61,12 @@ git clone https://github.com/Atyzze/syncrain && cd syncrain   # or unpack SYNCRA
 * `--login-screen`: greetd instead of SDDM (or Plasma Login); the rain and the same box on every
   screen, then Plasma, with its splash and wallpaper a still frame of the rain. Only greetd's
   `[default_session]` changes; what PAM asks after the password (a second factor) is asked in the
-  box. If it fails (or after "Text login" in the box), greetd's text login asks. What started at
-  boot before is kept in `/etc/greetd/display-manager.before-syncrain`. The installs of the user
+  box. If it fails (or after "Text login" in the box), greetd's text login asks; KDE's wallet opens
+  after either where syncrain added the wallet lines to greetd's PAM file (SDDM's lines, the session
+  one with `force_run`: the text login cannot tell PAM the session is graphical). With SELinux on
+  (Fedora), the login screen's files get their default labels at each install, and `--diagnose`
+  names this boot's SELinux refusals of it. What started at boot before is kept in
+  `/etc/greetd/display-manager.before-syncrain`. The installs of the user
   who set it up keep it current, and their `--uninstall` takes it out; other users' leave it alone.
 * Back: `./install.sh --login-screen-off` puts back what started at boot before (SDDM, Plasma Login,
   greetd's own login, or none), greetd's `[default_session]` as it was, and takes the wallet lines

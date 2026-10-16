@@ -151,6 +151,51 @@ def login_lines(log_lines=8) -> list[str]:
         if said:
             lines.append(f"{'the last start' if name == 'login.log' else 'the start before'} ({state}/{name}):")
             lines.extend("  " + line for line in said[-log_lines:])
+    if built:                                   # SELinux and the login screen, where there is one
+        lines.extend(selinux_lines(lib, state))
+    return lines
+
+
+#: What the journal says when SELinux refused something (the kernel's audit records).
+DENIED = "avc:  denied"
+
+
+def journal_denials() -> list[str] | None:
+    """This boot's SELinux refusals the journal holds (readable by the operator's groups on Fedora;
+    with auditd running they are in /var/log/audit/audit.log instead, root's alone); None when the
+    journal could not be read (a user outside its groups, a journalctl without --grep)."""
+    import subprocess
+    try:
+        done = subprocess.run(["journalctl", "-b", "--no-pager", "-o", "cat", "--grep", DENIED],
+                              capture_output=True, text=True, timeout=20)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if done.returncode not in (0, 1) or done.stderr.strip():   # 1: nothing matched
+        return None
+    return [line for line in done.stdout.splitlines() if DENIED in line]
+
+
+def selinux_lines(lib: str, state: str, denials=journal_denials) -> list[str]:
+    """SELinux, where it is on (Fedora's default): greetd runs the login screen as its own domain,
+    which may be refused files under /usr/local/lib or its state folder. The login screen is then
+    greetd's text login, and these lines say why."""
+    root = os.environ.get("SYNCRAIN_SELINUX") or "/sys/fs/selinux"
+    mode = (_read(os.path.join(root, "enforce")) or "").strip()
+    if mode not in ("0", "1"):
+        return []
+    lines = [f"SELinux: {'enforcing' if mode == '1' else 'permissive (refusals are logged, not made)'}"]
+    found = denials()
+    if found is None:
+        return lines + ["the journal could not be read here: sudo journalctl -b --grep 'avc:  denied'"]
+    ours = [line for line in found if any(word in line for word in (lib, state, "syncrain", 'comm="greetd"'))]
+    if ours:
+        lines.append("SELinux refused the login screen this boot (the last of them):")
+        lines.extend("  " + line.strip() for line in ours[-5:])
+        lines.append("  the text login asks meanwhile; sudo restorecon -R " + lib + " " + state +
+                     " labels its files again, and these lines are what to report")
+    else:
+        lines.append("no SELinux refusal of the login screen in this boot's journal (with auditd: "
+                     "sudo ausearch -m avc -ts boot)")
     return lines
 
 

@@ -1,12 +1,12 @@
-# The next build is 43
+# The next build is 44
 
 The first line is parsed: `# The next build is <N>`, exactly one above `BUILD_NUMBER`.
 
-## Build 43: the login screen
+## Build 44: the stream id and small scales
 
 * Read what the operator sent last, and answer it in one plain sentence first.
-* Then `docs/ROADMAP.md`, "Planned builds": KDE's wallet after greetd's text login (L8), Fedora's
-  SELinux labels.
+* Then `docs/ROADMAP.md`, "Planned builds": the stream id covers what decides the picture (L20), and
+  `--scale` below 0.4 (L11): a stream change, on purpose.
 * No boot splash: never touch the bootloader, initramfs or Plymouth.
 
 **Known blockers**: watts, NVIDIA's driver and Plasma's shell exist only on the operator's machine;

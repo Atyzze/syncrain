@@ -399,8 +399,16 @@ greeter_user() {
 }
 PAM_MARK="written by syncrain's install.sh --login-screen"
 WALLET_MARK="# added by syncrain's install.sh --login-screen"
+# force_run: pam_kwallet5 opens the wallet only for a session it knows to be graphical
+# (XDG_SESSION_TYPE x11 or wayland when PAM opens it); syncrain's box says so, greetd's text login
+# (agreety, when the box does not come up) cannot, so the wallet stayed shut after it. It cannot
+# reach greetd's greeter: greetd never authenticates it, so there is no password to open a wallet
+# with (and its file has no wallet lines). pam_kwallet5 does nothing for root, and an older one
+# passes over an option it does not know.
 WALLET_LINES=("-auth       optional    pam_gnome_keyring.so" "-auth       optional    pam_kwallet5.so"
-              "-session    optional    pam_gnome_keyring.so    auto_start" "-session    optional    pam_kwallet5.so         auto_start")
+              "-session    optional    pam_gnome_keyring.so    auto_start" "-session    optional    pam_kwallet5.so         auto_start force_run")
+# what earlier builds added, taken out as theirs too
+WALLET_OLD_LINES=("-session    optional    pam_kwallet5.so         auto_start")
 # A PAM file (stdin) without the lines --login-screen added: its mark, the wallet lines right after it,
 # and the blank line before it; nothing else.
 without_wallet() {
@@ -417,7 +425,7 @@ while i < len(lines):
         continue
     out.append(lines[i])
     i += 1
-sys.stdout.buffer.write("\n".join(out).encode("utf-8", "surrogateescape"))' "$WALLET_MARK" "${WALLET_LINES[@]}"
+sys.stdout.buffer.write("\n".join(out).encode("utf-8", "surrogateescape"))' "$WALLET_MARK" "${WALLET_LINES[@]}" "${WALLET_OLD_LINES[@]}"
 }
 CONFIG_MARK="set by syncrain's install.sh --login-screen"
 
@@ -485,6 +493,24 @@ apply_greetd() {
   if [ -f "$pam" ] && ! grep -q pam_kwallet5 "$pam"; then
     printf '%s\n' "" "$WALLET_MARK: the wallet opens with the login, as under SDDM" "${WALLET_LINES[@]}" \
       | as_root tee -a "$pam" >/dev/null
+  elif grep -qsF "$WALLET_MARK" "$pam" && ! grep -qxF -e "${WALLET_LINES[3]}" "$pam"; then
+    # syncrain's own lines from an earlier build: these lines alone made current, the rest as it is.
+    # Written only when every other line of the file is in what replaces it, in order: a read that
+    # failed would otherwise leave greetd a PAM file of these optional lines alone, and no login.
+    local original current
+    original="$(mktemp)" current="$(mktemp)"
+    if read_system_file "$pam" > "$original" && without_wallet < "$original" > "$current" \
+        && "$PY" -c 'import sys
+read = lambda p: open(p, encoding="utf-8", errors="surrogateescape").read().split("\n")
+mark, ours = sys.argv[3], set(sys.argv[4:])
+theirs = [l for l in read(sys.argv[1]) if l.strip() and not l.startswith(mark) and l not in ours]
+sys.exit(0 if theirs and theirs == [l for l in read(sys.argv[2]) if l.strip()] else 1)' \
+             "$original" "$current" "$WALLET_MARK" "${WALLET_LINES[@]}" "${WALLET_OLD_LINES[@]}"; then
+      printf '%s\n' "" "$WALLET_MARK: the wallet opens with the login, as under SDDM" "${WALLET_LINES[@]}" >> "$current"
+      copy_to_root "$current" "$pam"
+      info "greetd's PAM: the wallet now opens after the text login too"
+    fi
+    rm -f "$original" "$current"
   fi
   # greetd runs its greeter under its own PAM service where that file exists, else under the users'
   # one: a file without the wallet lines keeps a wallet starting for the user greeter at every boot.
@@ -577,6 +603,7 @@ login_screen_on() {
   as_root install -d -m 700 -o "$owner" -g "$(id -gn "$owner")" "$LOGIN_STATE"
   clear_state_copies
   rm -rf "$tmp"
+  selinux_relabel say
   info "the app: $LOGIN_LIB (user $(id -un), Plasma, the rain's options given to this installer)"
 
   apply_greetd
@@ -708,6 +735,22 @@ login_screen_off() {
 # A newer build updates the login screen's copy too, keeping its settings (and moving the record of
 # what started at boot before out of the copy, where builds 16 and 17 kept it). Only the user who
 # set the login screen up updates it.
+# SELinux (Fedora's default): the login screen's files labeled as their folders want them, whatever
+# a copy or a move gave them, so greetd's domain reads what it reads elsewhere. Said once, with
+# where the reasons are should it still be refused (the text login asks then).
+selinux_relabel() {
+  command -v selinuxenabled >/dev/null && selinuxenabled 2>/dev/null || return 0
+  command -v restorecon >/dev/null || return 0
+  local f there=()
+  for f in "$LOGIN_LIB" "$LOGIN_STATE"; do if [ -e "$f" ]; then there+=("$f"); fi; done
+  [ ${#there[@]} -gt 0 ] || return 0
+  # without -F: a label the operator set on purpose (semanage fcontext) is kept
+  as_root restorecon -R "${there[@]}" >/dev/null 2>&1 || true
+  if [ "${1:-}" = say ]; then
+    info "SELinux is on here: the login screen's files are labeled for it; should greetd's text login ask instead, syncrain --diagnose shows the refusals"
+  fi
+}
+
 login_screen_refresh() {
   if ! mine; then
     if [ -f "$LOGIN_LIB/login.json" ]; then info "the login screen stays as $(login_user) set it up"; fi
@@ -740,6 +783,7 @@ login_screen_refresh() {
     fi
     if [ -d "$LOGIN_STATE" ]; then as_root chmod 700 "$LOGIN_STATE"; fi
   fi
+  selinux_relabel
   info "the login screen: build $BUILD too"
   # Options given now, or a new settings file, are the login screen's too, as they are the service's:
   # its options from before would go over the new settings and draw another rain there.
