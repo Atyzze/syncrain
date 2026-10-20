@@ -51,7 +51,7 @@ This page, `docs/agent/NEXT_BUILD.md`, `docs/agent/WORKING_WITH_THE_OPERATOR.md`
   to the spec, stricter colours and periods); `822ea58a` 29 to 34 (sentences' gaps and trails in `state.frag`); `85ace386` in
   28; `a9c058f3` 24 to 27; `f98ef1ca` in 23; `25b02556` in 22; `def5684f` 15 to 21; `c18f8be2` in 12
   to 14; `48e6bf9c` 3 to 11.
-* **GitHub**: `main` holds builds 7 to 46 (47 was delivered as an archive, not pushed), a commit `syncrain build <N>` each, and a few
+* **GitHub**: `main` holds builds 7 to 47, a commit `syncrain build <N>` each, and a few
   documents-only commits between them.
 
 ## Done last
