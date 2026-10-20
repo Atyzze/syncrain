@@ -7,12 +7,15 @@ Outputs (into syncrain/data/):
                  glow, B = tight bloom for the white heads. A wallpaper copies the ones its symbols
                  use into its own atlas (syncrain/glyphs.py).
   themes.json    the presets (each one's palette, symbol sets, hidden words, snow and logo settings),
-                 which one is the default, and the list of glyphs.png's slots.
+                 which one is the default, and the list of glyphs.png's slots. The default preset,
+                 syncrain, is the settings file config.json at the repository's top: that file is
+                 where the defaults are kept (a null in it keeps the preset's own value).
   logo-white.png the official NixOS snowflake (CC-BY 4.0), with colour bled into the
                  transparent area so mipmapped edges stay clean (only with --nixos-artwork).
                  logo-syncrain.png comes from its drawing, by tools/build_logo.py.
 
 Run from the repository root:  python3 tools/build_assets.py [--nixos-artwork /path/to/nixos-artwork]
+                               python3 tools/build_assets.py --themes-only   (config.json changed: no fonts needed)
 Fonts: Noto Sans Mono CJK JP and DejaVu Sans (Debian's fonts-noto-cjk, fonts-dejavu-core), Noto Sans
 Egyptian Hieroglyphs and Noto Sans Arabic (github.com/notofonts, OFL 1.1).
 """
@@ -27,6 +30,9 @@ ap.add_argument('--nixos-artwork', help='checkout of github.com/NixOS/nixos-artw
 ap.add_argument('--hieroglyph-font', default='/usr/share/fonts/truetype/noto/NotoSansEgyptianHieroglyphs-Regular.ttf')
 ap.add_argument('--arabic-font', default='/usr/share/fonts/truetype/noto/NotoSansArabic-Bold.ttf')
 ap.add_argument('--out', default=os.path.join(os.path.dirname(__file__), '..', 'syncrain', 'data'))
+ap.add_argument('--config', default=os.path.join(os.path.dirname(__file__), '..', 'config.json'),
+                help='the settings file the default preset is made from (default: config.json at the top)')
+ap.add_argument('--themes-only', action='store_true', help='write themes.json only; glyphs.png stays as it is')
 args = ap.parse_args()
 os.makedirs(args.out, exist_ok=True)
 
@@ -57,11 +63,12 @@ add(G.ARABIC, ARABIC, size=0.90)
 assert len(library) <= G.MAX_GLYPHS
 
 rows = -(-len(library) // G.GRID)
-sheet = Image.new('RGBA', (G.GRID * G.SLOT, rows * G.SLOT), (0, 0, 0, 255))
-for i, (key, font, kw) in enumerate(library):
-    y, x = divmod(i, G.GRID)
-    sheet.paste(G.glow_slot(G.render_glyph(key[0], font, **kw)), (x * G.SLOT, y * G.SLOT))
-sheet.save(os.path.join(args.out, 'glyphs.png'), optimize=True)
+if not args.themes_only:
+    sheet = Image.new('RGBA', (G.GRID * G.SLOT, rows * G.SLOT), (0, 0, 0, 255))
+    for i, (key, font, kw) in enumerate(library):
+        y, x = divmod(i, G.GRID)
+        sheet.paste(G.glow_slot(G.render_glyph(key[0], font, **kw)), (x * G.SLOT, y * G.SLOT))
+    sheet.save(os.path.join(args.out, 'glyphs.png'), optimize=True)
 
 def rgb(hexstr, k=1.0):
     h = hexstr.lstrip('#')
@@ -99,13 +106,63 @@ MATRIX_COLORS = {'deep': [0.0, 0.62, 0.22], 'mid': [0.12, 1.0, 0.36], 'pale': [0
 MATRIX_BACKGROUND = {'mode': 'gradient', 'top': rgb('#020604'), 'bottom': rgb('#03090a'),
                      'center': rgb('#06180f'), 'vignette': 0.4}
 
+# The default preset is the settings file config.json (the operator's, 2026-10-20): what the
+# installer reads when given none, and what no settings file draws. A key it leaves null keeps the
+# value below; the keys that are no part of a preset (channel, fps, pause_under, lock_rest) are the
+# app's own defaults, held equal to the file by tests/unit/test_the_options.py.
+with open(args.config, encoding='utf-8-sig') as fh:
+    CONFIG = json.load(fh)
+assert CONFIG.get('contract') == 'syncrain-config-1', args.config
+assert CONFIG.get('preset', 'syncrain') == 'syncrain', 'config.json starts from the syncrain preset'
+LOGO_NAMES = {'nixos': 'white', 'white': 'white', 'syncrain': 'syncrain', 'none': 'none'}
+
+
+def colour(c):
+    """A settings file's colour ("#rrggbb" or three numbers 0 to 1) as a preset holds it."""
+    return rgb(c) if isinstance(c, str) else [float(x) for x in c]
+
+
+def from_config(base):
+    """The syncrain preset: base, with every value config.json gives (null: base's)."""
+    t = json.loads(json.dumps(base))
+    c = {k: v for k, v in CONFIG.items() if v is not None}
+    if 'glyphs' in c:
+        t['glyphs'] = {'balance': c['glyphs'].get('balance', 'sets'), 'sets': c['glyphs']['sets']}
+    if 'words' in c:
+        t['wordText'] = list(c['words'])
+    if 'rain_colors' in c:
+        t['colors'].update(zip(('deep', 'mid', 'pale', 'head'), map(colour, c['rain_colors'])))
+    if 'glow_color' in c:
+        t['colors']['glow'] = colour(c['glow_color'])
+    if 'background_colors' in c:
+        t['background'].update(zip(('top', 'bottom', 'center'), map(colour, c['background_colors'])))
+    for key, to in (('vignette', 'vignette'),):
+        if key in c:
+            t['background'][to] = c[key]
+    for key in ('speed', 'density', 'glow', 'bloom', 'bg_gain'):
+        if key in c:
+            t['look'][key] = float(c[key])
+    if 'logo' in c:
+        assert c['logo'] in LOGO_NAMES, f"config.json's logo is one of {sorted(LOGO_NAMES)}: {c['logo']!r}"
+        t['logo']['default'] = LOGO_NAMES[c['logo']]
+    for key, to in (('logo_size', 'size'), ('logo_cycle', 'hueCycle'), ('spin', 'spin'), ('drift', 'drift')):
+        if key in c:
+            t['logo'][to] = c[key]
+    for key, to in (('cycle', 'cycle'), ('flavours', 'flavours'), ('flavour_layout', 'flavourLayout')):
+        if key in c:
+            t['rain'][to] = c[key]
+    if 'snow' in c:
+        t['snowDefault'] = bool(c['snow'])
+    for key in ('rainbow', 'logo_color', 'hieroglyphs', 'background', 'mask', 'scale', 'layer'):
+        assert key not in c, f"config.json's {key} has no place in a preset: leave it null or out"
+    return t
+
+
 themes = {
-    # the operator's own (their settings file of 2026-10-15, after build 33's review): the matrix
-    # colours with a white tail and a bright glow, 64 of them at once in a wave across the screen
-    # turning every 440 s, the NixOS logo at 0.44 turning its rainbow every 40 s, snow, a black
-    # background with a green glow in the middle, twice build 23's bloom; their digits (no 6 or 7),
-    # `sSs` among the symbols, Latin and Arabic letters, their words and sentences
-    'syncrain': {
+    # the values config.json leaves null start here: the operator's look of build 35 (the matrix
+    # colours with a white tail, 64 of them in a wave turning every 440 s, the NixOS logo, snow,
+    # black with a green glow in the middle, twice build 23's bloom)
+    'syncrain': from_config({
         'label': 'Syncrain',
         'glyphs': SYNCRAIN_GLYPHS,
         'wordText': ['AI', 'AGI', 'sSs', 'LINUX', 'WAKE UP', 'HELLO', 'NYX NYX NYX'],
@@ -121,7 +178,7 @@ themes = {
         'rain': dict(RAIN, bloom=5.0, cycle=440, flavours=64, flavourLayout='wave'),
         'snow': SNOW,
         'snowDefault': True,
-    },
+    }),
     'nixos': {
         'label': 'NixOS snow',
         # the weights build 12 drew them with: each base-32 character 1, the lambda 2.6, the snowflakes
@@ -176,6 +233,9 @@ for name, theme in themes.items():                    # every symbol a theme nam
         assert all(ch == ' ' or meta['library']['glyphs'].index(ch) < 254 for ch in word), word
 with open(os.path.join(args.out, 'themes.json'), 'w', encoding='utf-8') as fh:
     json.dump(meta, fh, ensure_ascii=False, separators=(',', ':'))
+# the file itself, as it is, inside the app: what `syncrain --write-config` writes where there is none
+with open(args.config, 'rb') as src, open(os.path.join(args.out, 'config.json'), 'wb') as dst:
+    dst.write(src.read())
 
 # ---- official NixOS logo, rasterised, with colour bled outward under the transparent area
 for variant, svg in (('white', 'nix-snowflake-white.svg'),):

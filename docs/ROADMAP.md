@@ -8,6 +8,10 @@ None open.
 
 ## Decisions answered
 
+* **2026-10-20**: the video's loop crossfade blurs its first seconds and goes; the lock screen's
+  rest stays but off by default, as a setting on the page; config.json is the default settings
+  file, in every build, what `install.sh` reads (generated when missing) and where the defaults are
+  kept; their file of that day is it (`pause_under` never). Build 47.
 * **2026-10-16**: the roadmap's open items next, the most useful first; no installer image of the
   NixOS flavour for now. Builds 42 and on.
 * **2026-10-15, their settings file**: 30 frames a second, and pausing behind maximized windows as

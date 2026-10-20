@@ -227,7 +227,7 @@ CONFIG_KEYS = {"preset": "--preset", "theme": "--preset", "channel": "--channel"
                "flavour_layout": "--flavour-layout", "logo": "--logo", "logo_color": "--logo-color", "logo_size": "--logo-size",
                "logo_cycle": "--logo-cycle", "spin": "--spin", "drift": "--drift", "speed": "--speed",
                "density": "--density", "glow": "--glow", "bloom": "--bloom", "bg_gain": "--bg-gain", "snow": "--snow",
-               "hieroglyphs": "--hieroglyphs", "words": "--words", "fps": "--fps", "pause_under": "--pause-under",
+               "hieroglyphs": "--hieroglyphs", "words": "--words", "fps": "--fps", "pause_under": "--pause-under", "lock_rest": "--lock-rest",
                # the desktop's own, kept in the file the page saves (it shows none of them): a picture
                # behind the rain, its mask, the drawing scale and the Wayland layer
                "background": "--background", "mask": "--mask", "scale": "--scale", "layer": "--layer"}
@@ -238,6 +238,25 @@ PICTURE_ENDINGS = (".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".tif", ".t
 PICTURE_NAME = re.compile(r"(^|[/\\])[^/\\]+\.(png|jpe?g|webp|gif|bmp|tiff?|ico|svgz?)\Z", re.IGNORECASE | re.ASCII)
 #: The settings whose values are colours: (how many, as a list).
 COLOUR_KEYS = {"rain_colors": 4, "background_colors": 3, "glow_color": 1, "logo_color": 1}
+
+
+#: The default settings file: config.json at the repository's top, copied in by tools/build_assets.py
+#: (the default preset is made from it, so it and no settings file draw the same frame).
+DEFAULT_CONFIG = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "config.json")
+
+
+def write_default_config(path: str) -> int:
+    """`syncrain --write-config PATH`: the default settings file, where there is none yet."""
+    try:
+        with open(DEFAULT_CONFIG, "rb") as fh:
+            data = fh.read()
+        with open(path, "xb") as out:          # never over a file someone made
+            out.write(data)
+    except OSError as e:
+        print(f"syncrain: no settings file written to {path}: {e.strerror or e}", file=sys.stderr)
+        return 1
+    print(f"syncrain: the default settings written to {path}", flush=True)
+    return 0
 
 
 def default_config_path() -> str:
@@ -366,7 +385,7 @@ def _read_settings(ap, path):
 
 
 #: Options that only say something and exit, whatever the settings file holds.
-INFO_ONLY = {"--build", "--version", "-h", "--help", "--list-themes"}
+INFO_ONLY = {"--build", "--version", "-h", "--help", "--list-themes", "--write-config"}
 
 
 def parse_args(argv=None):
@@ -380,9 +399,12 @@ def parse_args(argv=None):
                     help="stream name; everyone on the same channel with a synced clock sees the same frame")
     ap.add_argument("--fps", type=_number(above=0, high=1000), default=30.0,
                     help="frame rate cap (default 30); frames land on whole refreshes of the screen")
-    ap.add_argument("--pause-under", choices=hidden.POLICIES, default="maximized",
+    ap.add_argument("--pause-under", choices=hidden.POLICIES, default="never",
                     help="on KDE Plasma, stop drawing a screen while a maximized or full-screen window covers "
-                         "it (maximized, the default), only while a full-screen one does (fullscreen), or never")
+                         "it (maximized), only while a full-screen one does (fullscreen), or never (the default)")
+    ap.add_argument("--lock-rest", type=_number(low=0, high=86400), default=0.0, metavar="SECONDS",
+                    help="the lock screen draws 10 fps instead of 30 after this many seconds without a key or a "
+                         "moved pointer, and 30 again at the next one; 0, the default: never")
     ap.add_argument("--pacing", choices=("refresh", "timer"), default="refresh",
                     help=argparse.SUPPRESS)        # timer: build 4's frame timing, for the power sweep's comparison
     ap.add_argument("--host", choices=native.HOSTS, default="auto",
@@ -474,8 +496,6 @@ def parse_args(argv=None):
                     help="how long --video is (default 30, a GIF 10)")
     ap.add_argument("--video-fps", type=_number(above=0, high=240), metavar="FPS",
                     help="frames per second of --video (default 30, a GIF 15)")
-    ap.add_argument("--loop", choices=("on", "off"), default="on",
-                    help="--video ends where it begins, so a player repeating it shows no seam (default on)")
     ap.add_argument("--size", type=_size, help="window size for --window / --record (default 1280x720), the size of --video, "
                                    "or the size --benchmark draws at (default: the first screen), e.g. 1920x1080")
     ap.add_argument("--list-themes", action="store_true", help="list the presets and exit")
@@ -486,6 +506,9 @@ def parse_args(argv=None):
                          "print the table and save it; every screen goes black in its last two phases")
     ap.add_argument("--sweep-seconds", type=int, default=25, help="seconds per --power-sweep phase (default 25)")
     ap.add_argument("--write-scene", metavar="PATH", help=argparse.SUPPRESS)   # the lock screen's scene
+    ap.add_argument("--write-config", metavar="PATH",
+                    help="write the default settings file (config.json, what no settings file draws) to PATH, "
+                         "which must not exist yet, and exit; install.sh makes one this way where it finds none")
     ap.add_argument("--diagnose", action="store_true",
                     help="check whether syncrain can draw on this machine, print what it found, exit")
     ap.add_argument("--build", action=_ShowBuild, help="print the build number and the stream fingerprint, exit")
@@ -754,6 +777,8 @@ def main(argv=None):
         print(f"syncrain: {args.config_file or 'no settings file'}: preset {r.theme_name}, channel "
               f"{r.channel!r}, {len(r.glyphs.sets)} symbol sets from {r.glyphs.source}")
         return 0
+    if args.write_config:
+        return write_default_config(args.write_config)
     if args.write_scene:                      # for the lock screen: no window, no GTK
         try:
             return native.write_scene(args, args.write_scene)
@@ -1152,7 +1177,7 @@ def main(argv=None):
                     gl.glBindFramebuffer(gl.GL_FRAMEBUFFER, off)
                     return gl.read_pixels(0, 0, w, h)
                 app.video = video.Writer(args.video, w, h, args.video_fps,
-                                         video.plan(args.seconds, args.video_fps, args.loop == "on", t0), draw)
+                                         video.plan(args.seconds, args.video_fps, t0), draw)
             writer, until = app.video, time.monotonic() + 0.1
             while time.monotonic() < until:
                 if writer.step():
@@ -1160,7 +1185,7 @@ def main(argv=None):
                     if sys.stderr.isatty():
                         print(file=sys.stderr)
                     print(f"syncrain: saved {args.video} ({w}x{h}, {writer.done} frames at {args.video_fps:g} "
-                          f"fps, {'a loop' if args.loop == 'on' else 'not a loop'})", flush=True)
+                          "fps)", flush=True)
                     return True
             if sys.stderr.isatty():
                 video.progress_line(writer.done, len(writer.frames))

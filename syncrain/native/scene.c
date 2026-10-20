@@ -8,6 +8,7 @@
  *   cols 64
  *   keep logo <size> <drift> | keep mask <x0> <y0> <x1> <y1> <drift> | keep none
  *   bg <width> <height>                          (only with a background image)
+ *   lock-rest <seconds>                          (only when set: the lock screen's rest; the wallpaper ignores it)
  *   shader <vert|state|field|glyphs|blur|composite> <offset> <length>
  *   texture <atlas|table|words|logo|bg|mask> <width> <height> <nearest|linear|mip> <offset> <length>
  *   uniform <program> <name> <i|ui|f|f2|f3|f4|f4v> <values...>
@@ -214,6 +215,11 @@ bool scene_load(struct scene *scene, int fd, char *why, size_t why_size)
 			scene->bg_width = (int)w;
 			scene->bg_height = (int)h;
 			seen_bg = true;
+		} else if (strcmp(word[0], "lock-rest") == 0 && n == 2) {
+			double rest;
+			if (scene->lock_rest > 0.0 || !real(word[1], &rest) || !(rest > 0.0 && rest <= 86400.0))
+				FAIL("the lock screen's rest is no number of seconds, or said twice");
+			scene->lock_rest = rest;
 		} else if (strcmp(word[0], "shader") == 0 && n == 4) {
 			struct blob b;
 			if (!span(word[2], word[3], data, data_size, &b))

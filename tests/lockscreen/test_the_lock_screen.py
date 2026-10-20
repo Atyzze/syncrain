@@ -82,12 +82,14 @@ def clean_env(**extra) -> dict:
 def greeter(built, scene, tmp_path):
     """tests/lockscreen/greeter.qml in a 640x360 headless Sway: greeter(what, *args, module=True) ->
     (status, output)."""
-    def run(what, *args, module=True):
+    runs = iter(range(1000))
+
+    def run(what, *args, module=True, scene_path=None):
         imports = ([built["lockscreen"] / "lib/qt-6/qml"] if module else []) + [built["qtdeclarative"] / "lib/qt-6/qml"]
-        with headless_sway(tmp_path / f"run-{what}", screen="640x360") as session:
+        with headless_sway(tmp_path / f"run-{what}-{next(runs)}", screen="640x360") as session:
             env = clean_env(**session, QT_QPA_PLATFORM="wayland", QSG_RHI_BACKEND="opengl",
                             QT_FORCE_STDERR_LOGGING="1", QML_IMPORT_PATH=":".join(map(str, imports)),
-                            SYNCRAIN_LOCK_SCENE=str(scene), SYNCRAIN_TEST_TIME=str(MOMENT))
+                            SYNCRAIN_LOCK_SCENE=str(scene_path or scene), SYNCRAIN_TEST_TIME=str(MOMENT))
             done = subprocess.run([str(built["qtdeclarative"] / "bin/qml"), str(HERE / "greeter.qml"), "--",
                                    LOCKSCREEN_QML.as_uri(), what, *map(str, args)],
                                   env=env, capture_output=True, text=True, timeout=180)
@@ -153,6 +155,19 @@ def test_the_lock_screen_draws_the_desktop_s_frame(greeter, built, tmp_path):
     # the same Mesa as the lock screen's Qt: to the pixel. Against the GTK host on another Mesa
     # (25.2 here, the lane's Qt has 26.2) it was 1.8% darker, the two llvmpipes' own difference.
     assert outside_the_box(shot, native_frame(built, tmp_path)) == 0
+
+
+def test_the_lock_screen_rests_only_when_the_settings_ask(greeter, tmp_path):
+    """No rest in the default scene; a settings file's lock_rest reaches the item through the scene."""
+    code, said = greeter("shot", tmp_path / "plain.png")
+    assert code == 0 and ", rest 0" in said, said
+    rested = tmp_path / "rest.scene"
+    done = subprocess.run([sys.executable, "-m", "syncrain", "--config", "none", "--lock-rest", "120",
+                           "--write-scene", str(rested)], cwd=ROOT, env=dict(os.environ, PYTHONPATH=str(ROOT)),
+                          capture_output=True, text=True, timeout=120)
+    assert done.returncode == 0, done.stderr
+    code, said = greeter("shot", tmp_path / "rest.png", scene_path=rested)
+    assert code == 0 and ", rest 120" in said, said
 
 
 def steps(said: str) -> list[str]:
@@ -251,7 +266,7 @@ def test_two_screens_show_one_box_that_comes_and_goes_with_the_person(built):
                           capture_output=True, text=True, timeout=180)
     said = done.stdout + done.stderr
     assert done.returncode == 0 and "0 failed" in said, said[-4000:]
-    assert said.count("PASS   : qmltestrunner::TwoScreens::test_") == 19, said[-4000:]
+    assert said.count("PASS   : qmltestrunner::TwoScreens::test_") == 20, said[-4000:]
 
 
 def test_without_the_rain_s_module_the_box_still_unlocks(greeter, tmp_path):

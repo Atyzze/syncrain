@@ -25,6 +25,8 @@ class SyncRain : public QQuickFramebufferObject
     // "preparing", "drawing" or "error: <why>"
     Q_PROPERTY(QString status READ status NOTIFY statusChanged)
     Q_PROPERTY(int frames READ frames NOTIFY framesChanged)
+    // the scene's lock-rest: seconds without a key or a move before 10 fps (Shared.qml); 0: never
+    Q_PROPERTY(qreal rest READ rest NOTIFY restChanged)
 
 public:
     explicit SyncRain(QQuickItem *parent = nullptr);
@@ -39,6 +41,7 @@ public:
     void setFixedTime(qreal time);
     QString status() const { return m_status; }
     int frames() const { return m_frames; }
+    qreal rest() const { return m_rest; }
 
     // what the render thread copies in synchronize
     int m_generation = 0;
@@ -48,6 +51,7 @@ public:
     // from the render thread, queued
     Q_INVOKABLE void frameDrawn();
     Q_INVOKABLE void failed(const QString &why);
+    void setRest(double seconds);
 
 Q_SIGNALS:
     void sceneChanged();
@@ -55,6 +59,7 @@ Q_SIGNALS:
     void fixedTimeChanged();
     void statusChanged();
     void framesChanged();
+    void restChanged();
 
 protected:
     void itemChange(ItemChange change, const ItemChangeData &value) override;
@@ -71,6 +76,7 @@ private:
     qreal m_fixedTime;
     QString m_status = QStringLiteral("preparing");
     int m_frames = 0;
+    qreal m_rest = 0.0;
     QTimer m_tick;
     QElapsedTimer m_clock;
     double m_next = 0.0;                  // when the next frame is due, in m_clock's milliseconds

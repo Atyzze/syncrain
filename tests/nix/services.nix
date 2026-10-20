@@ -17,7 +17,7 @@ let
   };
   nixos = system {
     services.syncrain = { enable = true; inherit channel; rainbow = "all"; spin = 240; drift = 0.05;
-                          pauseUnder = "fullscreen"; speed = 0.5; glow = 0.0; snow = false;
+                          pauseUnder = "fullscreen"; lockRest = 300; speed = 0.5; glow = 0.0; snow = false;
                           hieroglyphs = 0.3; flavours = 9; flavourLayout = "wave"; cycle = 30;
                           rainColors = [ "#202040" "#8040c0" "#e0c0ff" "#ffffff" ]; words = [ "HI" "THERE" ]; };
   };

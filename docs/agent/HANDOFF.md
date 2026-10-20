@@ -1,4 +1,4 @@
-# Handoff: the state of syncrain at build 46
+# Handoff: the state of syncrain at build 47
 
 What is true now, for a context that has just opened this tree. Where this page and the code
 disagree, the code is right; fix the page in the same build. Each fact has one home; this page
@@ -31,10 +31,12 @@ This page, `docs/agent/NEXT_BUILD.md`, `docs/agent/WORKING_WITH_THE_OPERATOR.md`
 * **How it works**: three hosts (native C on Wayland, GTK elsewhere and for `--screenshot`,
   `--record` and `--video`, the page in browsers), six passes, the settings file, the login and
   lock screens, video: `docs/ARCHITECTURE.md`. Every option and how to use it: `docs/OPERATIONS.md`.
-* **The default** is the operator's settings file sent with the review of build 33
-  (`tests/fixtures/operator_config.json`), as the `syncrain` preset (`syncrain/data/themes.json`,
-  made by `tools/build_assets.py`; its `look` says where the sliders start, so that file and no
-  file are the same frame, `tests/unit/test_the_options.py`). Presets: syncrain, nixos, matrix.
+* **The default** is `config.json` at the top (the operator's of 2026-10-20, build 47), shipped in
+  every release and read by `./install.sh` by default (written with the defaults when missing). The
+  `syncrain` preset is made from it (`tools/build_assets.py --themes-only`, which also copies it to
+  `syncrain/data/config.json`); the app's other defaults equal it and the page untouched saves it
+  (`tests/unit/test_the_options.py`, the browser lane). To change a default: edit config.json,
+  rebuild the themes, re-take the stream. Presets: syncrain, nixos, matrix.
 * **The login and lock screens stay optional**: only `--login-screen` and `--lock-screen` touch
   them, and `-off` puts back what was there. `tests/unit/test_the_login_screen_is_optional.py` and
   `tests/unit/test_the_lock_screen_is_optional.py` hold every build to it. The lock screen is tested
@@ -44,12 +46,12 @@ This page, `docs/agent/NEXT_BUILD.md`, `docs/agent/WORKING_WITH_THE_OPERATOR.md`
   a second factor, take an empty answer to a visible prompt and ignore clicks while hidden.
 * **Boot stays plain text** (the operator, 2026-10-15): never the bootloader, the initramfs or a
   boot splash.
-* **Stream**: `0aa22037` since build 44 (the id names what the code computes, not its text; the
+* **Stream**: `c5c869a0` since build 47 (the default from config.json); `0aa22037` 44 to 46 (the id names what the code computes, not its text; the
   same frame as 35 to 43 at a scale of 1); `1ad0a2dd` 35 to 43 (the new default, `composite.frag`
   to the spec, stricter colours and periods); `822ea58a` 29 to 34 (sentences' gaps and trails in `state.frag`); `85ace386` in
   28; `a9c058f3` 24 to 27; `f98ef1ca` in 23; `25b02556` in 22; `def5684f` 15 to 21; `c18f8be2` in 12
   to 14; `48e6bf9c` 3 to 11.
-* **GitHub**: `main` holds builds 7 to 46, a commit `syncrain build <N>` each, and a few
+* **GitHub**: `main` holds builds 7 to 46 (47 was delivered as an archive, not pushed), a commit `syncrain build <N>` each, and a few
   documents-only commits between them.
 
 ## Done last
@@ -70,6 +72,9 @@ Since then the open items of `docs/ROADMAP.md` that can be done here, one area a
 * **46** the lock screen's frame is the native wallpaper's to the pixel (the 2% was two Mesa
   versions in the lane); the GTK host at a fractional scale draws the screen's own pixels; the page
   keeps a logo given as a picture file's path.
+* **47** the operator's reports of 2026-10-20: the lock screen's rest is a setting, off by default
+  (`lock_rest`); a video has no loop crossfade (its first seconds were blurred), `--loop` gone;
+  config.json is the default settings file and the source of the default preset (a stream change).
 
 ## Waits on the operator
 

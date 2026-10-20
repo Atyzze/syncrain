@@ -61,13 +61,14 @@ def test_the_services_pass_the_channel_through_systemd_intact(evaluated, which):
     assert str(service["prevent"]).split() == [str(status) for status in NO_RESTART]
     if which == "nixos":                      # set there; the home-manager service keeps the defaults
         assert words[words.index("--pause-under") + 1] == "fullscreen", words
+        assert words[words.index("--lock-rest") + 1] == "300", words
         assert [words[words.index(o) + 1] for o in ("--speed", "--glow", "--snow", "--hieroglyphs", "--flavours",
                                                     "--flavour-layout", "--cycle", "--rain-colors")] == \
             ["0.500000", "0.000000", "off", "0.300000", "9", "wave", "30", "#202040,#8040c0,#e0c0ff,#ffffff"], words
         assert "--words=HI,THERE" in words, words
         assert "--preset" not in words and "--fps" not in words, "left to a settings file, else the preset"
     else:
-        for o in ("--pause-under", "--speed", "--glow", "--snow", "--hieroglyphs"):
+        for o in ("--pause-under", "--lock-rest", "--speed", "--glow", "--snow", "--hieroglyphs"):
             assert o not in words, words
         assert words[words.index("--preset") + 1] == "matrix", words
 

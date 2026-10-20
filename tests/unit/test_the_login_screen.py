@@ -200,7 +200,8 @@ def test_install_makes_the_rain_the_login_screen_and_puts_sddm_back_after(tmp_pa
                                                                                 "size": 1.2}]}))
     (tmp_path / "config/kwinoutputconfig.json").write_text("[]")
     (tmp_path / "config/kxkbrc").write_text("[Layout]\nLayoutList=us\n")
-    done = login_install(tmp_path, "--theme", "matrix", "--login-screen")
+    # no settings file (config.json's sets would go over the symbols file): the symbols file's path
+    done = login_install(tmp_path, "--config", "none", "--theme", "matrix", "--login-screen")
     assert done.returncode == 0, done.stdout + done.stderr
     lib = tmp_path / "lib"
     assert json.loads((lib / "login.json").read_text()) == {
@@ -226,7 +227,7 @@ def test_install_makes_the_rain_the_login_screen_and_puts_sddm_back_after(tmp_pa
     assert "sudo systemctl enable --force sddm.service && sudo reboot" in done.stdout
     assert (tmp_path / "state").stat().st_mode & 0o777 == 0o700, "who logged in, and when, is greetd's user's alone"
 
-    again = login_install(tmp_path)                   # a newer build: the login screen's copy follows
+    again = login_install(tmp_path, "--config", "none")   # a newer build: the login screen's copy follows
     assert again.returncode == 0 and "the login screen: build" in again.stdout, again.stdout + again.stderr
     assert json.loads((lib / "login.json").read_text())["rain"][:1] == ["--preset=matrix"]
     page = tmp_path / "page.json"                     # a settings file from the page: it decides there too

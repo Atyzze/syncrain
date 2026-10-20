@@ -38,8 +38,9 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 #: What a release carries: these files at the root, and these directories whole.
+#: config.json is the default settings file: the default preset is made from it, and install.sh reads it.
 ROOT_FILES = {".gitignore", "BUILD_NUMBER", "LICENSE", "README.md", "flake.nix", "flake.lock", "index.html",
-              "install.sh", "pyproject.toml"}
+              "install.sh", "pyproject.toml", "config.json"}
 #: Root files whose absence is a fact about the tree, not a broken promise.
 OPTIONAL_ROOT_FILES = {"flake.lock"}
 ROOT_DIRS = {"docs", "nix", "syncrain", "tests", "tools"}
@@ -49,7 +50,8 @@ EXCLUDED_PARTS = {".git", ".pytest_cache", "__pycache__", "build", "dist", "var"
 EXCLUDED_SUFFIXES = {".pyc", ".pyo"}
 #: What a fresh machine needs; the release refuses to ship without any of them.
 REQUIRED_RELEASE_PATHS = {
-    "BUILD_NUMBER", "README.md", "LICENSE", "install.sh", "flake.nix", "pyproject.toml",
+    "BUILD_NUMBER", "README.md", "LICENSE", "install.sh", "flake.nix", "pyproject.toml", "config.json",
+    "syncrain/data/config.json",
     "syncrain/__main__.py", "syncrain/app.py", "syncrain/build.py", "syncrain/diagnose.py", "syncrain/engine.py",
     "syncrain/renderer.py", "syncrain/logo.py", "syncrain/gl.py", "syncrain/native.py", "syncrain/native/build.sh",
     "syncrain/native/wallpaper.c", "syncrain/native/render.c", "syncrain/native/syncrain.h",

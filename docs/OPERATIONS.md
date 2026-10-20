@@ -16,7 +16,7 @@ git clone https://github.com/Atyzze/syncrain && cd syncrain   # or unpack SYNCRA
 ./install.sh --autostart      # also a systemd user service
 ./install.sh --login-screen   # optional: also the login screen, from the next boot (greetd)
 ./install.sh --lock-screen    # optional, KDE Plasma 6: also the lock screen, from the next login
-./install.sh --config config.json   # the settings the web page saved (see below)
+./install.sh --config mine.json     # another settings file than config.json beside it (see below)
 ./install.sh --uninstall      # remove it (the system's packages stay)
 ```
 
@@ -46,10 +46,17 @@ git clone https://github.com/Atyzze/syncrain && cd syncrain   # or unpack SYNCRA
   logo, speed and the rest), not where or how often it is drawn: it draws at 30 fps, at full size,
   with no `--offset`, whatever `--fps`, `--scale` and `--offset` say. Also `--prefix DIR` (or
   `SYNCRAIN_PREFIX`), `--no-deps`, `--yes`; `./install.sh --help`.
-* `--config FILE`: a settings file from the web page, checked, then kept as
+* The settings file: `config.json` beside `install.sh` by default (where there is none, it is written
+  with the defaults first, `syncrain --write-config`), or `--config FILE`; checked, then kept as
   `~/.config/syncrain/config.json` (one there before is kept as `config.json.before`). The service
   and the login screen's rain are written again with only the options of that run, so the file
-  decides; the login screen gets a copy of it.
+  decides; the login screen gets a copy of it, the lock screen's scene is made from it.
+  `--config none` installs no settings file and keeps the service's options from before. `--preset
+  NAME` without `--config` draws that preset: the kept settings file is set aside as
+  `config.json.before` (a settings file names every colour, symbol and word, so a preset under it
+  would change little); `./install.sh` alone brings config.json back. A kept file replaced by
+  another is kept as `config.json.before`, and an earlier `.before` of its own as
+  `config.json.before.<date>`.
 * The app is made beside the installed one and swapped in whole, and only a folder this script
   installed is ever replaced or removed (never the folder it runs from). The launcher runs the
   Python the install checked: the system's with GTK 4's bindings, else the first on PATH with them
@@ -81,8 +88,9 @@ git clone https://github.com/Atyzze/syncrain && cd syncrain   # or unpack SYNCRA
   PAM's words) on every screen. The box comes up on a key or a moved pointer, goes after a minute
   without either and forgets what was typed (Escape sends it away at once); every screen shows the
   same box, so it never matters which one you type on. With more than one keyboard layout the box
-  names the one in use (click it for the next). After five minutes without a key or a move the rain
-  rests at 10 frames a second, and the first key or move brings back 30. It builds a QML module (with the lock screen's packages above) into
+  names the one in use (click it for the next). The rain draws up to 30 frames a second for as long
+  as the screen is locked, touched or not; with `"lock_rest"` (seconds, the page's Lock screen rest)
+  it draws 10 after that long without a key or a move, and 30 again at the next. It builds a QML module (with the lock screen's packages above) into
   `~/.local/lib/syncrain/`, puts the shell package `org.syncrain.lockscreen` in
   `~/.local/share/plasma/shells/`, writes the scene to `~/.local/state/syncrain/lock-screen.scene`
   (each start of the native wallpaper keeps it current), and gives KWin's unit alone a drop-in
@@ -163,7 +171,9 @@ A Plasma web-wallpaper plugin can host it, behind the desktop icons.
 | `--channel` | `public` | Stream name: same name, synced clock, same frame |
 | `--fps` | `30` | Cap; frames land on whole refreshes (every 2nd at 60 Hz) |
 | `--host` | `auto` | Wayland: `auto` (native when built, else GTK), `native` (only), `gtk` |
-| `--pause-under` | `maximized` | KDE: stop a screen under a maximized or full-screen window; `fullscreen`, `never` |
+| `--pause-under` | `never` | KDE: `maximized` stops a screen under a maximized or full-screen window, `fullscreen` under a full-screen one only |
+| `--lock-rest S` | `0` | The lock screen draws 10 fps instead of 30 after S seconds without a key or a moved pointer, 30 again at the next; `0`: never |
+| `--write-config FILE` | - | Write the default settings file (`config.json`) to FILE, which must not exist, and exit |
 | `--rain-colors C,C,C,C` | preset's | The rain's gradient, dark, middle, bright, then the leading symbol: `#rrggbb` (or `r/g/b`, 0 to 1) |
 | `--glow-color C` | preset's | The glow round the rain |
 | `--flavours N` | preset's | Colours at once, 1 to 64: each column one of N hues round the colour wheel |
@@ -203,7 +213,6 @@ A Plasma web-wallpaper plugin can host it, behind the desktop icons.
 | `--video FILE` | - | A video of the rain from `--time` or now: `.mp4`, `.mkv`, `.webm` or `.gif` (needs ffmpeg) |
 | `--seconds N` | `30` (a GIF 10) | How long `--video` is |
 | `--video-fps F` | `30` (a GIF 15, at most 50) | Frames per second of `--video` |
-| `--loop` | `on` | `--video` ends where it begins, so a player repeating it shows no seam; `off` for the moments only |
 | `--diagnose` | - | What this machine offers and why syncrain can or can't draw |
 | `--benchmark` | - | GPU time of each pass on this card |
 | `--power-sweep` | - | The card's watts at several settings, about four minutes |
@@ -221,8 +230,12 @@ Open `index.html` (or the live page), press **Settings** and move anything: a pr
 the channel, the rain's colours and how many at once, the colour cycle, the background, the logo
 (or a picture of your own), motion, light, the symbol sets (add, remove, weigh, type your own), the
 hidden words and sentences, the frame rate. The rain changes as you go; **Screen shape** previews
-a 16:9, 21:9 or other desktop. Then **Save config.json** (or **Copy**) and, in the syncrain folder,
-`./install.sh --config config.json`.
+a 16:9, 21:9 or other desktop. Then **Save config.json** (or **Copy**), put it in the syncrain folder
+in place of the `config.json` there, and run `./install.sh`: it reads that file by default.
+
+* `config.json` in the syncrain folder is where the defaults are kept: the default preset is made
+  from it (`tools/build_assets.py`), the page untouched saves it to the byte, and the installer
+  reads it. A release always carries it; deleted, `./install.sh` writes it again with the defaults.
 
 * The desktop draws what the page showed: the same frame at the same moment on the same channel.
   Symbols that are not among the 489 shipped ones are drawn by each side's fonts and can differ a
@@ -316,10 +329,10 @@ picture or font it cannot use).
 
 ## Recipes
 
-* **A video**: `syncrain --video rain.mp4` (30 s at 1920x1080, a seamless loop, your settings
-  file's look); `--seconds 60 --size 3840x2160 --video-fps 60` for more, `rain.gif` for a GIF
-  (10 s at 640x360 and 15 fps: a GIF of rain is large, and a big one is refused). Its first two
-  seconds are the end fading into the start; `--loop off` leaves that out. It is made as
+* **A video**: `syncrain --video rain.mp4` (30 s at 1920x1080, your settings file's look);
+  `--seconds 60 --size 3840x2160 --video-fps 60` for more, `rain.gif` for a GIF (10 s at 640x360
+  and 15 fps: a GIF of rain is large, and a big one is refused). Every frame is its own moment,
+  nothing faded into it, the first seconds too. It is made as
   `rain.part.mp4` and named when whole: Ctrl+C or a failure leaves nothing, and an earlier
   `rain.mp4` as it was. A video repeats where the live rain never does; whether it costs fewer
   watts is not measured yet.

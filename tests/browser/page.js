@@ -8,9 +8,10 @@
 //   node page.js symbols <json>...                     what the page drew its symbols from, with those files
 //   node page.js logo <picture>                       a picture given as the logo: the settings it saves
 //   node page.js studio                                the settings panel used as a person would, and saved
-//   node page.js video <webm> <w> <h> <seconds> <fps> <loop> <t0>  a video made by the page's Save video
+//   node page.js video <webm> <w> <h> <seconds> <fps> <t0>  a video made by the page's Save video
 //   node page.js dropdowns                             the colours a dropdown's options are drawn in
 //   node page.js states <w> <h> <json>               the rain-cell grid's hash after drawing each moment (ms) listed
+//   node page.js defaults                              the settings file a fresh page saves
 //   node page.js reads <json>                          each text of that list loaded as a settings file: '' or why not, and the settings then
 'use strict';
 const { chromium } = require('playwright');
@@ -61,10 +62,10 @@ const PAGE = 'file://' + path.resolve(__dirname, '..', '..', 'index.html');
     out = await page.evaluate(() => Object.assign({}, window.__syncrainIdentity,
       { ident: document.getElementById('ident').textContent }));
   } else if (mode === 'video') {
-    const [file, w, h, seconds, fps, loop, t0] = rest;
+    const [file, w, h, seconds, fps, t0] = rest;
     const page = await open(640, 360, 'fps=1');
     const b64 = await page.evaluate(o => window.__syncrainVideo(o),
-      { size: [Number(w), Number(h)], seconds: Number(seconds), fps: Number(fps), loop: loop === '1', t0: Number(t0) });
+      { size: [Number(w), Number(h)], seconds: Number(seconds), fps: Number(fps), t0: Number(t0) });
     require('fs').writeFileSync(file, Buffer.from(b64, 'base64'));
     out.bytes = Buffer.from(b64, 'base64').length;
   } else if (mode === 'states') {
@@ -77,6 +78,10 @@ const PAGE = 'file://' + path.resolve(__dirname, '..', '..', 'index.html');
       return window.__syncrainState().data;
     }), JSON.parse(list));
     out.hashes = out.hashes.map(d => crypto.createHash('sha256').update(Buffer.from(d)).digest('hex'));
+  } else if (mode === 'defaults') {
+    // the settings file a fresh page saves, nothing touched, as text
+    const page = await open(800, 450, 'hud=0');
+    out.text = await page.evaluate(() => window.__syncrainExport());
   } else if (mode === 'reads') {
     const texts = JSON.parse(require('fs').readFileSync(rest[0], 'utf8'));
     const page = await open(800, 450, 'hud=0&fps=1');

@@ -9,4 +9,6 @@ import org.syncrain
 SyncRain {
     objectName: "rain"
     fps: Shared.fps
+    // the settings file's lock_rest, carried in the scene; 0 (the default): the rain never rests
+    onRestChanged: Shared.restMs = Math.round(rest * 1000)
 }

@@ -69,6 +69,10 @@ def scene_bytes(args, fallback: list[str] | None) -> bytes:
         header.append("keep none")
     if r.bg_size:
         header.append(f"bg {r.bg_size[0]} {r.bg_size[1]}")
+    rest = float(getattr(args, "lock_rest", 0.0) or 0.0)
+    if rest > 0:
+        # only when asked for: a lock screen built before this line knew it refuses a scene that has it
+        header.append(f"lock-rest {rest.hex()}")
     blobs: list[bytes] = []
     size = 0
 

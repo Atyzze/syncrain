@@ -224,10 +224,17 @@ def test_a_scene_s_numbers_are_numbers_and_said_once(native_wallpaper, tmp_path)
     keep = next(i for i, line in enumerate(lines) if line.startswith(b"keep "))
     for bad in ([*lines[:cols], b"cols 64junk", *lines[cols + 1:]],
                 [*lines[:keep], b"keep logo 0,44 0x0p+0", *lines[keep + 1:]],
-                [*lines, lines[cols]]):
+                [*lines, lines[cols]],
+                [*lines, b"lock-rest 0x0p+0"], [*lines, b"lock-rest 5m"],
+                [*lines, b"lock-rest 0x1.2cp+8", b"lock-rest 0x1.2cp+8"]):
         done = run_with_scene(native_wallpaper, b"\n".join(bad) + b"\nend\n" + rest, env)
         assert done.returncode == 70 and "cannot read its scene" in done.stderr, done.stderr
     done = run_with_scene(native_wallpaper, whole, env)
+    assert "cannot read its scene" not in done.stderr, done.stderr
+    # the lock screen's rest, when the settings ask for one: the wallpaper reads past it
+    rested = native.scene_bytes(native_args("--lock-rest", "300"), None)
+    assert f"\nlock-rest {300.0.hex()}\n".encode() in rested and b"lock-rest" not in whole
+    done = run_with_scene(native_wallpaper, rested, env)
     assert "cannot read its scene" not in done.stderr, done.stderr
 
 

@@ -232,7 +232,7 @@ Window {
                 if (status === "preparing" && tries < 60)
                     return;
                 stop();
-                console.log("flow: rain " + status + (rain ? ", frames " + rain.frames : ""));
+                console.log("flow: rain " + status + (rain ? ", frames " + rain.frames + ", rest " + rain.rest : ""));
                 screen.grabToImage(r => { r.saveToFile(win.argv[2]); Qt.exit(status === "drawing" ? 0 : 3); });
                 return;
             }

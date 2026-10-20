@@ -364,19 +364,19 @@ def test_every_list_opens_readable(page):
 
 
 def test_the_page_makes_a_video_the_desktop_would(page, app, tmp_path, root):
-    """The Video section's WebM, decoded: its frames are the moments the app draws, and a looping
-    video's first frame is the moment just after its last, so a player repeating it shows no seam."""
+    """The Video section's WebM, decoded: its frames are the moments the app draws, the first one
+    too (a crossfade once made the first seconds a blur of two moments, the logo with them)."""
     ffmpeg = shutil.which("ffmpeg")
     need(ffmpeg is not None, "no ffmpeg to decode the page's video")
     t0, seconds, fps, w, h = int(MOMENT), 3, 10, 640, 360
     webm = tmp_path / "page.webm"
-    page("video", webm, w, h, seconds, fps, 1, t0)
+    page("video", webm, w, h, seconds, fps, t0)
     probe = subprocess.run(["ffprobe", "-v", "error", "-count_frames", "-show_entries",
                             "stream=codec_name,width,height,nb_read_frames", "-of", "csv=p=0", str(webm)],
                            capture_output=True, text=True)
     codec, *rest = probe.stdout.strip().split(",")
     assert codec in ("vp9", "vp8") and [int(v) for v in rest] == [w, h, seconds * fps], probe.stdout
-    for k, moment in ((0, t0 + seconds), (25, t0 + 25 / fps)):     # the fade is 2 s: frame 0 is all end
+    for k, moment in ((0, t0), (5, t0 + 5 / fps), (25, t0 + 25 / fps)):   # the first frame is the first moment
         frame, native = tmp_path / f"frame{k}.png", tmp_path / f"native{k}.png"
         subprocess.run([ffmpeg, "-v", "error", "-y", "-i", str(webm), "-vf", f"select=eq(n\\,{k})", "-vsync", "0",
                         "-frames:v", "1", str(frame)], check=True)
@@ -395,12 +395,12 @@ def test_the_desktop_makes_the_video_the_page_does(page, app, tmp_path):
     need(ffmpeg is not None, "no ffmpeg for syncrain --video")
     t0, seconds, fps, w, h = int(MOMENT), 3, 10, 640, 360
     webm, mkv = tmp_path / "page.webm", tmp_path / "app.mkv"
-    page("video", webm, w, h, seconds, fps, 1, t0)
+    page("video", webm, w, h, seconds, fps, t0)
     _the_seek_head_finds(webm.read_bytes())
     done = app(["--time", str(t0), "--video", str(mkv), "--seconds", str(seconds), "--video-fps", str(fps),
                 "--size", f"{w}x{h}"], timeout=300)
     assert done.returncode == 0, done.stderr
-    for k in (0, 10, 25):                             # in the fade, at its middle, after it
+    for k in (0, 10, 25):                             # the first frame, and two after it
         a, b = tmp_path / f"page{k}.png", tmp_path / f"app{k}.png"
         for src, dst in ((webm, a), (mkv, b)):
             subprocess.run([ffmpeg, "-v", "error", "-y", "-i", str(src), "-vf", f"select=eq(n\\,{k})", "-vsync", "0",
@@ -483,6 +483,12 @@ def _texts():
     texts.append(head + '"cycle": 1e400}')                               # past what a double holds
     texts.append(head + '"speed": "1.5", "channel": "\\ud83d\\ude00"}')  # a whole character, escaped
     return texts
+
+
+def test_the_page_untouched_saves_config_json_itself(page, root):
+    """config.json at the top is the defaults' one home: the page, nothing touched, saves it to the
+    byte, so the file the installer reads by default and the page's starting point are the same."""
+    assert page("defaults")["text"] == (root / "config.json").read_text(encoding="utf-8")
 
 
 def test_the_page_and_the_desktop_read_the_same_settings_files(page, tmp_path):

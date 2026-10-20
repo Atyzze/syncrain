@@ -1,8 +1,8 @@
-# The next build is 47
+# The next build is 48
 
 The first line is parsed: `# The next build is <N>`, exactly one above `BUILD_NUMBER`.
 
-## Build 47: the operator's machine
+## Build 48: the operator's machine
 
 * Read what the operator sent last, and answer it in one plain sentence first.
 * What the roadmap still has needs the operator's machine (booting NixOS and the other

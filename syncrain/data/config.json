@@ -1,0 +1,84 @@
+{
+  "contract": "syncrain-config-1",
+  "about": "syncrain's settings, as the web page made them. ./install.sh reads config.json beside it by default (and writes one with the defaults where there is none); they are kept as ~/.config/syncrain/config.json. Try them with syncrain --config config.json --window. Colours are \"#rrggbb\" or three numbers 0 to 1. Options on the command line go over these.",
+  "preset": "syncrain",
+  "channel": "public",
+  "rain_colors": [
+    "#ffffff",
+    [
+      0.12,
+      1,
+      0.36
+    ],
+    [
+      0.6,
+      1,
+      0.68
+    ],
+    [
+      0.85,
+      1,
+      0.9
+    ]
+  ],
+  "glow_color": "#00ff51",
+  "background_colors": [
+    "#000000",
+    "#000000",
+    "#00ff04"
+  ],
+  "vignette": 0.66,
+  "cycle": 440,
+  "flavours": 64,
+  "flavour_layout": "wave",
+  "logo": "nixos",
+  "logo_color": null,
+  "logo_size": 0.44,
+  "logo_cycle": 40,
+  "spin": 300,
+  "drift": 0,
+  "speed": 1,
+  "density": 1.15,
+  "glow": 1,
+  "bloom": 1,
+  "bg_gain": null,
+  "snow": true,
+  "hieroglyphs": null,
+  "words": [
+    "AI",
+    "AGI",
+    "sSs",
+    "AGENT",
+    "LINUX",
+    "WAKEUP"
+  ],
+  "fps": 30,
+  "pause_under": "never",
+  "lock_rest": 0,
+  "glyphs": {
+    "balance": "sets",
+    "sets": [
+      {
+        "name": "katakana",
+        "chars": "アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワン",
+        "weight": 135,
+        "mirror": true
+      },
+      {
+        "name": "digits",
+        "chars": "01234589",
+        "weight": 16
+      },
+      {
+        "name": "symbols",
+        "chars": "Z:.=*+-<>¦|sSs\"",
+        "weight": 7.2
+      },
+      {
+        "name": "hieroglyphs",
+        "chars": "𓀀𓀁𓀭𓁐𓁚𓁦𓁨𓁹𓂀𓂋𓂓𓂭𓃀𓃒𓃛𓃠𓃢𓃩𓃭𓃹𓄂𓄋𓄟𓄣𓄤𓄿𓅃𓅆𓅓𓅜𓅨𓅬𓅭𓅱𓆄𓆊𓆐𓆑𓆓𓆗𓆛𓆣𓆳𓆷𓆼𓇋𓇓𓇯𓇳𓇶𓇼𓈌𓈎𓈖𓈘𓈙𓈞𓉐𓉔𓉺𓊃𓊖𓊛𓊨𓊪𓊮𓊵𓊹𓊽𓋀𓋑𓋔𓋙𓋞𓋴𓋹𓋾𓌀𓌂𓌅𓌉𓌙𓌳𓌻𓍘𓍢𓍿𓎆𓎛𓎡𓏌𓏏𓏠𓏶𓐍𓀎𓀠𓁶𓁷𓂉𓃗𓃥𓄇𓅐𓅘𓅡𓅮𓅿𓆈𓆙𓆟𓆤𓆭𓆰𓇰𓉡𓉴𓊡𓋭𓌢𓍱𓎺𓏙𓏛𓐎",
+        "share": 0.15
+      }
+    ]
+  }
+}

@@ -156,6 +156,9 @@ class Session:
                                            "org.freedesktop.DBus.NameHasOwner", f"string:{name}")
 
     def syncrain(self, *args, **extra):
+        # these tests are about pausing: maximized, unless one says otherwise (the default is never)
+        if "--pause-under" not in args:
+            args = ("--pause-under", "maximized", *args)
         return Proc([sys.executable, "-m", "syncrain", *args], self.env(**{"SYNCRAIN_DEBUG_FPS": "1", **extra}))
 
     def window(self, state, screen=0):
@@ -401,8 +404,11 @@ def test_frames_land_on_every_second_refresh_drawn_for_the_moment_they_are_shown
 
 
 def test_diagnose_says_what_kwin_reports_and_the_screens_refresh_rates(two):
-    done = subprocess.run([sys.executable, "-m", "syncrain", "--diagnose"], cwd=ROOT, env=two.env(),
-                          capture_output=True, text=True, timeout=120)
+    plain = subprocess.run([sys.executable, "-m", "syncrain", "--diagnose"], cwd=ROOT, env=two.env(),
+                           capture_output=True, text=True, timeout=120)
+    assert plain.returncode == 0 and "  --pause-under never: KWin is not asked" in plain.stdout, plain.stdout
+    done = subprocess.run([sys.executable, "-m", "syncrain", "--diagnose", "--pause-under", "maximized"], cwd=ROOT,
+                          env=two.env(), capture_output=True, text=True, timeout=120)
     assert done.returncode == 0, done.stdout + done.stderr
     out = done.stdout
     assert "screens:\n  Virtual-0: 320x180 at 0,0, scale 1, 60.00 Hz\n  Virtual-1: 320x180 at 320,0" in out, out
@@ -416,7 +422,9 @@ def test_the_power_sweep_on_kwin_draws_nothing_behind_windows(two, tmp_path):
     phases behind a maximized and a full-screen window draw no frames, the others are timed."""
     import json
     env = two.env(SYNCRAIN_POWER_COMMAND="echo 42.5", HOME=str(tmp_path))
-    done = subprocess.run([sys.executable, "-m", "syncrain", "--power-sweep", "--sweep-seconds", "7"], cwd=ROOT,
+    # the wallpaper's own options go through to every phase: pausing asked for (the default is never)
+    done = subprocess.run([sys.executable, "-m", "syncrain", "--power-sweep", "--sweep-seconds", "7",
+                           "--pause-under", "maximized"], cwd=ROOT,
                           env=env, capture_output=True, text=True, timeout=600)
     assert done.returncode == 0, done.stdout[-3000:] + done.stderr[-2000:]
     record = json.loads(next(tmp_path.glob("syncrain-power-*.json")).read_text())

@@ -5,9 +5,10 @@
 
     The box comes up on a key or a moved pointer and goes after a minute without either, on Escape
     and before a suspend; going, it forgets what was typed, sent or not (a half-typed password does
-    not wait on the screen, nor get tried later). The rain stays, and after five minutes without
-    either it rests: fewer frames a second, for a lock screen nobody is looking at (each frame costs
-    power, and on NVIDIA memory in KWin's greeter); a key or a move brings the full rate back.
+    not wait on the screen, nor get tried later). The rain stays, at its full rate for as long as the
+    screen is locked: a lock screen is watched (and recorded) without a key being touched. Only when
+    the settings file asks for a rest (`lock_rest`, seconds; Rain.qml sets restMs from the scene)
+    does it draw 10 frames a second after that long without a key or a move, and 30 again at the next.
 */
 pragma Singleton
 
@@ -21,14 +22,15 @@ QtObject {
     property bool shown: false
     property int idleMs: 60000               // tests make it shorter
     property bool resting: false
-    property int restMs: 300000
+    property int restMs: 0                   // 0: never rests (the default)
     readonly property real fps: resting ? 10 : 30
 
     function wake() {
         shared.shown = true;
         shared.resting = false;
         idle.restart();
-        rest.restart();
+        if (shared.restMs > 0)
+            rest.restart();
     }
 
     function sleep() {
@@ -44,10 +46,15 @@ QtObject {
         onTriggered: shared.sleep()
     }
 
-    // from the lock on, as from every key or move after it
+    // from the lock on (or from when the rest is set), as from every key or move after it
     property Timer rest: Timer {
-        interval: shared.restMs
-        running: true
+        interval: Math.max(1, shared.restMs)
+        running: shared.restMs > 0
         onTriggered: shared.resting = true
+    }
+    onRestMsChanged: {
+        shared.resting = false;
+        if (shared.restMs > 0)
+            rest.restart();
     }
 }

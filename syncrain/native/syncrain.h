@@ -54,6 +54,7 @@ struct scene {
 	enum keep keep;                     /* which cells the hidden words keep clear */
 	double logo_size, drift, mask_bbox[4];
 	int bg_width, bg_height;            /* 0 without a background image */
+	double lock_rest;                   /* the lock screen's rest after this many seconds; 0: never */
 	struct blob vertex, fragment[PROGRAM_COUNT];
 	struct texture_source texture[TEXTURE_COUNT];
 	struct uniform_source *uniform;

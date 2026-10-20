@@ -208,12 +208,22 @@ in
   };
 
   pauseUnder = mkOption {
-    type = types.enum [ "maximized" "fullscreen" "never" ];
-    default = "maximized";
+    type = types.nullOr (types.enum [ "maximized" "fullscreen" "never" ]);
+    default = null;
     description = ''
       On KDE Plasma, stop drawing a screen while a maximized or full-screen window covers it
       (`maximized`), only while a full-screen one does (`fullscreen`), or never. Other compositors
-      stop asking a hidden wallpaper for frames by themselves.
+      stop asking a hidden wallpaper for frames by themselves. null: the settings file's, else
+      `never` (the default settings file's).
+    '';
+  };
+
+  lockRest = mkOption {
+    type = types.nullOr (types.numbers.between 0 86400);
+    default = null;
+    description = ''
+      The lock screen draws 10 frames a second instead of 30 after this many seconds without a key
+      or a moved pointer, and 30 again at the next one; 0: never. null: the settings file's, else 0.
     '';
   };
 

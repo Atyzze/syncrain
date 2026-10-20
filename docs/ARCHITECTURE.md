@@ -83,6 +83,10 @@ GTK draws more pixels and scales them down), the page within texture filtering.
 * `syncrain-config-1`: the picture options by name (`bg_gain` for `--bg-gain`), `null` for the
   preset's, and `glyphs`, a symbols file's sets; build 21's `theme` and `rainbow` still read. Read before the command line, as if its options were
   typed first, so they are checked the same way and the command line goes over them.
+* `config.json` at the repository's top is the default settings file: `tools/build_assets.py` makes
+  the `syncrain` preset from it (a null keeps the preset's value) and copies it to
+  `syncrain/data/config.json` (`--write-config`); the app's other defaults (`channel`, `fps`,
+  `pause_under`, `lock_rest`) equal it, and the page untouched saves it (tests hold all three).
 * `--config FILE`, else `~/.config/syncrain/config.json` when it is there. The page checks what it
   loads and saves the same way (`readSettings`, `checkGlyphs`), so a file it saves is one the
   desktop takes; the browser lane draws one on both and compares.
@@ -122,16 +126,18 @@ GTK draws more pixels and scales them down), the page within texture filtering.
 * The rain is `SyncRain` (`rainitem.cpp`, the QML module `org.syncrain`): the native passes into a
   framebuffer on Qt Quick's OpenGL context, from the scene file `syncrain --write-scene` writes; the
   native wallpaper rewrites it at every start (the GTK host does not; `install.sh` writes it too),
-  so the lock screen draws the desktop's settings and runs no Python.
+  so the lock screen draws the desktop's settings and runs no Python. A `lock_rest` above 0 adds a
+  `lock-rest` line to the scene (only then: a lock screen built before it refuses the line); the
+  item's `rest` sets `Shared.restMs`, and the rain draws 10 fps after that long untouched.
 
 ## Video (`syncrain/video.py`, the page's `makeVideo`)
 
 * The GTK host draws each frame off the screen at the video's size, in slices of a tenth of a second
   per frame callback, and pipes it to ffmpeg (H.264 or VP9 in BT.709, or a GIF with one palette),
   as `NAME.part.EXT`, renamed when whole. The page encodes with WebCodecs and writes the WebM itself.
-* A loop's first frames (2 s, or half the video) are the moments n frames on fading into their own
-  (`video.plan`): frame n-1 flows into frame 0. Python and the page do the same sums, halves
-  rounded up; the browser lane compares their frames with each other and with the app's.
+* Frame k is the moment t0 + k / fps, drawn as it is (`video.plan`): nothing faded or blended in.
+  Python and the page do the same sums, halves rounded up; the browser lane compares their frames
+  with each other and with the app's.
 
 ## When a frame is drawn (`syncrain/pacing.py`, `syncrain/native/timing.c`)
 
@@ -141,8 +147,9 @@ compositor reports a miss on.
 
 ## Covered screens (`syncrain/hidden.py`, `syncrain/native/kwin.c`)
 
-KWin asks covered wallpapers for frames anyway. On KDE syncrain loads a small KWin script that says
-which screens a maximized or full-screen window covers; those stop drawing until they show again.
+KWin asks covered wallpapers for frames anyway. On KDE, with `--pause-under maximized` or
+`fullscreen` (the default is `never`), syncrain loads a small KWin script that says which screens a
+maximized or full-screen window covers; those stop drawing until they show again.
 
 ## Memory and power
 

@@ -9,33 +9,27 @@ from syncrain.app import parse_args
 from tests.conftest import need
 
 
-def test_a_looping_video_ends_where_it_begins():
-    """Its first two seconds are the moments just after its end fading into themselves: frame 0 is
-    all end (the moment after the last frame), and from the fade's end each frame is its moment."""
-    frames = video.plan(4, 10, True, 1000.7)
+def test_every_frame_is_its_own_moment():
+    """No frame is faded or blended into another: a crossfade made the first seconds of a video
+    blurred, the logo with them. The moments start at a whole second, as the page rounds them."""
+    frames = video.plan(4, 10, 1000.7)
     assert len(frames) == 40
-    assert frames[0] == (1000.0, (1004.0, 0.0))                 # rounded down to the second, as the page does
-    t, (t_end, a) = frames[10]
-    assert (t, t_end, a) == (1001.0, 1005.0, 0.5)
-    assert frames[19][1][1] == pytest.approx(0.95) and frames[20] == (1002.0, None)
-    assert frames[-1] == (1000.0 + 39 / 10, None)
+    assert frames[0] == 1000.0 and frames[10] == 1001.0 and frames[-1] == 1000.0 + 39 / 10
+    assert all(isinstance(t, float) for t in frames)
 
 
-def test_a_video_that_does_not_loop_is_its_moments_only():
-    assert all(end is None for _, end in video.plan(3, 30, False, 5))
+def test_the_number_of_frames_rounds_as_the_page_does():
+    """1.1 s at 7 fps is 8 frames (7.7, rounded); halves round up as the page's Math.round does."""
+    assert len(video.plan(1.1, 7, 0)) == 8
+    assert len(video.plan(0.1, 25, 0)) == 3                         # 2.5 frames
+    assert len(video.plan(0.001, 30, 0)) == 1                       # never none
 
 
-def test_a_short_loop_fades_over_half_of_itself():
-    frames = video.plan(1, 10, True, 0)
-    assert [end is not None for _, end in frames] == [True] * 5 + [False] * 5
-
-
-def test_a_frame_in_the_fade_is_drawn_as_a_canvas_draws_it():
-    over, under = bytes([200, 0, 100, 255]), bytes([0, 200, 100, 255])
-    assert video.blend(over, under, 0.25) == bytes([50, 150, 100, 255])
-    assert video.blend(over, under, 0.0) == under and video.blend(over, under, 1.0) == over
-    # rounded, as the page's canvas rounds: 255 * 0.5 is 127.5, which truncating made 127
-    assert video.blend(bytes([255, 0, 0, 255]), bytes([0, 0, 0, 255]), 0.5)[0] == 128
+def test_there_is_no_loop_option_any_more():
+    """The seamless-loop crossfade is gone, and with it --loop: asked for, it is refused, not ignored."""
+    with pytest.raises(SystemExit):
+        parse_args(["--config", "none", "--video", "a.mp4", "--loop", "on"])
+    assert not hasattr(video, "blend") and not hasattr(video, "LOOP_FADE")
 
 
 @pytest.mark.parametrize("name, size, seconds, fps", [("a.mp4", (1920, 1080), 30, 30), ("a.webm", (1920, 1080), 30, 30),
@@ -43,23 +37,15 @@ def test_a_frame_in_the_fade_is_drawn_as_a_canvas_draws_it():
 def test_the_defaults_go_with_the_format(name, size, seconds, fps):
     """A GIF is large for what it shows: smaller, shorter and slower unless asked."""
     args = parse_args(["--config", "none", "--video", name])
-    assert (args.video_size, args.seconds, args.video_fps, args.loop) == (size, seconds, fps, "on")
+    assert (args.video_size, args.seconds, args.video_fps) == (size, seconds, fps)
     args = parse_args(["--config", "none", "--video", name, "--size", "480x270", "--seconds", "4", "--video-fps", "24"])
     assert (args.video_size, args.seconds, args.video_fps) == ((480, 270), 4, 24)
-
-
-def test_the_seam_is_one_frame_whatever_the_length():
-    """The moment after the last frame is n frames on, also where seconds x fps is no whole number
-    (1.1 s at 7 fps is 8 frames, 8/7 s, not 1.1); halves round up as the page's Math.round does."""
-    frames = video.plan(1.1, 7, True, 0)
-    assert len(frames) == 8 and frames[0][1][0] == pytest.approx(8 / 7)
-    assert sum(end is not None for _, end in video.plan(1, 25, True, 0)) == 13      # 12.5 frames of fade
 
 
 @pytest.mark.parametrize("argv", [
     ["--video", "a.avi"], ["--video", "a"], ["--video", "a.mp4", "--size", "641x360"],
     ["--video", "a.mp4", "--size", "8x8"], ["--video", "a.mp4", "--seconds", "0"],
-    ["--video", "a.mp4", "--video-fps", "500"], ["--video", "a.mp4", "--loop", "maybe"],
+    ["--video", "a.mp4", "--video-fps", "500"], ["--video", "a.mp4", "--loop", "off"],
     ["--video", "a.mp4", "--screenshot", "a.png"], ["--video", "a.mp4", "--record", "d"],
     ["--video", "a.avi", "--size", "640x360"], ["--video", "a.mp4", "--size", "big"],
     ["--video", "a.gif", "--video-fps", "60"], ["--video", "a.gif", "--size", "1920x1080"],
@@ -101,7 +87,7 @@ def test_without_ffmpeg_it_says_what_to_install(monkeypatch):
 
 
 def test_a_video_is_made_from_the_frames_drawn(tmp_path):
-    """With a stand-in for the drawing: every frame reaches ffmpeg, and the fade's draws the end too."""
+    """With a stand-in for the drawing: every frame reaches ffmpeg, each drawn once, at its moment."""
     need(shutil.which("ffmpeg") is not None, "no ffmpeg")
     import subprocess
     drawn = []
@@ -110,9 +96,9 @@ def test_a_video_is_made_from_the_frames_drawn(tmp_path):
         drawn.append(t)
         return bytes([int(t * 40) % 256, 0, 0, 255]) * (32 * 18)
     path = tmp_path / "out" / "a.mp4"
-    frames = video.plan(1, 10, True, 0)
+    frames = video.plan(1, 10, 0)
     assert video.write(str(path), 32, 18, 10, frames, draw) == 10
-    assert len(drawn) == 15                                          # 10 frames, 5 of them with the end
+    assert drawn == frames                                           # nothing drawn twice, nothing blended in
     assert sorted(p.name for p in path.parent.iterdir()) == ["a.mp4"]   # made as a.part.mp4, then named
     probe = subprocess.run(["ffprobe", "-v", "error", "-count_frames", "-show_entries", "stream=nb_read_frames",
                             "-of", "csv=p=0", str(path)], capture_output=True, text=True)
@@ -125,14 +111,14 @@ def test_what_ffmpeg_refuses_is_said_and_leaves_what_was_there(tmp_path):
     path = tmp_path / "a.mp4"
     path.write_bytes(b"the earlier one")
     with pytest.raises(RuntimeError, match="ffmpeg could not make"):
-        video.write(str(path), 31, 17, 10, video.plan(1, 10, False, 0), lambda t: bytes(31 * 17 * 4))
+        video.write(str(path), 31, 17, 10, video.plan(1, 10, 0), lambda t: bytes(31 * 17 * 4))
     assert path.read_bytes() == b"the earlier one" and sorted(p.name for p in tmp_path.iterdir()) == ["a.mp4"]
 
 
 def test_a_video_stopped_halfway_leaves_nothing(tmp_path):
     need(shutil.which("ffmpeg") is not None, "no ffmpeg")
     path = tmp_path / "a.mp4"
-    writer = video.Writer(str(path), 32, 18, 10, video.plan(2, 10, False, 0), lambda t: bytes(32 * 18 * 4))
+    writer = video.Writer(str(path), 32, 18, 10, video.plan(2, 10, 0), lambda t: bytes(32 * 18 * 4))
     for _ in range(5):
         assert not writer.step()
     writer.abort()

@@ -10,7 +10,7 @@ It runs on Wayland and X11, KDE Plasma included (GNOME only in a window or the p
 base it is built for; the installer covers the four big families: Arch, Debian, Fedora and openSUSE.
 
 <p align="center">
-  <img src="docs/images/syncrain.jpg" width="49%" alt="The default look: katakana, digits, Latin letters and Egyptian hieroglyphs falling in columns over black with a green glow in the middle and snow, the columns in a rainbow wave across the screen, the NixOS snowflake in rainbow colours in the middle">
+  <img src="docs/images/syncrain.jpg" width="49%" alt="The default look: katakana, digits and Egyptian hieroglyphs falling in columns over black with a green glow in the middle and snow, the columns in a rainbow wave across the screen, the NixOS snowflake in rainbow colours in the middle">
   <img src="docs/images/nixos.jpg" width="49%" alt="The nixos preset: pale blue characters and hieroglyphs falling over dark blue, with snowflakes and the NixOS snowflake in rainbow colours in the middle">
 </p>
 <p align="center"><sub>Left, the default; right, the nixos preset. Channel <code>public</code> at 2026-10-07
@@ -18,22 +18,22 @@ base it is built for; the installer covers the four big families: Arch, Debian, 
 
 ## What you get
 
-* **The default look** (the `syncrain` preset): katakana, digits, Latin and Arabic letters and
+* **The default look** (the `syncrain` preset, made from `config.json`): katakana, digits and
   hieroglyphs with white-hot tails, 64 colours at once in a rainbow wave across the screen that
   turns once every 440 s, the NixOS snowflake in the middle in its own turning rainbow, snow, on
   black with a green glow in the middle. Hidden words (`AI`, `AGI`, `LINUX` and more) fall now and
-  then; whole sentences can too (`WAKE UP`, up to 30 characters).
+  then; whole sentences can too (`WAKE UP`, up to 30 characters, in your own words).
 * **Two more presets**: `nixos` (ice blue, snow) and `matrix` (classic green). Every colour,
   speed, the logo (or a picture of your own), the symbols and the words can be changed.
 * **Your desktop wallpaper**: a small native program (under 1% of a core, and about 11 W at 30 fps
   on two screens of the operator's RTX 5090, measured before the default had snow); on KDE Plasma a
-  screen under a full-screen or maximized window is not drawn at all.
+  screen under a full-screen or maximized window can be left undrawn (`"pause_under"`, off by default).
 * **Optional**: the rain as your login screen (greetd, with a login box on every screen) and as
   KDE Plasma's lock screen (the rain stays live; the box appears when you move the mouse or press
   a key, and is the same on every screen). Without asking for them, the installer leaves both alone.
 * **The web page** (`index.html`): the same rain in a browser, and a Settings panel to try every
   option live and save it as `config.json` for the desktop.
-* **A video of your look**: a seamless loop as MP4, WebM or GIF, for a phone, a TV, a video
+* **A video of your look**: MP4, WebM or GIF, every frame as the rain draws it, for a phone, a TV, a video
   wallpaper app or anywhere the live rain cannot run (whether playing one costs fewer watts than
   the live rain is not measured yet). The live rain stays the default: it never repeats and stays
   in sync, which a video cannot.
@@ -69,9 +69,12 @@ everything it needs to know is in these documents.
 A release archive (`SYNCRAIN<N>.tar.zst`) works the same: unpack it and run `./install.sh` from the
 folder. Running a newer build's `./install.sh` upgrades in place and restarts the wallpaper.
 
-**Make it yours**: open `index.html` in a browser, press Settings, change anything and watch the
-rain follow, then Save config.json and run `./install.sh --config config.json`. The desktop draws
-exactly what the page showed.
+**Your settings are `config.json`**, beside `install.sh`: `./install.sh` reads it by default (and
+writes one with the defaults if it is missing), and the default look is made from it. **Make it
+yours**: open `index.html` in a browser, press Settings, change anything and watch the rain follow,
+then Save config.json into the syncrain folder in place of the one there, and run `./install.sh`.
+The desktop draws exactly what the page showed. `./install.sh --config mine.json` takes another
+file; `--config none`, none.
 
 **Login and lock screen** (both optional, both undone exactly):
 
@@ -83,10 +86,10 @@ exactly what the page showed.
 After `--lock-screen`, log out and back in once. Should the lock screen ever not unlock:
 Ctrl+Alt+F3, log in, `loginctl unlock-sessions`, then `./install.sh --lock-screen-off`.
 
-**Make a video**: `syncrain --video rain.mp4` (30 s at 1920x1080 with your settings, ending
-where it begins; needs ffmpeg). `--seconds 60 --size 3840x2160 --video-fps 60` for more, `rain.gif`
-for a GIF (10 s at 640x360 and 15 fps: a GIF of rain is large), `--loop off` for one that does not
-loop. In the browser, the page's Settings has a **Video** section that saves the same as WebM.
+**Make a video**: `syncrain --video rain.mp4` (30 s at 1920x1080 with your settings; needs
+ffmpeg). `--seconds 60 --size 3840x2160 --video-fps 60` for more, `rain.gif` for a GIF (10 s at
+640x360 and 15 fps: a GIF of rain is large). In the browser, the page's Settings has a **Video**
+section that saves the same as WebM.
 
 **Why boot stays plain text**: syncrain never touches the bootloader, the initramfs or a boot
 splash. The plain text while the machine starts says it is not up yet; the moment the rain appears,

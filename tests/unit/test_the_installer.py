@@ -7,6 +7,7 @@ the app's libraries: it is named with SYNCRAIN_PYTHON, since /usr/bin/python3 ma
 """
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import subprocess
@@ -227,13 +228,14 @@ def test_a_misspelt_option_is_refused_before_the_service_keeps_it(root, home):
 
 
 def test_the_service_is_written_again_at_every_install(root, home):
-    """A fix to the service reaches an upgrade; options given later reach it; none given keeps its own."""
+    """A fix to the service reaches an upgrade; options given later reach it; none given (and no
+    settings file) keeps its own; the default settings file, config.json, decides instead of them."""
     tmp, env = home
     assert install(root, env, "--autostart", "--preset", "matrix").returncode == 0
     path = tmp / "config/systemd/user/syncrain.service"
     path.write_text(path.read_text().replace("StartLimitBurst=30\n", "").replace("RestartPreventExitStatus=2 69 70 78",
                                                                                  "RestartPreventExitStatus=69"))
-    assert install(root, env).returncode == 0                      # an upgrade, no options
+    assert install(root, env, "--config", "none").returncode == 0  # an upgrade, no options, no settings
     unit, words = unit_words(tmp)
     assert "StartLimitBurst=30" in unit and "RestartPreventExitStatus=2 69 70 78" in unit
     assert not path.with_name("syncrain.service.before").exists(), "syncrain's own lines are no hand edit"
@@ -241,6 +243,48 @@ def test_the_service_is_written_again_at_every_install(root, home):
     done = install(root, env, "--preset", "nixos")
     assert done.returncode == 0 and "options from before go" in done.stdout, done.stdout + done.stderr
     assert unit_words(tmp)[1] == [str(tmp / ".local/bin/syncrain"), "--preset=nixos"]
+    done = install(root, env)                                      # config.json beside it: the settings decide
+    assert done.returncode == 0 and "options from before go" in done.stdout, done.stdout + done.stderr
+    assert unit_words(tmp)[1] == [str(tmp / ".local/bin/syncrain")]
+    assert (tmp / "config/syncrain/config.json").read_bytes() == (root / "config.json").read_bytes()
+    # a preset without --config is that preset: config.json's look over it would be one in name only
+    kept = tmp / "config/syncrain/config.json"
+    kept.write_text(kept.read_text().replace('"fps": 30', '"fps": 24'))          # their own edit
+    done = install(root, env, "--preset", "matrix")
+    assert done.returncode == 0 and "set aside" in done.stdout, done.stdout + done.stderr
+    assert not kept.exists() and '"fps": 24' in kept.with_name("config.json.before").read_text()
+    assert unit_words(tmp)[1] == [str(tmp / ".local/bin/syncrain"), "--preset=matrix"]
+    assert install(root, env).returncode == 0                      # back to config.json
+    assert kept.read_bytes() == (root / "config.json").read_bytes()
+    assert '"fps": 24' in kept.with_name("config.json.before").read_text(), "their file is never lost"
+    kept.write_text(kept.read_text().replace('"fps": 30', '"fps": 20'))
+    assert install(root, env).returncode == 0
+    assert '"fps": 20' in kept.with_name("config.json.before").read_text()
+    dated = list(kept.parent.glob("config.json.before.*"))
+    assert len(dated) == 1 and '"fps": 24' in dated[0].read_text(), "an earlier one of their own, kept dated"
+
+
+def test_config_json_beside_the_installer_is_the_default_and_is_made_when_missing(root, home, tmp_path):
+    """./install.sh reads config.json from its folder; where there is none it writes one with the
+    defaults (syncrain --write-config) and installs that; --config none installs none."""
+    tmp, env = home
+    src = tmp_path / "release"
+    shutil.copytree(root, src, ignore=shutil.ignore_patterns(".git", "__pycache__", "*.mp4", "var"), symlinks=True)
+    (src / "config.json").unlink()
+    done = install(src, env)
+    assert done.returncode == 0 and "made one with the defaults" in done.stdout, done.stdout + done.stderr
+    assert (src / "config.json").read_bytes() == (root / "config.json").read_bytes()
+    kept = tmp / "config/syncrain/config.json"
+    assert kept.read_bytes() == (root / "config.json").read_bytes()
+    mine = json.loads((src / "config.json").read_text())
+    mine["fps"] = 24
+    (src / "config.json").write_text(json.dumps(mine))
+    assert install(src, env).returncode == 0
+    assert json.loads(kept.read_text())["fps"] == 24, "the folder's config.json, edited, is what is installed"
+    (src / "config.json").write_text("{not json")
+    done = install(src, env)
+    assert done.returncode != 0 and "config.json" in done.stderr, done.stdout + done.stderr
+    assert json.loads(kept.read_text())["fps"] == 24, "a broken one changes nothing"
 
 
 def test_a_checkout_where_the_app_goes_is_never_emptied(root, home):
@@ -317,7 +361,7 @@ def test_uninstall_after_the_ways_back_and_what_it_keeps(root, home):
     tmp, env = home
     assert install(root, env).returncode == 0
     (tmp / ".cache/syncrain").mkdir(parents=True)
-    (tmp / "config/syncrain").mkdir(parents=True)
+    (tmp / "config/syncrain").mkdir(parents=True, exist_ok=True)
     (tmp / "config/syncrain/config.json").write_text("{}")
     gone = install(root, env, "--lock-screen-off", "--uninstall")
     assert gone.returncode == 0, gone.stdout + gone.stderr
@@ -333,7 +377,7 @@ def test_a_service_another_prefix_wrote_starts_this_install(root, home):
     assert install(root, env, "--autostart", "--preset", "matrix").returncode == 0
     path = tmp / "config/systemd/user/syncrain.service"
     path.write_text(path.read_text().replace(f"'{tmp}/.local/bin/syncrain'", f"'{tmp}/opt/bin/syncrain'"))
-    done = install(root, env)
+    done = install(root, env, "--config", "none")
     assert done.returncode == 0 and "it now starts" in done.stdout, done.stdout + done.stderr
     assert unit_words(tmp)[1] == [str(tmp / ".local/bin/syncrain"), "--preset=matrix"]
 
@@ -355,9 +399,9 @@ def test_a_bad_option_or_settings_file_stops_the_install_before_anything_changes
     (app / "left-by-hand").write_text("x")
     unit = (tmp / "config/systemd/user/syncrain.service").read_text()
     settings = tmp / "config/syncrain/config.json"
-    settings.parent.mkdir(parents=True)
+    settings.parent.mkdir(parents=True, exist_ok=True)
     settings.write_text("{not json")
-    done = install(root, env, "--preset", "nixos")
+    done = install(root, env, "--config", "none", "--preset", "nixos")
     assert done.returncode != 0 and "your settings file" in done.stderr, done.stdout + done.stderr
     assert (app / "left-by-hand").exists(), "the installed app stays as it was"
     assert not (tmp / ".local/share/syncrain.new").exists()

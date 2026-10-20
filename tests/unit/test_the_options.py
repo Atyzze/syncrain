@@ -361,24 +361,25 @@ def test_one_colour_over_the_logo_and_its_own_again(tmp_path):
 
 
 def test_the_default_is_the_operator_s_own_look():
+    """config.json at the top (the operator's of 2026-10-20) is the default preset."""
     from syncrain.renderer import from_args, static_uniforms
     r = from_args(parse_args(["--config", "none"]), glyphs="theme")
     assert (r.theme_name, r.logo_choice, r.th["rain"]["flavours"], r.th["rain"]["cycle"],
             r.th["rain"]["flavourLayout"]) == ("syncrain", "white", 64, 440, "wave")
-    assert r.th["wordText"] == ["AI", "AGI", "sSs", "LINUX", "WAKE UP", "HELLO", "NYX NYX NYX"]
+    assert r.th["wordText"] == ["AI", "AGI", "sSs", "AGENT", "LINUX", "WAKEUP"]
     assert r.look["snow"] is True
-    # their settings file of 2026-10-15 (after build 33's review): bloom 2 times build 23's 2.5, a
-    # green glow in the middle of black at half the glow and 0.6 of the brightness, density 1.15,
-    # the NixOS logo at 0.44 and its rainbow every 40 s, snow, Latin and Arabic letters
+    # bloom 2 times build 23's 2.5, a green glow in the middle of black at the full glow and (bg_gain
+    # left null) the preset's 0.6 of the brightness, density 1.15, the NixOS logo at 0.44 and its
+    # rainbow every 40 s, snow; katakana, digits, symbols and hieroglyphs
     uniforms = {n: v for _, n, _, v in static_uniforms(r)}
     assert uniforms["uBloomK"] == (5.0,) and uniforms["uLogoGlowK"] == (0.0,)
-    assert uniforms["uCentreGlow"] == (0.5,) and uniforms["uBgGain"] == (0.6,)
+    assert uniforms["uCentreGlow"] == (1.0,) and uniforms["uBgGain"] == (0.6,)
     assert uniforms["uDensity"] == (pytest.approx(0.43 * 1.15),)
     assert r.th["background"]["top"] == r.th["background"]["bottom"] == [0.0, 0.0, 0.0]
     assert r.th["background"]["center"] == [0.0, 1.0, 0.0157]
     assert r.th["colors"]["deep"] == [1.0, 1.0, 1.0] and r.th["colors"]["glow"] == [0.0, 1.0, 0.3176]
     assert (r.th["logo"]["spin"], r.th["logo"]["hueCycle"], r.th["logo"]["drift"], r.th["logo"]["size"]) == (300, 40, 0.0, 0.44)
-    assert [s["name"] for s in r.th["glyphs"]["sets"]] == ["katakana", "digits", "symbols", "hieroglyphs", "latin", "arabic"]
+    assert [s["name"] for s in r.th["glyphs"]["sets"]] == ["katakana", "digits", "symbols", "hieroglyphs"]
     nixos = from_args(parse_args(["--config", "none", "--preset", "nixos"]), glyphs="theme")
     assert nixos.logo_choice == "white" and nixos.th["rain"]["flavours"] == 1, "nixos as it was"
     nixos_uniforms = {n: v for _, n, _, v in static_uniforms(nixos)}
@@ -386,11 +387,21 @@ def test_the_default_is_the_operator_s_own_look():
     assert from_args(parse_args(["--config", "none", "--logo", "syncrain"]), glyphs="theme").logo_choice == "syncrain"
 
 
-def test_the_operator_s_settings_file_draws_what_no_settings_file_draws(root):
-    """Their file names the preset's own values, sliders included: read over the preset, it must
-    change nothing (a slider's value is not applied twice)."""
+def test_config_json_is_the_default_and_draws_what_no_settings_file_draws(root):
+    """config.json at the top is where the defaults are kept: the default preset is made from it
+    (tools/build_assets.py) and the app's own defaults are its values, so read over the preset it
+    changes nothing (a slider's value is not applied twice), and the app carries it whole."""
+    import json
+    from syncrain.app import DEFAULT_CONFIG
     from syncrain.renderer import from_args, static_uniforms
-    theirs = from_args(parse_args(["--config", str(root / "tests/fixtures/operator_config.json")]))
+    path = root / "config.json"
+    assert path.read_bytes() == open(DEFAULT_CONFIG, "rb").read(), "python3 tools/build_assets.py --themes-only"
+    cfg = json.loads(path.read_text(encoding="utf-8"))
+    plain_args = parse_args(["--config", "none"])
+    assert (plain_args.channel, plain_args.fps, plain_args.pause_under, plain_args.lock_rest) == \
+        (cfg["channel"], cfg["fps"], cfg["pause_under"], cfg["lock_rest"])
+    assert cfg["lock_rest"] == 0, "the lock screen's rest stays off unless asked for"
+    theirs = from_args(parse_args(["--config", str(path)]))
     plain = from_args(parse_args(["--config", "none"]), glyphs="theme")
     assert static_uniforms(theirs) == static_uniforms(plain)
     assert theirs.glyphs.words_bytes() == plain.glyphs.words_bytes()
@@ -478,3 +489,29 @@ def test_a_part_of_the_diagnosis_that_fails_leaves_the_rest_said(monkeypatch, ca
     assert diagnose.run(parse_args(["--config", "none", "--diagnose"])) == 1
     out = capsys.readouterr().out
     assert "verdict: the check stopped: RuntimeError: no Pillow" in out and "session:" in out
+
+
+def test_the_lock_screen_s_rest_is_a_setting_off_by_default(tmp_path):
+    """lock_rest (seconds; 0: never) from the settings file or --lock-rest, into the lock screen's
+    scene only when set (a lock screen built before refuses a line it does not know)."""
+    from syncrain import native
+    assert parse_args(["--config", "none"]).lock_rest == 0
+    assert parse_args(["--config", settings(tmp_path, lock_rest=300)]).lock_rest == 300
+    assert parse_args(["--config", "none", "--lock-rest", "90"]).lock_rest == 90
+    for bad in ("-1", "86401", "soon"):
+        with pytest.raises(SystemExit):
+            parse_args(["--config", "none", "--lock-rest", bad])
+    head = lambda argv: native.scene_bytes(parse_args(argv), None).split(b"\nend\n", 1)[0]  # noqa: E731
+    assert b"lock-rest" not in head(["--config", "none"])
+    assert f"\nlock-rest {300.0.hex()}\n".encode() in head(["--config", "none", "--lock-rest", "300"]) + b"\n"
+
+
+def test_the_default_settings_file_is_written_where_there_is_none(tmp_path, capsys):
+    """syncrain --write-config: what install.sh does where no config.json is beside it."""
+    from syncrain.app import DEFAULT_CONFIG, main
+    out = tmp_path / "config.json"
+    assert main(["--config", "none", "--write-config", str(out)]) == 0
+    assert out.read_bytes() == open(DEFAULT_CONFIG, "rb").read()
+    out.write_text("mine")
+    assert main(["--config", "none", "--write-config", str(out)]) == 1, "never over a file someone made"
+    assert out.read_text() == "mine"

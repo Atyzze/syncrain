@@ -101,8 +101,8 @@ def test_the_picture_options_are_multiples_of_the_theme_s_own_values():
 def test_a_preset_says_where_its_sliders_start():
     """An option not given is the preset's "look" (1 where it says nothing); one given replaces it."""
     theme = engine.load_meta()["themes"]["syncrain"]
-    assert theme["look"] == {"speed": 1.0, "density": 1.15, "glow": 0.5, "bloom": 1.0, "bg_gain": 0.6}
-    assert engine.look(theme) == {"speed": 1.0, "density": 1.15, "glow": 0.5, "bloom": 1.0, "hieroglyphs": None,
+    assert theme["look"] == {"speed": 1.0, "density": 1.15, "glow": 1.0, "bloom": 1.0, "bg_gain": 0.6}
+    assert engine.look(theme) == {"speed": 1.0, "density": 1.15, "glow": 1.0, "bloom": 1.0, "hieroglyphs": None,
                                   "snow": True}
     assert engine.look(theme, density=1.0, glow=2.0)["density"] == 1.0
     assert engine.look(theme, density=1.0, glow=2.0)["glow"] == 2.0

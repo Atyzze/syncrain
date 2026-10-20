@@ -6,10 +6,10 @@ player decodes it, on most machines in the video hardware, where the live rain r
 card every frame.
 
 Frames are drawn one by one at the video's own size (not the window's) and handed to ffmpeg as
-they are drawn, so nothing is kept on disk. A looping video (the default) ends where it begins:
-its first seconds are drawn twice over, once as themselves and once as the moment just after the
-end, the one fading into the other, so the last frame flows into the first. The web page's Video
-section makes the same video, frame for frame (index.html, makeVideo)."""
+they are drawn, so nothing is kept on disk. Every frame is its own moment, drawn as it is, from the
+first to the last: nothing is faded or blended into it (a crossfade made the first seconds of a
+video blurred, the logo with them). The web page's Video section makes the same video, frame for
+frame (index.html, makeVideo)."""
 
 import contextlib
 import math
@@ -26,8 +26,6 @@ DEFAULTS = {"gif": ((640, 360), 10.0, 15.0), "video": ((1920, 1080), 30.0, 30.0)
 #: in all (640x360 for 30 s at 15 fps, about 300 MiB), and at most 50 fps (browsers show a frame
 #: that asks for under 20 ms for 100 ms)
 GIF_PIXELS, GIF_FPS = 640 * 360 * 450, 50.0
-#: seconds the end fades into the start over, at most (half the video, if that is shorter)
-LOOP_FADE = 2.0
 
 
 def kind(path: str) -> str:
@@ -67,20 +65,12 @@ def settle(args) -> None:
                              f"slower, or make an .mp4")
 
 
-def plan(seconds: float, fps: float, loop: bool, t0: float):
-    """The frames, in order: [(t, None)] for a frame drawn as it is, [(t, (t_end, a))] for one that
-    is the moment t over the moment t_end with opacity a (the page's makeVideo, the same sums).
-    t0 is rounded down to a whole second, as the page rounds it."""
+def plan(seconds: float, fps: float, t0: float) -> list[float]:
+    """The moments of the frames, in order (the page's makeVideo, the same sums). t0 is rounded down
+    to a whole second, as the page rounds it."""
     t0 = float(math.floor(t0))
     n = max(1, js_round(seconds * fps))
-    fade = min(LOOP_FADE, seconds / 2) if loop else 0.0
-    nf = js_round(fade * fps)
-    out = []
-    for k in range(n):
-        t = t0 + k / fps
-        # the moment just after the last frame is the one n frames on, so frame n-1 flows into frame 0
-        out.append((t, (t0 + (n + k) / fps, k / nf)) if k < nf else (t, None))
-    return out
+    return [t0 + k / fps for k in range(n)]
 
 
 def ffmpeg_command(path: str, w: int, h: int, fps: float) -> list[str]:
@@ -110,15 +100,6 @@ def ffmpeg_command(path: str, w: int, h: int, fps: float) -> list[str]:
         ["-movflags", "+faststart"] if ext == ".mp4" else []) + [path]
 
 
-def blend(over: bytes, under: bytes, a: float) -> bytes:
-    """over with opacity a on under, as a canvas draws it (8 bits, rounded: Image.blend truncates)."""
-    from PIL import Image
-    w = len(over) // 4                            # any shape will do: the sum is per byte
-    mask = Image.new("L", (w, 1), round(a * 255))
-    img = Image.composite(Image.frombytes("RGBA", (w, 1), over), Image.frombytes("RGBA", (w, 1), under), mask)
-    return img.tobytes()
-
-
 class Writer:
     """A video being made, a frame at a time: draw(t) gives the moment t as bottom-up RGBA bytes,
     w x h. step() writes the next frame and says whether the video is whole; abort() ends it with
@@ -137,13 +118,8 @@ class Writer:
 
     def step(self) -> bool:
         if self.done < len(self.frames):
-            t, end = self.frames[self.done]
             try:
-                data = self.draw(t)
-                if end is not None:
-                    t_end, a = end
-                    data = blend(data, self.draw(t_end), a)
-                self.proc.stdin.write(data)
+                self.proc.stdin.write(self.draw(self.frames[self.done]))
             except BrokenPipeError:              # ffmpeg stopped: what it said comes with the failure
                 self._fail()
             except BaseException:

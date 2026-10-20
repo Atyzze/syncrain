@@ -75,7 +75,7 @@ Item {
             Lock.Pam.retry.stop();
             Lock.Pam.retry.interval = 3000;
             Lock.Shared.idleMs = 60000;
-            Lock.Shared.restMs = 300000;
+            Lock.Shared.restMs = 0;
             Keyboards.LayoutState.layouts = [{ shortName: "us", displayName: "", longName: "English (US)" }];
             Keyboards.LayoutState.current = 0;
             Lock.Shared.sleep();
@@ -284,8 +284,22 @@ Item {
             tryCompare(find(left, "layout"), "visible", false);
         }
 
-        function test_19_the_rain_rests_while_nobody_is_there() {
-            Lock.Shared.restMs = 200;
+        function test_19_the_rain_keeps_its_full_rate_while_nobody_is_there() {
+            const rain = find(left, "rain");
+            compare(Lock.Shared.restMs, 0, "no rest unless the settings file asks for one");
+            compare(Lock.Shared.fps, 30);
+            Lock.Shared.idleMs = 200;                 // the box goes; the rain must not slow with it
+            Lock.Shared.wake();
+            tryCompare(Lock.Shared, "shown", false, 3000);
+            wait(400);
+            compare(Lock.Shared.resting, false);
+            compare(Lock.Shared.fps, 30, "a lock screen nobody touches is still watched");
+            if (rain)
+                compare(rain.fps, 30);
+        }
+
+        function test_20_a_rest_asked_for_drops_the_rate_until_a_key() {
+            Lock.Shared.restMs = 200;                 // what Rain.qml sets from the scene's lock-rest
             Lock.Shared.wake();
             compare(Lock.Shared.fps, 30);
             tryCompare(Lock.Shared, "resting", true, 3000);
@@ -296,6 +310,8 @@ Item {
             tryCompare(Lock.Shared, "resting", true, 3000);
             keyClick(Qt.Key_Escape);
             compare(Lock.Shared.resting, false, "Escape is a key too");
+            Lock.Shared.restMs = 0;
+            compare(Lock.Shared.resting, false, "the rest taken away: the full rate");
         }
     }
 }

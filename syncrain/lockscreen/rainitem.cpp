@@ -146,6 +146,8 @@ private:
             return;
         }
         m_hasScene = true;
+        const double rest = m_scene.lock_rest;
+        tell([rest](SyncRain *item) { item->setRest(rest); });
         m_passes = passes_create(&m_scene, es, why, sizeof why);
         scene_unmap(&m_scene);                // the sources and pixels are on the card now
         QQuickOpenGLUtils::resetOpenGLState();
@@ -241,6 +243,14 @@ void SyncRain::setFixedTime(qreal time)
     m_fixedTime = time;
     Q_EMIT fixedTimeChanged();
     update();
+}
+
+void SyncRain::setRest(double seconds)
+{
+    if (seconds == m_rest)
+        return;
+    m_rest = seconds;
+    Q_EMIT restChanged();
 }
 
 void SyncRain::setStatus(const QString &status)

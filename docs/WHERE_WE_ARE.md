@@ -1,4 +1,4 @@
-# Where we are, at build 46
+# Where we are, at build 47
 
 The project on one page. Detail: `docs/agent/HANDOFF.md`.
 
@@ -12,23 +12,25 @@ plain text by design: the text means the machine is not up yet, the rain that it
 ## Where it stands
 
 * **Your desktop** (KDE Plasma, RTX 5090, two screens): a small C program, 123 MiB and 0.9% of a
-  core at 30 fps, about 11 W; covered screens are not drawn (0 W), every frame lands on the
-  refresh, freed memory goes back every five minutes.
-* **Your look is the default** (build 35): your settings file sent with the review, the green
-  glow in the middle, density 1.15, your words, Latin and Arabic letters; your file and no file
-  draw the same frame. NixOS and Matrix are presets; your redrawn logo is a choice.
-* **Try every setting on the page**: `index.html`, Settings, move anything, Save config.json, then
-  `./install.sh --config config.json`. Your desktop draws what the page showed.
+  core at 30 fps, about 11 W; covered screens can be left undrawn (0 W, `pause_under`, off in your
+  file), every frame lands on the refresh, freed memory goes back every five minutes.
+* **Your config.json is the default** (build 47): in every release, beside `install.sh`, which
+  reads it (and writes one with the defaults if missing); the default look is made from it. NixOS
+  and Matrix are presets; your redrawn logo is a choice.
+* **Try every setting on the page**: `index.html`, Settings, move anything, Save config.json into
+  the folder, then `./install.sh`. Your desktop draws what the page showed.
 * **Picture options**: colours, how many at once and their cycle, background, any picture as the
   logo with one colour over it, glow, bloom, speed, density, snow, your own symbol sets, hidden
   words and sentences (up to 30 characters).
 * **The login screen** (optional, working on your desktop): `./install.sh --login-screen`; greetd,
   the rain and a box on every screen; `--login-screen-off` takes out only what it put in (build 36).
 * **The lock screen** (optional, build 27): `./install.sh --lock-screen`, then log out and in once;
-  the rain stays live, your box comes up on a key or a moved mouse and is the same on every screen.
+  the rain stays live at 30 fps (build 47: the rest to 10 fps is a setting, off), your box comes up
+  on a key or a moved mouse and is the same on every screen.
   In use on your desktop since build 26. Build 34 fixed what the review found: a screen coming
   back after every screen went, a second factor, a prompt that wants only Enter, the hidden eye.
-* **Videos** (build 29): `syncrain --video rain.mp4` or the page's Video section, a seamless loop.
+* **Videos** (build 29): `syncrain --video rain.mp4` or the page's Video section; every frame as
+  drawn, no crossfade (build 47: it blurred the first seconds).
 * **Four families** (build 31): `./install.sh` on Arch, Debian, Fedora and openSUSE, each installed
   for real in a root of its own; anything else gets the packages named, or its AI agent.
 * **NixOS** (build 32): the module gives the wallpaper, the login screen and the lock screen
@@ -47,7 +49,7 @@ plain text by design: the text means the machine is not up yet, the rain that it
 
 ## The decision in front of you
 
-None open: 30 fps and pausing behind maximized windows are the default the operator chose.
+None open: the defaults are the operator's config.json (30 fps, no pausing, no lock screen rest).
 
 ## Words
 

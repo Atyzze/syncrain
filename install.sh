@@ -2,10 +2,11 @@
 # syncrain installer for four families of Linux: Arch (CachyOS, EndeavourOS, Manjaro, Garuda),
 # Debian (Ubuntu, Mint, Pop!_OS), Fedora and openSUSE. Elsewhere: --no-deps, with the packages it names.
 #
-#   ./install.sh                     install this build for your user (asks for sudo once, for the system's packages)
+#   ./install.sh                     install this build for your user (asks for sudo once, for the system's packages),
+#                                    with the settings in config.json beside this script (made with the defaults if missing)
 #   ./install.sh --autostart         ...and start it with every graphical login
 #   ./install.sh --preset matrix --channel friends --autostart
-#   ./install.sh --config config.json  ...and draw what the web page showed (the settings it exported)
+#   ./install.sh --config mine.json  ...with another settings file the web page saved (--config none: none)
 #   ./install.sh --login-screen      ...and the rain as your login screen too (optional; greetd, yours stays installed)
 #   ./install.sh --login-screen-off  back to the login screen you had (undoes only what --login-screen did)
 #   ./install.sh --lock-screen       ...and the rain with syncrain's box as KDE Plasma's lock screen (optional)
@@ -162,8 +163,11 @@ Options:
   --lock-screen         optional, KDE Plasma 6 on Wayland: the rain and syncrain's box as the lock
                         screen, from your next login; without it the installer never touches it
   --lock-screen-off     back to Plasma's own lock screen (undoes only what --lock-screen did)
-  --config FILE         a settings file the web page exported: the wallpaper (and the login screen)
-                        draw what the page showed; kept as ~/.config/syncrain/config.json
+  --config FILE         the settings file (the web page saves one): the wallpaper, login and lock screens
+                        draw what the page showed; kept as ~/.config/syncrain/config.json. Default:
+                        config.json beside install.sh, written with the defaults when there is none;
+                        none: no settings file at all (the defaults, and an earlier one kept).
+                        --preset without --config sets the kept settings file aside for the preset
   --preset NAME         where the look starts: syncrain (the default), nixos or matrix (--theme: the same)
   --channel NAME        stream name (default: public)
   --rainbow MODE        logo (default), all or off
@@ -1145,9 +1149,36 @@ ARGS=()
 ARGS+=("${EXTRA[@]}")
 staged() { PYTHONPATH="$STAGE" PYTHONSAFEPATH=1 "$PY" -m syncrain "$@"; }
 staged --config none --build >/dev/null || die "the new app does not run in $PY (see above)"
+# The settings file: --config's, else config.json beside this script, the defaults' own file
+# (syncrain/data/config.json is a copy, the default preset is made from it). Where there is none
+# (deleted, or a checkout without one) it is written with the defaults, so it is there to edit.
+# A preset given without --config is that preset, not config.json's look over it (a settings file
+# names every colour, symbol and word, so a preset under it would be one in name only): no settings
+# file then, and the one kept from before is set aside below.
+CONFIG_MADE="" SET_ASIDE=""
+if [ "$CONFIG" = none ]; then
+  CONFIG=""
+elif [ -z "$CONFIG" ] && [ -n "$THEME" ]; then
+  SET_ASIDE=1
+elif [ -z "$CONFIG" ]; then
+  CONFIG="$SRC/config.json"
+  if [ ! -e "$CONFIG" ]; then
+    if staged --config none --write-config "$CONFIG" >/dev/null 2>&1; then
+      info "no config.json beside install.sh: made one with the defaults ($CONFIG)"
+    else                                      # a folder it cannot write: the defaults all the same
+      CONFIG_MADE="$(mktemp)" CONFIG="$CONFIG_MADE"
+      rm -f "$CONFIG"
+      staged --config none --write-config "$CONFIG" >/dev/null || die "the default settings could not be written"
+      info "no config.json beside install.sh, and $SRC cannot be written: the defaults are installed"
+    fi
+  fi
+fi
 if [ -n "$CONFIG" ]; then
   staged --config "$CONFIG" "${ARGS[@]}" --check-config >/dev/null \
     || die "$CONFIG${ARGS[*]:+ or these options (${ARGS[*]})} cannot be used (see above)"
+elif [ -n "$SET_ASIDE" ]; then
+  staged --config none "${ARGS[@]}" --check-config >/dev/null \
+    || die "these options (${ARGS[*]}) cannot be used (see above)"
 elif [ ${#ARGS[@]} -gt 0 ]; then
   staged "${ARGS[@]}" --check-config >/dev/null \
     || die "these options (${ARGS[*]}) or your settings file (${XDG_CONFIG_HOME:-$HOME/.config}/syncrain/config.json) cannot be used (see above)"
@@ -1212,11 +1243,27 @@ json.dump(cfg, open(out, "w", encoding="utf-8"), indent=2, ensure_ascii=False)
 open(out, "a", encoding="utf-8").write("\n")' "$CONFIG" "$settings.new" 2>/dev/null; then
       cp "$CONFIG" "$settings.new"
     fi
-    # what was kept before, if this is another file: the same one given again keeps the first .before
-    if [ -f "$settings" ] && ! cmp -s "$settings" "$settings.new"; then cp "$settings" "$settings.before"; fi
+    # what was kept before, if this is another file: the same one given again keeps the first .before,
+    # and an earlier .before that differs is kept too, dated, so no settings of one's own are lost
+    if [ -f "$settings" ] && ! cmp -s "$settings" "$settings.new"; then
+      if [ -f "$settings.before" ] && ! cmp -s "$settings" "$settings.before"; then
+        mv "$settings.before" "$settings.before.$(date +%Y%m%d-%H%M%S)"
+      fi
+      cp "$settings" "$settings.before"
+    fi
     mv -f "$settings.new" "$settings"
   fi
   info "settings: $settings (from $CONFIG)"
+  if [ -n "$CONFIG_MADE" ]; then rm -f "$CONFIG_MADE"; fi
+elif [ -n "$SET_ASIDE" ]; then
+  settings="${XDG_CONFIG_HOME:-$HOME/.config}/syncrain/config.json"
+  if [ -f "$settings" ] || [ -L "$settings" ]; then
+    if [ -f "$settings.before" ] && ! cmp -s "$settings" "$settings.before"; then
+      mv "$settings.before" "$settings.before.$(date +%Y%m%d-%H%M%S)"
+    fi
+    mv "$settings" "$settings.before"
+    info "settings: --preset $THEME without --config, so the settings file is set aside ($settings.before); ./install.sh alone brings config.json back"
+  fi
 fi
 
 remove_plasma_wallpaper
@@ -1324,7 +1371,7 @@ echo
 bold "Done. Try it:"
 info "syncrain --window        preview in a normal window"
 info "syncrain                 run as your wallpaper (Ctrl+C stops it)"
-info "index.html (in this folder): try every setting, then ./install.sh --config config.json; syncrain --help for all options"
+info "index.html (in this folder): try every setting, save config.json here, then ./install.sh again; syncrain --help for all options"
 info "syncrain --diagnose      if it does not draw: what this machine offers, and why"
 case ":$PATH:" in *":$BINDIR:"*) ;; *) info "note: $BINDIR is not on your PATH; run $BINDIR/syncrain or add it to PATH" ;; esac
 case "$desktop" in
