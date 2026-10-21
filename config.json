@@ -45,12 +45,10 @@
   "snow": true,
   "hieroglyphs": null,
   "words": [
-    "AI",
     "AGI",
     "sSs",
-    "AGENT",
     "LINUX",
-    "WAKEUP"
+    "WAKE UP"
   ],
   "fps": 30,
   "pause_under": "never",
@@ -70,13 +68,8 @@
         "weight": 16
       },
       {
-        "name": "symbols",
-        "chars": "Z:.=*+-<>¦|sSs\"",
-        "weight": 7.2
-      },
-      {
         "name": "hieroglyphs",
-        "chars": "𓀀𓀁𓀭𓁐𓁚𓁦𓁨𓁹𓂀𓂋𓂓𓂭𓃀𓃒𓃛𓃠𓃢𓃩𓃭𓃹𓄂𓄋𓄟𓄣𓄤𓄿𓅃𓅆𓅓𓅜𓅨𓅬𓅭𓅱𓆄𓆊𓆐𓆑𓆓𓆗𓆛𓆣𓆳𓆷𓆼𓇋𓇓𓇯𓇳𓇶𓇼𓈌𓈎𓈖𓈘𓈙𓈞𓉐𓉔𓉺𓊃𓊖𓊛𓊨𓊪𓊮𓊵𓊹𓊽𓋀𓋑𓋔𓋙𓋞𓋴𓋹𓋾𓌀𓌂𓌅𓌉𓌙𓌳𓌻𓍘𓍢𓍿𓎆𓎛𓎡𓏌𓏏𓏠𓏶𓐍𓀎𓀠𓁶𓁷𓂉𓃗𓃥𓄇𓅐𓅘𓅡𓅮𓅿𓆈𓆙𓆟𓆤𓆭𓆰𓇰𓉡𓉴𓊡𓋭𓌢𓍱𓎺𓏙𓏛𓐎",
+        "chars": "𓁨𓂀𓃒𓃩𓅓𓅜𓅭𓆐𓆊𓆑𓆓𓆗𓆛𓆣𓇶𓇼𓋑𓋔𓋹𓀠𓃗𓃥𓅘𓅡𓅮𓅿𓆈𓆙𓆟",
         "share": 0.15
       }
     ]
