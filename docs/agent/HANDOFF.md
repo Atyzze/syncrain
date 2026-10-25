@@ -1,4 +1,4 @@
-# Handoff: the state of syncrain at build 47
+# Handoff: the state of syncrain at build 48
 
 What is true now, for a context that has just opened this tree. Where this page and the code
 disagree, the code is right; fix the page in the same build. Each fact has one home; this page
@@ -31,7 +31,7 @@ This page, `docs/agent/NEXT_BUILD.md`, `docs/agent/WORKING_WITH_THE_OPERATOR.md`
 * **How it works**: three hosts (native C on Wayland, GTK elsewhere and for `--screenshot`,
   `--record` and `--video`, the page in browsers), six passes, the settings file, the login and
   lock screens, video: `docs/ARCHITECTURE.md`. Every option and how to use it: `docs/OPERATIONS.md`.
-* **The default** is `config.json` at the top (the operator's of 2026-10-20, build 47), shipped in
+* **The default** is `config.json` at the top (the operator's of 2026-10-21, build 48), shipped in
   every release and read by `./install.sh` by default (written with the defaults when missing). The
   `syncrain` preset is made from it (`tools/build_assets.py --themes-only`, which also copies it to
   `syncrain/data/config.json`); the app's other defaults equal it and the page untouched saves it
@@ -46,12 +46,12 @@ This page, `docs/agent/NEXT_BUILD.md`, `docs/agent/WORKING_WITH_THE_OPERATOR.md`
   a second factor, take an empty answer to a visible prompt and ignore clicks while hidden.
 * **Boot stays plain text** (the operator, 2026-10-15): never the bootloader, the initramfs or a
   boot splash.
-* **Stream**: `c5c869a0` since build 47 (the default from config.json); `0aa22037` 44 to 46 (the id names what the code computes, not its text; the
+* **Stream**: `b8c95b5e` since build 48 (the operator's config.json of 2026-10-21); `c5c869a0` in 47 (the default from config.json); `0aa22037` 44 to 46 (the id names what the code computes, not its text; the
   same frame as 35 to 43 at a scale of 1); `1ad0a2dd` 35 to 43 (the new default, `composite.frag`
   to the spec, stricter colours and periods); `822ea58a` 29 to 34 (sentences' gaps and trails in `state.frag`); `85ace386` in
   28; `a9c058f3` 24 to 27; `f98ef1ca` in 23; `25b02556` in 22; `def5684f` 15 to 21; `c18f8be2` in 12
   to 14; `48e6bf9c` 3 to 11.
-* **GitHub**: `main` holds builds 7 to 47, a commit `syncrain build <N>` each, and a few
+* **GitHub**: `main` holds builds 7 to 48, a commit `syncrain build <N>` each, and a few
   documents-only commits between them.
 
 ## Done last
@@ -75,13 +75,19 @@ Since then the open items of `docs/ROADMAP.md` that can be done here, one area a
 * **47** the operator's reports of 2026-10-20: the lock screen's rest is a setting, off by default
   (`lock_rest`); a video has no loop crossfade (its first seconds were blurred), `--loop` gone;
   config.json is the default settings file and the source of the default preset (a stream change).
+* **48** the operator's report of 2026-10-25 (120 to 401 MiB in 2 days): NVIDIA's 615 driver keeps
+  about 16 bytes per sync object its `eglSwapBuffers` makes, freed only by `eglTerminate`; the
+  native wallpaper makes OpenGL anew when the heap has grown 32 MiB (`render_renew`). Their
+  config.json uploaded on 2026-10-21 is the default (a stream change).
 
 ## Waits on the operator
 
 * Anyone booting Debian, Fedora or openSUSE with the login or lock screen (only the roots so far;
   Fedora's SELinux is untried).
 * A video's watts against the live rain's, measured there.
-* How fast the login screen comes up (`--diagnose`); the memory record after a few hours.
+* How fast the login screen comes up (`--diagnose`); the memory record after a day on build 48:
+  the "OpenGL made anew" lines, what each gave back, and that nothing flashed on screen (KWin and
+  NVIDIA, which the lanes do not have).
 * The time of the next glow flare-up: two hours of frames show none (`docs/HISTORY.md`, build 12).
 
 How to work with them: `docs/agent/WORKING_WITH_THE_OPERATOR.md`.

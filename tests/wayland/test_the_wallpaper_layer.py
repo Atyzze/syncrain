@@ -391,3 +391,58 @@ def test_a_screen_that_never_draws_holds_no_memory_back(root, tmp_path):
             proc.send_signal(signal.SIGTERM)
             proc.wait(timeout=30)
     assert proc.returncode == 0
+
+
+def test_opengl_made_anew_gives_the_driver_s_memory_back_and_keeps_the_picture(root, tmp_path):
+    """NVIDIA's driver (615.71.09, 615.78.08) keeps about 16 bytes for every sync object it makes, and
+    it makes them inside eglSwapBuffers; only eglTerminate gives them back: the operator's wallpaper
+    grew about 6 MiB an hour that way. Once the C heap holds 32 MiB more than it did when the screens
+    had drawn, the native wallpaper gives back everything EGL holds and makes it anew between two
+    frames, on the same Wayland surfaces, from the shaders' kept sources and the textures read back
+    from the card. Here (SYNCRAIN_RENEW_MIB=0) that happens every round, each second, on two screens
+    with the clock still: every grab, before, during and after, is the first one to the pixel, and
+    the record has each renewal and the heap once the new context has drawn. A screen plugged in
+    after renewals gets its surface from the new context, and the renewals go on."""
+    need(shutil.which("sway") is not None and shutil.which("grim") is not None and shutil.which("swaymsg") is not None,
+         "no sway, grim and swaymsg")
+    state = tmp_path / "state"
+    with headless_sway(tmp_path / "run", screen="320x180") as session:
+        sway_env = dict(os.environ, **session)
+        subprocess.run(["swaymsg", "-q", "create_output"], env=sway_env, check=True)
+        env = wallpaper_env(root, session, SYNCRAIN_MEMORY_SECONDS="1", SYNCRAIN_RENEW_MIB="0",
+                            XDG_STATE_HOME=str(state))
+        proc, line = start(root, env, "--time", str(MOMENT))
+        record = state / "syncrain" / "memory.log"
+
+        def lines(word):
+            return [text for text in (record.read_text().splitlines() if record.exists() else []) if word in text]
+
+        try:
+            assert HOSTS["native"] in line and "2 screens" in line, line + said_when_stopped(proc)
+            first = tmp_path / "first.png"
+            grab_settled(session, first)
+            grabs = 0
+            deadline = time.monotonic() + 60
+            while len(lines("after renewal")) < 3 and time.monotonic() < deadline:
+                shot = tmp_path / "shot.png"
+                grab(session, shot)
+                grabs += 1
+                assert mean_abs_diff(shot, first) == 0, f"grab {grabs} is not the first frame: {lines('renewal')}"
+            made, judged = lines("OpenGL made anew"), lines("after renewal")
+            assert len(judged) >= 3, record.read_text() if record.exists() else "no record"
+            assert all(re.search(r"OpenGL made anew in \d+ ms \(renewal \d+\): malloc [\d.]+ MiB in use "
+                                 r"\(-?[\d.]+ grown before\); [\d.]+ MiB resident \([\d.]+ before\)$", text)
+                       for text in made), made
+            assert all(re.search(r"after renewal \d+, drawing again: malloc [\d.]+ MiB in use \([\d.]+ once the "
+                                 r"screens had first drawn\)$", text) for text in judged), judged
+            subprocess.run(["swaymsg", "-q", "create_output"], env=sway_env, check=True)
+            before = len(judged)
+            deadline = time.monotonic() + 60
+            while len(lines("after renewal")) < before + 3 and time.monotonic() < deadline:
+                time.sleep(0.5)
+            assert len(lines("after renewal")) >= before + 3 and proc.poll() is None, record.read_text()
+            assert not lines("no more renewals") and not lines("could not"), record.read_text()
+        finally:
+            proc.send_signal(signal.SIGTERM)
+            proc.wait(timeout=30)
+    assert proc.returncode == 0

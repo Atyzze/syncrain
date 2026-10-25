@@ -61,6 +61,7 @@ struct scene {
 	int uniforms;
 	char *kwin_script;                  /* the KWin script, "@SERVICE@" still to fill in */
 	char **fallback;                    /* the GTK host's command line, or NULL */
+	char *sources;                      /* the shaders' sources, kept by scene_drop_pixels, or NULL */
 	void *map;
 	size_t map_size;
 };
@@ -68,6 +69,10 @@ struct scene {
 const char *scene_program_name(enum program program);
 bool scene_load(struct scene *scene, int fd, char *why, size_t why_size);
 void scene_unmap(struct scene *scene);  /* the sources and pixels, once they are on the card */
+/* The pixels, once they are on the card: the map goes, the shaders' sources (tens of KiB) and the
+ * uniforms stay, so OpenGL can be made anew (render_renew) from them and the card's textures.
+ * false (out of memory): the scene is as scene_unmap leaves it. */
+bool scene_drop_pixels(struct scene *scene);
 
 /* ------------------------------------------------------------------ arithmetic (timing.c)
  * Every value here must equal what the Python host computes (renderer.py, engine.py, pacing.py),
@@ -122,6 +127,9 @@ struct passes *passes_create(const struct scene *scene, bool es, char *why, size
 /* One viewport (x, y, w, h, origin bottom-left) of framebuffer `out`. */
 void passes_draw(struct passes *p, double unix_time, unsigned out, int x, int y, int w, int h);
 void passes_draw_scaled(struct passes *p, double unix_time, unsigned out, int w, int h, double scale);
+/* The scene's textures as the card holds them, level 0, width * height * 4 bytes each, rows in the
+ * order they were uploaded: into pixels[t] (malloc'd; the caller frees them). false: none kept. */
+bool passes_read_textures(struct passes *p, void *pixels[TEXTURE_COUNT]);
 void passes_destroy(struct passes *p);
 
 /* ------------------------------------------------------------------ drawing (render.c) */
@@ -151,6 +159,14 @@ void render_surface_destroy(struct render_surface *rs);
  * is to be swapped */
 bool render_frame(struct render_surface *rs, double unix_time, double scale, unsigned *error);
 bool render_swap(struct render_surface *rs, unsigned *error);
+/* Everything EGL holds given back (eglTerminate) and made anew on the same Wayland surfaces, from
+ * `scene`'s kept sources and the textures read back from the card. NVIDIA's driver (615.71.09,
+ * 615.78.08) keeps about 16 bytes for every sync object it makes, never freed until eglTerminate,
+ * and it makes them inside eglSwapBuffers. RENEW_KEPT: nothing was touched (why says what failed);
+ * RENEW_LOST: torn down and not made again, nothing can be drawn. */
+enum renew { RENEW_DONE, RENEW_KEPT, RENEW_LOST };
+enum renew render_renew(struct scene *scene, struct render_surface *const *surfaces, int n, char *why,
+                        size_t why_size);
 void render_shutdown(void);
 
 /* ------------------------------------------------------------------ KWin (kwin.c) */

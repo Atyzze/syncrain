@@ -84,6 +84,7 @@ static EGLDisplay (*eglGetPlatformDisplayEXT)(EGLenum, void *, const EGLint *);
 static EGLSurface (*eglCreatePlatformWindowSurfaceEXT)(EGLDisplay, EGLConfig, void *, const EGLint *);
 
 struct render_surface {
+	struct wl_surface *wl;                     /* the screen's: render_renew makes the window anew on it */
 	struct wl_egl_window *window;
 	EGLSurface surface;
 	int width, height;
@@ -289,6 +290,27 @@ void render_info(struct gl_info *info)
 
 /* ------------------------------------------------------------------ surfaces */
 
+/* The EGL window surface on the screen's wl_surface, at the size the render surface holds. */
+static bool make_window(struct render_surface *rs, char *why, size_t why_size)
+{
+	rs->interval_set = false;
+	rs->window = wl_egl_window_create(rs->wl, rs->width, rs->height);
+	if (!rs->window) {
+		snprintf(why, why_size, "no EGL window for a screen");
+		return false;
+	}
+	rs->surface = eglCreatePlatformWindowSurfaceEXT
+	              ? eglCreatePlatformWindowSurfaceEXT(R.display, R.config, rs->window, NULL)
+	              : eglCreateWindowSurface(R.display, R.config, rs->window, NULL);
+	if (rs->surface == EGL_NO_SURFACE) {
+		snprintf(why, why_size, "no EGL surface for a screen (EGL error 0x%x)", (unsigned)eglGetError());
+		wl_egl_window_destroy(rs->window);
+		rs->window = NULL;
+		return false;
+	}
+	return true;
+}
+
 struct render_surface *render_surface_create(struct wl_surface *surface, int width, int height,
                                              char *why, size_t why_size)
 {
@@ -297,23 +319,13 @@ struct render_surface *render_surface_create(struct wl_surface *surface, int wid
 		snprintf(why, why_size, "out of memory");
 		return NULL;
 	}
-	rs->window = wl_egl_window_create(surface, width, height);
-	if (!rs->window) {
-		snprintf(why, why_size, "no EGL window for a screen");
-		free(rs);
-		return NULL;
-	}
-	rs->surface = eglCreatePlatformWindowSurfaceEXT
-	              ? eglCreatePlatformWindowSurfaceEXT(R.display, R.config, rs->window, NULL)
-	              : eglCreateWindowSurface(R.display, R.config, rs->window, NULL);
-	if (rs->surface == EGL_NO_SURFACE) {
-		snprintf(why, why_size, "no EGL surface for a screen (EGL error 0x%x)", (unsigned)eglGetError());
-		wl_egl_window_destroy(rs->window);
-		free(rs);
-		return NULL;
-	}
+	rs->wl = surface;
 	rs->width = width;
 	rs->height = height;
+	if (!make_window(rs, why, why_size)) {
+		free(rs);
+		return NULL;
+	}
 	return rs;
 }
 
@@ -334,8 +346,10 @@ void render_surface_destroy(struct render_surface *rs)
 		eglMakeCurrent(R.display, EGL_NO_SURFACE, EGL_NO_SURFACE, R.context);
 		R.current = NULL;
 	}
-	eglDestroySurface(R.display, rs->surface);
-	wl_egl_window_destroy(rs->window);
+	if (rs->surface != EGL_NO_SURFACE)             /* none after a renewal that failed */
+		eglDestroySurface(R.display, rs->surface);
+	if (rs->window)
+		wl_egl_window_destroy(rs->window);
 	free(rs);
 }
 
@@ -372,6 +386,70 @@ bool render_swap(struct render_surface *rs, unsigned *error)
 		return true;
 	*error = (unsigned)eglGetError();
 	return false;
+}
+
+/* The screens keep their Wayland surfaces throughout, and the compositor the last frame each
+ * committed, so what was on the screens stays there until the next frame comes from the new
+ * context. Only eglTerminate, with no context current, hands back what NVIDIA's sync objects kept:
+ * destroying the context alone does not. */
+enum renew render_renew(struct scene *scene, struct render_surface *const *surfaces, int n, char *why,
+                        size_t why_size)
+{
+	if (!scene->sources) {
+		snprintf(why, why_size, "the shaders' sources were not kept");
+		return RENEW_KEPT;
+	}
+	if (!eglMakeCurrent(R.display, EGL_NO_SURFACE, EGL_NO_SURFACE, R.context)) {
+		snprintf(why, why_size, "the context could not be made current without a surface (EGL error 0x%x)",
+		         (unsigned)eglGetError());
+		return RENEW_KEPT;
+	}
+	R.current = NULL;                              /* each screen's surface is made current again */
+	void *pixels[TEXTURE_COUNT];
+	if (!passes_read_textures(R.passes, pixels)) {
+		snprintf(why, why_size, "the textures could not be read back from the graphics card");
+		return RENEW_KEPT;
+	}
+
+	passes_destroy(R.passes);
+	R.passes = NULL;
+	for (int i = 0; i < n; i++) {
+		eglDestroySurface(R.display, surfaces[i]->surface);
+		surfaces[i]->surface = EGL_NO_SURFACE;
+		wl_egl_window_destroy(surfaces[i]->window);
+		surfaces[i]->window = NULL;
+	}
+	eglMakeCurrent(R.display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
+	eglDestroyContext(R.display, R.context);
+	R.context = EGL_NO_CONTEXT;
+	eglTerminate(R.display);
+	eglReleaseThread();
+
+	enum renew result = RENEW_LOST;
+	EGLint major = 0, minor = 0;
+	if (!eglInitialize(R.display, &major, &minor)) {
+		snprintf(why, why_size, "EGL could not be started again (EGL error 0x%x)", (unsigned)eglGetError());
+		goto done;
+	}
+	if (!try_api(R.info.es, why, why_size))        /* the same API as before: the same shaders' header */
+		goto done;
+	for (int t = 0; t < TEXTURE_COUNT; t++) {
+		struct texture_source *src = &scene->texture[t];
+		src->pixels = (struct blob){ pixels[t], (size_t)src->width * (size_t)src->height * 4 };
+	}
+	R.passes = passes_create(scene, R.info.es, why, why_size);
+	for (int t = 0; t < TEXTURE_COUNT; t++)
+		scene->texture[t].pixels = (struct blob){ 0 };
+	if (!R.passes)
+		goto done;
+	for (int i = 0; i < n; i++)
+		if (!make_window(surfaces[i], why, why_size))
+			goto done;
+	result = RENEW_DONE;
+done:
+	for (int t = 0; t < TEXTURE_COUNT; t++)
+		free(pixels[t]);
+	return result;
 }
 
 void render_shutdown(void)

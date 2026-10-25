@@ -1,4 +1,4 @@
-# Where we are, at build 47
+# Where we are, at build 48
 
 The project on one page. Detail: `docs/agent/HANDOFF.md`.
 
@@ -13,8 +13,10 @@ plain text by design: the text means the machine is not up yet, the rain that it
 
 * **Your desktop** (KDE Plasma, RTX 5090, two screens): a small C program, 123 MiB and 0.9% of a
   core at 30 fps, about 11 W; covered screens can be left undrawn (0 W, `pause_under`, off in your
-  file), every frame lands on the refresh, freed memory goes back every five minutes.
-* **Your config.json is the default** (build 47): in every release, beside `install.sh`, which
+  file), every frame lands on the refresh, freed memory goes back every five minutes, and what
+  NVIDIA's 615 driver keeps for each frame goes back too (build 48: OpenGL made anew when the heap
+  has grown 32 MiB, without a gap on screen).
+* **Your config.json is the default** (build 47; your upload of 2026-10-21 since build 48): in every release, beside `install.sh`, which
   reads it (and writes one with the defaults if missing); the default look is made from it. NixOS
   and Matrix are presets; your redrawn logo is a choice.
 * **Try every setting on the page**: `index.html`, Settings, move anything, Save config.json into
@@ -39,12 +41,12 @@ plain text by design: the text means the machine is not up yet, the rain that it
 * **Your NixOS flavour** (build 33): `nix flake init -t github:Atyzze/syncrain` over your own
   `/etc/nixos`, kept whole, `nixos-rebuild switch`: Plasma 6 with the rain as wallpaper, login and lock screen.
   The whole system builds here; no machine has booted it yet.
-* **On GitHub**: github.com/Atyzze/syncrain, every build up to 47.
+* **On GitHub**: github.com/Atyzze/syncrain, every build up to 48.
 
 ## What comes next
 
-* **Next**: the roadmap's open items that can be done here, one area a build: the logo and
-  settings (45), the lanes' last two (46).
+* **Next**: your record after a day on build 48 (`syncrain --diagnose`: the "OpenGL made anew"
+  lines and what each gave back); then the roadmap's open items that can be done here.
 * **Build 50**: the next consolidation (every number ending in 0).
 
 ## The decision in front of you

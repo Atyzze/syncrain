@@ -159,6 +159,11 @@ maximized or full-screen window covers; those stop drawing until they show again
   (`syncrain/app.py`, `avoid_the_explicit_sync_leak`).
 * The C heap keeps what is freed until asked: both hosts hand it back after the first frames and
   every five minutes after. The native wallpaper keeps a record (`record_memory`).
+* NVIDIA's 615 driver keeps about 16 bytes for every sync object, and its `eglSwapBuffers` makes
+  them; only `eglTerminate` gives them back. When the heap has grown 32 MiB past what it held once
+  the screens had drawn, the native wallpaper makes OpenGL anew between two frames
+  (`render_renew`): the textures read back from the card, the shaders' sources kept from the scene,
+  every screen's Wayland surface kept, so the last frame stays on screen meanwhile (build 48).
 * The picture options (`--speed`, `--glow` and the rest, `engine.LOOK`; `--bg-gain` the
   renderer's) are uniforms set once.
 

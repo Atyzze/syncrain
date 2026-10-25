@@ -361,12 +361,12 @@ def test_one_colour_over_the_logo_and_its_own_again(tmp_path):
 
 
 def test_the_default_is_the_operator_s_own_look():
-    """config.json at the top (the operator's of 2026-10-20) is the default preset."""
+    """config.json at the top (the operator's of 2026-10-21) is the default preset."""
     from syncrain.renderer import from_args, static_uniforms
     r = from_args(parse_args(["--config", "none"]), glyphs="theme")
     assert (r.theme_name, r.logo_choice, r.th["rain"]["flavours"], r.th["rain"]["cycle"],
             r.th["rain"]["flavourLayout"]) == ("syncrain", "white", 64, 440, "wave")
-    assert r.th["wordText"] == ["AI", "AGI", "sSs", "AGENT", "LINUX", "WAKEUP"]
+    assert r.th["wordText"] == ["AGI", "sSs", "LINUX", "WAKE UP"]
     assert r.look["snow"] is True
     # bloom 2 times build 23's 2.5, a green glow in the middle of black at the full glow and (bg_gain
     # left null) the preset's 0.6 of the brightness, density 1.15, the NixOS logo at 0.44 and its
@@ -379,7 +379,7 @@ def test_the_default_is_the_operator_s_own_look():
     assert r.th["background"]["center"] == [0.0, 1.0, 0.0157]
     assert r.th["colors"]["deep"] == [1.0, 1.0, 1.0] and r.th["colors"]["glow"] == [0.0, 1.0, 0.3176]
     assert (r.th["logo"]["spin"], r.th["logo"]["hueCycle"], r.th["logo"]["drift"], r.th["logo"]["size"]) == (300, 40, 0.0, 0.44)
-    assert [s["name"] for s in r.th["glyphs"]["sets"]] == ["katakana", "digits", "symbols", "hieroglyphs"]
+    assert [s["name"] for s in r.th["glyphs"]["sets"]] == ["katakana", "digits", "hieroglyphs"]
     nixos = from_args(parse_args(["--config", "none", "--preset", "nixos"]), glyphs="theme")
     assert nixos.logo_choice == "white" and nixos.th["rain"]["flavours"] == 1, "nixos as it was"
     nixos_uniforms = {n: v for _, n, _, v in static_uniforms(nixos)}

@@ -315,6 +315,10 @@ picture or font it cannot use).
   warns first. To get the screens back sooner, Alt+Tab to its terminal and press Ctrl+C.
 * Memory: both hosts hand freed memory back every five minutes. The native one writes `~/.local/state/syncrain/memory.log` (a line
   an hour); `syncrain --diagnose` shows its end and every running wallpaper.
+* When the native wallpaper's C heap holds 32 MiB more than once its screens had drawn (NVIDIA's
+  615 driver keeps a little for every frame), it makes OpenGL anew between two frames, which gives
+  that back; the record has a line for each (build 48). `SYNCRAIN_RENEW_MIB` sets the growth (below
+  0: never).
 
 ## Desktops
 
