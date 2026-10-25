@@ -16,7 +16,7 @@ plain text by design: the text means the machine is not up yet, the rain that it
   file), every frame lands on the refresh, freed memory goes back every five minutes, and what
   NVIDIA's 615 driver keeps for each frame goes back too (build 48: OpenGL made anew when the heap
   has grown 32 MiB, without a gap on screen).
-* **Your config.json is the default** (build 47): in every release, beside `install.sh`, which
+* **Your config.json is the default** (build 47; your upload of 2026-10-21 since build 48): in every release, beside `install.sh`, which
   reads it (and writes one with the defaults if missing); the default look is made from it. NixOS
   and Matrix are presets; your redrawn logo is a choice.
 * **Try every setting on the page**: `index.html`, Settings, move anything, Save config.json into

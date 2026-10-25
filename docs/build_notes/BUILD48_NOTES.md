@@ -1,7 +1,8 @@
-# Build 48: the native wallpaper gives back what NVIDIA's driver keeps
+# Build 48: the native wallpaper gives back what NVIDIA's driver keeps; the operator's config.json of 2026-10-21
 
-**Type: fix; the picture does not change** (stream `c5c869a0` as in build 47). Made on 2026-10-25,
-from the operator's report of that day.
+**Type: fix; the picture changes** (stream `c5c869a0` to `b8c95b5e`: the default is the
+config.json the operator put on GitHub on 2026-10-21, so machines on build 47 and 48 stop
+matching). Made on 2026-10-25, from the operator's report of that day.
 
 ## The report
 
@@ -56,6 +57,16 @@ from the operator's report of that day.
   plugs a third in and the renewals go on.
 * Not measurable here: NVIDIA's driver and KWin. On the operator's desktop the record shows whether
   a renewal gives the driver's memory back.
+
+## The operator's config.json of 2026-10-21
+
+* The operator uploaded the tree to GitHub on 2026-10-21 with their own config.json at the top:
+  the words without `AI` and `AGENT`, `WAKE UP` for `WAKEUP`, the `symbols` set gone, fewer
+  hieroglyphs. The gate held build 47's copy (`syncrain/data/config.json`, the preset, the page)
+  to it and refused.
+* config.json is the one home of the defaults (build 47), and `./install.sh` installs the file
+  beside it: shipping build 47's would have put the removed words and symbols back on their
+  desktop. So it is the default now: `tools/build_assets.py --themes-only`, the stream re-taken.
 
 ## The review of this build
 
