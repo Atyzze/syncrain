@@ -95,4 +95,4 @@ whole for a moment (an 8K one about 130 MiB).
 
 ## Verification
 
-GATE_RESULT
+574 passed, 1 skipped in 1571.43s (0:26:11)
