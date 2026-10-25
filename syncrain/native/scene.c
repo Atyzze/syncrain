@@ -330,4 +330,36 @@ void scene_unmap(struct scene *scene)
 	free(scene->uniform);
 	scene->uniform = NULL;
 	scene->uniforms = 0;
+	free(scene->sources);
+	scene->sources = NULL;
+}
+
+bool scene_drop_pixels(struct scene *scene)
+{
+	size_t size = scene->vertex.size;
+	for (int i = 0; i < PROGRAM_COUNT; i++)
+		size += scene->fragment[i].size;
+	char *kept = malloc(size ? size : 1);
+	if (!kept) {
+		scene_unmap(scene);
+		return false;
+	}
+	char *p = kept;
+	struct blob *all[PROGRAM_COUNT + 1] = { &scene->vertex };
+	for (int i = 0; i < PROGRAM_COUNT; i++)
+		all[i + 1] = &scene->fragment[i];
+	for (int i = 0; i <= PROGRAM_COUNT; i++) {
+		memcpy(p, all[i]->data, all[i]->size);
+		all[i]->data = p;
+		p += all[i]->size;
+	}
+	free(scene->sources);
+	scene->sources = kept;
+	if (scene->map)
+		munmap(scene->map, scene->map_size);
+	scene->map = NULL;
+	scene->map_size = 0;
+	for (int i = 0; i < TEXTURE_COUNT; i++)
+		scene->texture[i].pixels = (struct blob){ 0 };
+	return true;
 }

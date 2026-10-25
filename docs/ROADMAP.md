@@ -69,6 +69,7 @@ What the documents and the review of build 17 leave to a build that changes code
 | Debian, Fedora and openSUSE: installed in roots, never booted; on Fedora, SELinux may still refuse greetd's domain the login screen (its files are labeled at install, `--diagnose` names the refusals, the text login asks meanwhile) | someone booting one, and the refusals `--diagnose` shows |
 | Ubuntu 24.04 and openSUSE Leap 16.0: no gtk4-layer-shell (the native wallpaper draws), Qt below 6.5 (no lock screen) | nothing to do until they update |
 | A video's watts against the live rain's: not measured (no graphics card in the sandbox) | measure on their machine before claiming it uses less |
+| NVIDIA's 615 driver keeps about 16 bytes per sync object until `eglTerminate` (build 48 makes OpenGL anew at 32 MiB of growth); unseen on KWin and NVIDIA here | the operator's record after a day, and a driver release that fixes it (then the renewals stop coming by themselves) |
 | The page's Video needs WebCodecs with a VP9 or VP8 encoder (Chrome, Edge, Firefox); Safari may say it cannot | `syncrain --video` instead |
 
 ## Build cadence

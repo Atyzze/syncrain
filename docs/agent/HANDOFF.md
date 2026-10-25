@@ -1,4 +1,4 @@
-# Handoff: the state of syncrain at build 47
+# Handoff: the state of syncrain at build 48
 
 What is true now, for a context that has just opened this tree. Where this page and the code
 disagree, the code is right; fix the page in the same build. Each fact has one home; this page
@@ -51,7 +51,7 @@ This page, `docs/agent/NEXT_BUILD.md`, `docs/agent/WORKING_WITH_THE_OPERATOR.md`
   to the spec, stricter colours and periods); `822ea58a` 29 to 34 (sentences' gaps and trails in `state.frag`); `85ace386` in
   28; `a9c058f3` 24 to 27; `f98ef1ca` in 23; `25b02556` in 22; `def5684f` 15 to 21; `c18f8be2` in 12
   to 14; `48e6bf9c` 3 to 11.
-* **GitHub**: `main` holds builds 7 to 47, a commit `syncrain build <N>` each, and a few
+* **GitHub**: `main` holds builds 7 to 48, a commit `syncrain build <N>` each, and a few
   documents-only commits between them.
 
 ## Done last
@@ -75,13 +75,18 @@ Since then the open items of `docs/ROADMAP.md` that can be done here, one area a
 * **47** the operator's reports of 2026-10-20: the lock screen's rest is a setting, off by default
   (`lock_rest`); a video has no loop crossfade (its first seconds were blurred), `--loop` gone;
   config.json is the default settings file and the source of the default preset (a stream change).
+* **48** the operator's report of 2026-10-25 (120 to 401 MiB in 2 days): NVIDIA's 615 driver keeps
+  about 16 bytes per sync object its `eglSwapBuffers` makes, freed only by `eglTerminate`; the
+  native wallpaper makes OpenGL anew when the heap has grown 32 MiB (`render_renew`).
 
 ## Waits on the operator
 
 * Anyone booting Debian, Fedora or openSUSE with the login or lock screen (only the roots so far;
   Fedora's SELinux is untried).
 * A video's watts against the live rain's, measured there.
-* How fast the login screen comes up (`--diagnose`); the memory record after a few hours.
+* How fast the login screen comes up (`--diagnose`); the memory record after a day on build 48:
+  the "OpenGL made anew" lines, what each gave back, and that nothing flashed on screen (KWin and
+  NVIDIA, which the lanes do not have).
 * The time of the next glow flare-up: two hours of frames show none (`docs/HISTORY.md`, build 12).
 
 How to work with them: `docs/agent/WORKING_WITH_THE_OPERATOR.md`.

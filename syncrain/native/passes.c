@@ -26,6 +26,7 @@ typedef unsigned char GLboolean, GLubyte;
 #define GL_DEPTH_TEST 0x0B71
 #define GL_SCISSOR_TEST 0x0C11
 #define GL_UNPACK_ALIGNMENT 0x0CF5
+#define GL_PACK_ALIGNMENT 0x0D05
 #define GL_TEXTURE_2D 0x0DE1
 #define GL_UNSIGNED_BYTE 0x1401
 #define GL_RGBA 0x1908
@@ -49,6 +50,7 @@ typedef unsigned char GLboolean, GLubyte;
 #define GL_INFO_LOG_LENGTH 0x8B84
 #define GL_READ_FRAMEBUFFER 0x8CA8
 #define GL_DRAW_FRAMEBUFFER 0x8CA9
+#define GL_FRAMEBUFFER_COMPLETE 0x8CD5
 #define GL_COLOR_ATTACHMENT0 0x8CE0
 #define GL_FRAMEBUFFER 0x8D40
 
@@ -59,6 +61,7 @@ typedef unsigned char GLboolean, GLubyte;
 	X(void, glBindTexture, (GLenum, GLuint)) \
 	X(void, glBindVertexArray, (GLuint)) \
 	X(void, glBlitFramebuffer, (GLint, GLint, GLint, GLint, GLint, GLint, GLint, GLint, GLbitfield, GLenum)) \
+	X(GLenum, glCheckFramebufferStatus, (GLenum)) \
 	X(void, glCompileShader, (GLuint)) \
 	X(GLuint, glCreateProgram, (void)) \
 	X(GLuint, glCreateShader, (GLenum)) \
@@ -86,6 +89,7 @@ typedef unsigned char GLboolean, GLubyte;
 	X(GLint, glGetUniformLocation, (GLuint, const GLchar *)) \
 	X(void, glLinkProgram, (GLuint)) \
 	X(void, glPixelStorei, (GLenum, GLint)) \
+	X(void, glReadPixels, (GLint, GLint, GLsizei, GLsizei, GLenum, GLenum, void *)) \
 	X(void, glShaderSource, (GLuint, GLsizei, const GLchar *const *, const GLint *)) \
 	X(void, glTexImage2D, (GLenum, GLint, GLint, GLsizei, GLsizei, GLint, GLenum, GLenum, const void *)) \
 	X(void, glTexParameteri, (GLenum, GLenum, GLint)) \
@@ -496,6 +500,41 @@ void passes_draw_scaled(struct passes *P, double unix_time, unsigned out, int w,
 		passes_draw(P, unix_time, out, 0, 0, w, h);
 	}
 	check("a frame");
+}
+
+/* Each texture attached to a framebuffer of its own and read whole: an RGBA8 texture is a colour
+ * attachment both OpenGL 3.3 and OpenGL ES 3 render to, and RGBA with unsigned bytes is the one read
+ * both always allow, so what comes back is what was uploaded, byte for byte. The mipmaps are not
+ * read: passes_create makes them from level 0 again, as it made them the first time. */
+bool passes_read_textures(struct passes *P, void *pixels[TEXTURE_COUNT])
+{
+	for (int t = 0; t < TEXTURE_COUNT; t++)
+		pixels[t] = NULL;
+	while (glGetError() != GL_NO_ERROR)
+		;
+	bool ok = true;
+	GLuint fbo = 0;
+	glGenFramebuffers(1, &fbo);
+	glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+	glPixelStorei(GL_PACK_ALIGNMENT, 1);
+	for (int t = 0; t < TEXTURE_COUNT && ok; t++) {
+		const struct texture_source *src = &P->scene->texture[t];
+		pixels[t] = malloc((size_t)src->width * (size_t)src->height * 4);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, P->texture[t], 0);
+		ok = pixels[t] && glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
+		if (ok)
+			glReadPixels(0, 0, src->width, src->height, GL_RGBA, GL_UNSIGNED_BYTE, pixels[t]);
+	}
+	glPixelStorei(GL_PACK_ALIGNMENT, 4);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glDeleteFramebuffers(1, &fbo);
+	ok = ok && glGetError() == GL_NO_ERROR;
+	if (!ok)
+		for (int t = 0; t < TEXTURE_COUNT; t++) {
+			free(pixels[t]);
+			pixels[t] = NULL;
+		}
+	return ok;
 }
 
 /* With its context current. */

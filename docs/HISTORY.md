@@ -237,4 +237,6 @@ the lock screen lost PAM when every screen went), fixed most critical first, one
   "heres the new default config to adopt as new standard/default values, and, fix all the found
   issues, split it up in multiple builds of course, start with addressing the most critical ones and
   work down the list until all are addressed".
+* **After 47** (2026-10-25 16:28): "there seems to be a memory leak, see screeshots ... from 120MB at
+  start to 400MB after 2 days, please fix"; their `memory.log` and driver 615.78.08 at 16:43.
 * **Standing**: no long dashes in anything written to them.

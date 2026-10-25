@@ -1,10 +1,14 @@
-# The next build is 48
+# The next build is 49
 
 The first line is parsed: `# The next build is <N>`, exactly one above `BUILD_NUMBER`.
 
-## Build 48: the operator's machine
+## Build 49: the operator's machine
 
 * Read what the operator sent last, and answer it in one plain sentence first.
+* Build 48's renewal on their desktop: the record (`syncrain --diagnose`) should show "OpenGL made
+  anew" about every six hours of drawing, most of the growth given back, resident memory near its
+  start. If a renewal gave back little, renewals stopped by themselves: then the growth is not the
+  driver's sync objects; look again at what grows.
 * What the roadmap still has needs the operator's machine (booting NixOS and the other
   distributions, watts, Safari); ask them for what they see, or take what they ask next.
 * No boot splash: never touch the bootloader, initramfs or Plymouth.

@@ -21,6 +21,10 @@ Rules learned by shipping their opposite, one line each. When and how: `docs/HIS
   freed, not leaked; a cold shader cache leaves tens of MiB there.
 * **NVIDIA's Wayland driver leaks a fixed amount per frame with explicit sync on**; flat on Mesa.
   `__NV_DISABLE_EXPLICIT_SYNC=1` stops it.
+* **NVIDIA's 615 driver keeps about 16 bytes for every sync object, even with that set**, and its
+  own `eglSwapBuffers` makes them; only `eglTerminate` frees them. Read the record's "malloc in use":
+  steps 1.5 times the last are one array regrown, a leak in the heap, not memory not yet handed
+  back. Make OpenGL anew from what the card holds rather than restart (build 48).
 * **C that must match Python must do Python's arithmetic**: float `//`, `round`, the order of
   operations. Compare both, printed exactly.
 * **Python rounds halves to even, JavaScript up**: say which, in both, when the two must agree.
