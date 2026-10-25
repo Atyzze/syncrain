@@ -32,27 +32,55 @@ from the operator's report of that day.
   upload), the textures uploaded again, a new EGL surface on each screen's same Wayland surface.
 * The screens keep their Wayland surfaces throughout, so the compositor keeps showing the last
   frame until the next one comes from the new context.
-* `memory.log` gets a line for each: how long it took, the heap after, what it gave back of what
-  had grown, resident before and after. A renewal that gives back less than half of 8 MiB or more
-  stops renewals (the growth is then not the driver's), and the record says so. One that cannot
-  build again stops the wallpaper with status 1, so its service starts it afresh, as after a lost
-  compositor. A driver that frees what it makes (Mesa) never reaches 32 MiB, so never renews.
-* `SYNCRAIN_RENEW_MIB`: the growth that calls for it (below 0: never; the lane uses 0).
+* `memory.log` gets two lines for each: the renewal (how long it took, the heap after it, how much
+  had grown, resident before and after), and, once the new context has drawn, the heap then beside
+  what it held when the screens first drew. That level is the new baseline, and the verdict: back
+  near the start, the growth was the driver's. Still 32 MiB above it after three renewals in a row,
+  renewals stop (the growth is then not what a renewal gives back) and the record says so. It is
+  judged by the level after, not by how much fell at once: a driver may keep a table's room after
+  emptying it.
+* A renewal that cannot start (a passing failure after a resume, say) touches nothing and is tried
+  again at the next round; three in a row and renewals stop. One that tears down and cannot build
+  again stops the wallpaper with status 1, so its service starts it afresh (about 3 s of Plasma's
+  own wallpaper), as after a lost compositor. A driver that frees what it makes (Mesa) never reaches
+  32 MiB, so never renews.
+* `SYNCRAIN_RENEW_MIB`: the growth that calls for it (below 0: never; 0: every round, never judged,
+  for the lane; anything not a number: the default).
 
 ## Measured here (Mesa llvmpipe, headless Sway, two screens)
 
 * A renewal every 5 to 10 s: about 110 ms each (shaders compiled in software included); over 40,
   the heap stayed at 71.0 MiB and resident memory level at about 144 MiB after the first.
 * With the clock still, 1,277 grabs across three renewals, every one the first to the pixel: the
-  textures come back byte for byte and nothing blanks.
+  textures come back byte for byte and nothing blanks. The lane does the same on two screens, then
+  plugs a third in and the renewals go on.
 * Not measurable here: NVIDIA's driver and KWin. On the operator's desktop the record shows whether
   a renewal gives the driver's memory back.
+
+## The review of this build
+
+An agent that did not write it read the change, and egl-wayland and egl-wayland2's sources. It
+confirmed the cause there: egl-wayland2 makes and destroys a native fence sync on every swap, even
+with `__NV_DISABLE_EXPLICIT_SYNC=1`, and `eglTerminate` reaches the driver's display once no
+surface holds it. Terminate then initialize on the same display, and a new window on the same
+`wl_surface`, are what both libraries support; the frame callbacks and presentation feedback
+syncrain asked for are untouched; a destroyed buffer does not unmap a layer surface, so KWin keeps
+the last frame (a still picture of 0.1 to 0.5 s at each renewal, about every six hours). Its
+everyday findings are fixed above: renewals were judged by what fell at once (could stop after one
+that worked), the baseline was taken before the new context drew, and covered screens were asked
+for a frame. Its rarer ones fixed too: screens beyond 64, a word in `SYNCRAIN_RENEW_MIB` meaning
+every round, one passing failure ending renewals for good, an unbounded wait on old OpenGL errors.
+Left for later: a screen that first draws resets the baseline (it delays a renewal, no more);
+egl-wayland 1.x frees its format list without forgetting it, which a renewal would reach only on a
+compositor with linux-dmabuf 3 (KWin 6 offers 4 or later); a large background picture is read back
+whole for a moment (an 8K one about 130 MiB).
 
 ## What the operator does
 
 * Unpack, then `./install.sh`. The wallpaper restarts with it.
-* After a day: `syncrain --diagnose` shows the record's end. Lines saying "OpenGL made anew" with
-  most of the growth given back mean it works; resident memory should stay near its start.
+* After a day: `syncrain --diagnose` shows the record's end. "after renewal N, drawing again"
+  lines with the heap back near its first value mean it works; resident memory should stay near
+  its start. Each renewal is a still picture for a fraction of a second.
 
 ## Verification
 

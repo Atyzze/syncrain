@@ -510,8 +510,8 @@ bool passes_read_textures(struct passes *P, void *pixels[TEXTURE_COUNT])
 {
 	for (int t = 0; t < TEXTURE_COUNT; t++)
 		pixels[t] = NULL;
-	while (glGetError() != GL_NO_ERROR)
-		;
+	for (int i = 0; i < 16 && glGetError() != GL_NO_ERROR; i++)
+		;                                      /* errors from before: not this read's */
 	bool ok = true;
 	GLuint fbo = 0;
 	glGenFramebuffers(1, &fbo);

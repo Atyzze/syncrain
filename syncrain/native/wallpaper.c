@@ -23,6 +23,7 @@
 #define _GNU_SOURCE
 #include <errno.h>
 #include <malloc.h>
+#include <math.h>
 #include <poll.h>
 #include <signal.h>
 #include <stdio.h>
@@ -239,9 +240,13 @@ static struct {
 	int64_t trim_us;
 	int trims;
 	double heap_base;                        /* MiB the C heap held once the screens had drawn (or after a renewal) */
-	double renew_mib;                        /* growth over heap_base that makes OpenGL anew (< 0: never) */
+	double heap_first;                       /* the same, before any renewal: what this process needs */
+	double renew_mib;                        /* growth over heap_base that makes OpenGL anew (< 0: never; 0: every round) */
 	bool renew_due;
 	int renewals;
+	int64_t rebase_at;                       /* frames shown, every screen, after which a renewal is judged (0: none pending) */
+	int unhelped;                            /* renewals in a row that left the heap RENEW_MIB above heap_first */
+	int kept;                                /* renewals in a row that could not start (RENEW_KEPT) */
 	bool running;
 	struct watch *watch;
 	bool watch_said, watch_retried;
@@ -600,7 +605,7 @@ static void trim_memory(int64_t now)
 	W.next_trim = now + W.trim_us;
 	if (++W.trims % RECORD_EVERY == 0)
 		record_memory(before, resident_mib());
-	if (W.renew_mib >= 0 && heap_mib() - W.heap_base >= W.renew_mib)
+	if (!W.rebase_at && (W.renew_mib == 0 || (W.renew_mib > 0 && heap_mib() - W.heap_base >= W.renew_mib)))
 		W.renew_due = true;                        /* in the loop, between frames: renew */
 }
 
@@ -621,7 +626,7 @@ static void settle_memory(struct screen *s)
 	malloc_trim(0);
 	double after = resident_mib();
 	record_memory(before, after);
-	W.heap_base = heap_mib();                      /* each screen's first frames are part of it */
+	W.heap_base = W.heap_first = heap_mib();       /* each screen's first frames are part of it */
 	if (!W.next_trim) {
 		W.next_trim = monotonic_us() + W.trim_us;
 		W.trims = 0;
@@ -661,6 +666,8 @@ static void swap_failed(struct screen *s, struct frame *f, unsigned error)
 	}
 }
 
+static void rebase(void);
+
 static void draw(struct screen *s)
 {
 	int64_t now = monotonic_us();
@@ -692,6 +699,8 @@ static void draw(struct screen *s)
 		s->failing_since = 0;
 		W.frames++;
 		settle_memory(s);
+		if (W.rebase_at && W.frames >= W.rebase_at)
+			rebase();
 		if (W.next_trim && now >= W.next_trim)
 			trim_memory(now);
 	} else {
@@ -1075,24 +1084,26 @@ static const struct wl_registry_listener registry_listener = { registry_global, 
 
 /* ------------------------------------------------------------------ OpenGL made anew */
 
-/* What the driver kept, handed back (render_renew), between two frames. A renewal that gives back
- * less than half the growth that called for it shows the growth is not the driver's to give: no
- * more renewals then, and the record says so. A renewal that tears down and cannot build again
- * leaves nothing to draw with: the wallpaper stops with status 1 and its service starts it afresh,
- * as after a lost compositor. */
+/* What the driver kept, handed back (render_renew), between two frames. A renewal that tears down
+ * and cannot build again leaves nothing to draw with: the wallpaper stops with status 1 and its
+ * service starts it afresh, as after a lost compositor. One that cannot start (a passing failure
+ * after a resume, say) is tried again at the next round, and given up after three in a row. */
 static void renew(void)
 {
 	W.renew_due = false;
-	struct render_surface *surfaces[64];
-	int n = 0;
+	int n = 0, count = wl_list_length(&W.screens);
+	struct render_surface **surfaces = malloc(sizeof *surfaces * (size_t)(count > 0 ? count : 1));
+	if (!surfaces)
+		return;                                    /* the next round tries again */
 	struct screen *s;
 	wl_list_for_each(s, &W.screens, link)
-		if (s->render && n < (int)(sizeof surfaces / sizeof *surfaces))
+		if (s->render)
 			surfaces[n++] = s->render;
 	double grown = heap_mib() - W.heap_base, resident = resident_mib();
 	int64_t started = monotonic_us();
 	char why[512];
 	enum renew result = render_renew(&W.scene, surfaces, n, why, sizeof why);
+	free(surfaces);
 	char text[320];
 	if (result == RENEW_LOST) {
 		static char lost[600];
@@ -1105,28 +1116,52 @@ static void renew(void)
 		return;
 	}
 	if (result == RENEW_KEPT) {
-		W.renew_mib = -1;
-		snprintf(text, sizeof text, "OpenGL is not made anew here (%.200s); the heap grew %.1f MiB", why, grown);
+		bool give_up = !W.scene.sources || ++W.kept >= 3;
+		if (give_up)
+			W.renew_mib = -1;
+		snprintf(text, sizeof text, "OpenGL not made anew (%.200s); the heap grew %.1f MiB; %s", why, grown,
+		         give_up ? "no more renewals" : "tried again at the next round");
 		record_line(text);
 		printf("syncrain: %s\n", text);
 		return;
 	}
+	W.kept = 0;
 	malloc_trim(0);
-	double heap = heap_mib(), gave = W.heap_base + grown - heap;
 	W.renewals++;
-	snprintf(text, sizeof text, "OpenGL made anew in %.0f ms (renewal %d): malloc %.1f MiB in use, %.1f given back "
-	         "of %.1f grown; %.1f MiB resident (%.1f before)", (monotonic_us() - started) / 1000.0, W.renewals, heap,
-	         gave, grown, resident_mib(), resident);
+	snprintf(text, sizeof text, "OpenGL made anew in %.0f ms (renewal %d): malloc %.1f MiB in use (%.1f grown "
+	         "before); %.1f MiB resident (%.1f before)", (monotonic_us() - started) / 1000.0, W.renewals, heap_mib(),
+	         grown, resident_mib(), resident);
 	record_line(text);
 	printf("syncrain: %s\n", text);
-	if (grown >= 8 && gave < grown / 2) {         /* below 8 MiB a test asked for it (SYNCRAIN_RENEW_MIB) */
-		W.renew_mib = -1;
-		record_line("that gave back less than half: no more renewals; the growth is not the driver's");
-		printf("syncrain: that gave back less than half: no more renewals\n");
-	}
-	W.heap_base = heap;
+	W.rebase_at = W.frames + 2 * (int64_t)(n > 0 ? n : 1);     /* judged once the new context has drawn */
 	wl_list_for_each(s, &W.screens, link)
-		queue(s);                                  /* the next frames come from the new context */
+		if (!s->hidden)
+			queue(s);                              /* the next frames come from the new context */
+}
+
+/* A renewal judged once the new context has drawn its first frames: what the heap holds then is
+ * the new baseline. Back near where this process started, the growth was the driver's and is gone;
+ * still RENEW_MIB above it after three renewals in a row, the growth is not what a renewal gives
+ * back: no more renewals, and the record says so. (Judged by the level after, not by how much fell
+ * at once: a driver may keep a table's room after emptying it.) */
+static void rebase(void)
+{
+	W.rebase_at = 0;
+	malloc_trim(0);
+	W.heap_base = heap_mib();
+	char text[200];
+	snprintf(text, sizeof text, "after renewal %d, drawing again: malloc %.1f MiB in use (%.1f once the screens "
+	         "had first drawn)", W.renewals, W.heap_base, W.heap_first);
+	record_line(text);
+	if (W.renew_mib <= 0)                          /* 0: a test's renewal at every round, never judged */
+		return;
+	W.unhelped = W.heap_base - W.heap_first >= W.renew_mib ? W.unhelped + 1 : 0;
+	if (W.unhelped >= 3) {
+		W.renew_mib = -1;
+		record_line("three renewals in a row left the heap as high: no more renewals; the growth is not "
+		            "the driver's sync objects");
+		printf("syncrain: three renewals in a row gave nothing back: no more renewals\n");
+	}
 }
 
 /* ------------------------------------------------------------------ the loop */
@@ -1328,7 +1363,10 @@ int main(int argc, char **argv)
 	const char *trim = getenv("SYNCRAIN_MEMORY_SECONDS");     /* tests: a shorter round */
 	W.trim_us = trim && c_strtod(trim, NULL) > 0 ? (int64_t)(c_strtod(trim, NULL) * 1e6) : TRIM_US;
 	const char *renew_at = getenv("SYNCRAIN_RENEW_MIB");      /* < 0: never; tests: 0, at every round */
-	W.renew_mib = renew_at && *renew_at ? c_strtod(renew_at, NULL) : RENEW_MIB;
+	char *renew_end = NULL;
+	W.renew_mib = renew_at && *renew_at ? c_strtod(renew_at, &renew_end) : RENEW_MIB;
+	if (renew_at && *renew_at && (renew_end == renew_at || *renew_end || !isfinite(W.renew_mib)))
+		W.renew_mib = RENEW_MIB;                   /* not a number: the default, never "every round" */
 	/* Few threads allocate here (the driver's); two arenas keep what they free from spreading out. */
 	mallopt(M_ARENA_MAX, 2);
 	char why[1024];
