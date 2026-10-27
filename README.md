@@ -1,5 +1,7 @@
 # syncrain backdrop
 
+https://www.youtube.com/watch?v=4uDTcz7IjUQ
+
 Live code rain for your whole Linux session: your desktop wallpaper, your login screen, your lock
 screen, a web page and, when you want one, a video. It never repeats and stays in sync across
 machines: every frame is worked out from the UTC clock and a channel name, so everyone on the same
