@@ -1,6 +1,6 @@
 # Build 49: a symbol keeps still once the rain has passed it
 
-**Type: feature; the picture changes** (stream `b8c95b5e` to `1021718d`: the trails' symbols, so
+**Type: feature; the picture changes** (stream `b8c95b5e` to `dc1b15b8`: the trails' symbols, so
 machines on build 48 and 49 stop matching). Made on 2026-10-30, from the operator's request of that
 day.
 
@@ -18,11 +18,14 @@ day.
   cell it scrambles 15 times a second, as before; once the head has moved on, the symbol is the
   one shown in the 15 Hz tick in which the head left the row, and it fades as it is. Only another
   head passing over the cell changes it. A hidden word's letters follow the same rule: a later drop
-  crossing a word writes over those letters.
+  crossing a word writes over those letters, and a cell written over is drawn as rain, not lit
+  whiter as a letter is.
 * The drop that passed last keeps the cell even after its own trail has gone dark and an older,
   longer trail still lights it, so the older trail never puts its symbol back.
-* The tick is counted from the drop's spawn second (an integer) plus a few seconds' float, so the
-  page, the GTK host and the native wallpaper agree, as the rest of the stream does.
+* The tick is counted from the drop's spawn second (an integer) plus a few seconds' float, so
+  every frame on a machine agrees with the last. Across two GPUs, a head that leaves a row within
+  a few ULP of a tick's edge can lock a different symbol: about one cell in 10 to 30 minutes,
+  held for its fade (an open item).
 
 ## Measured here (the state pass alone, 10 s at 30 fps, 64 x 40 cells, both contrast modes)
 
@@ -34,7 +37,15 @@ day.
 
 ## The review of this build
 
-REVIEW_SUMMARY
+An agent that did not write it read the change, compiled it as every host assembles it, and ran
+a port of the drop loop over 10 columns for 90 s at 30 fps: no symbol changed in a lit cell without
+a head arriving. Drops that stop early, starts mid-screen, sentences' gaps, glints, the logo's cells
+and the look-back window all hold; the integer ticks wrap together past 2033. No everyday fault.
+Fixed in this build: a word's brighter, whiter letter style stayed on a cell a later drop had
+written over (about 13% of such cells), and a comment called the lock exact on every GPU. Left for
+later (open items): the lock's few-ULP tie across GPUs; a slow head overtaken in its row, or a
+start mid-row, can sit on a still symbol for up to about 1/7 s; the symbol is now picked for dark
+cells too (twice the picks, on a pass of about 2,500 cells).
 
 ## What the operator does
 
