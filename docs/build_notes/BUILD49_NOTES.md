@@ -55,4 +55,4 @@ cells too (twice the picks, on a pass of about 2,500 cells).
 
 ## Verification
 
-GATE_RESULT
+574 passed, 1 skipped in 1381.73s (0:23:01)
