@@ -1,10 +1,15 @@
-# The next build is 49
+# The next build is 50
 
 The first line is parsed: `# The next build is <N>`, exactly one above `BUILD_NUMBER`.
 
-## Build 49: the operator's machine
+## Build 50: consolidation
 
+* A consolidation changes no behaviour (`docs/ROADMAP.md`, "Build cadence"): fold the notes since
+  build 40 into `docs/HISTORY.md`, make every document true and short again, write what it finds as
+  open items.
 * Read what the operator sent last, and answer it in one plain sentence first.
+* Build 49 on their desktop: a trail's symbols should stay as the head left them while they fade;
+  only falling heads change them.
 * Build 48's renewal on their desktop: the record (`syncrain --diagnose`) should show "OpenGL made
   anew" about every six hours of drawing, each "after renewal" line back near the first heap,
   resident memory near its start, no flash. If renewals stopped by themselves (three that left the

@@ -239,4 +239,6 @@ the lock screen lost PAM when every screen went), fixed most critical first, one
   work down the list until all are addressed".
 * **After 47** (2026-10-25 16:28): "there seems to be a memory leak, see screeshots ... from 120MB at
   start to 400MB after 2 days, please fix"; their `memory.log` and driver 615.78.08 at 16:43.
+* **After 48** (2026-10-30 13:56): "after a symbol has been locked in, we stop changing it, so that
+  only during the rain fall does the actual symbol change"; build 49.
 * **Standing**: no long dashes in anything written to them.
