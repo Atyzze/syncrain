@@ -48,6 +48,11 @@ void main() {
     float B = 0.0, W = 0.0;
     int G = -1;
     bool headCell = false;
+    // the glyph belongs to the drop whose head passed this cell last: while its head is here the
+    // glyph scrambles, once the head has moved on it is locked to the one shown as it left, and it
+    // fades as is. Only another head passing over the cell changes it.
+    float lastAge = 1.0e9;
+    int LG = -1;
 
     // longest life: a word drop (7 rows/s at speed 1) crossing the screen plus its trail (34 rows, or
     // a 40-cell sentence's 50) and a few rows' start
@@ -101,12 +106,31 @@ void main() {
         float age = el - (fr - r0) / v;                         // seconds since the head reached this row
         if (age < 0.0) continue;
         float x = age * v / T;
+        int hr = int(floor(head));
+        bool isHead = alive && r == hr;
+
+        // a sentence's space: this drop leaves the cell dark (another drop may still light it)
+        if (word >= 0 && r >= wr && r < wr + wl && wordGlyph(word, r - wr) == 254) continue;
+
+        if (age < lastAge) {
+            lastAge = age;
+            if (word >= 0 && r >= wr && r < wr + wl) {
+                LG = wordGlyph(word, r - wr);
+            } else if (isHead) {
+                uint tick15 = uSec * 15u + uint(uFrac * 15.0);   // the leading glyph scrambles 15x a second
+                LG = pickGlyph(H(cu, ru, tick15, 20u));
+            } else {
+                // the 15 Hz tick in which the head left this row (at row r + 1, or where it stopped),
+                // counted from the spawn second so it is exact on every GPU and the same every frame
+                float leave = U(H(cu, k, 0u, 2u)) + (min(fr + 1.0, r1) - r0) / v;
+                uint lockTick = k * 15u + uint(max(0.0, floor(leave * 15.0 - 1.0e-3)));
+                LG = pickGlyph(H(cu, ru, lockTick, 20u));
+            }
+        }
         if (x >= 1.0) continue;
 
         float b = pow(1.0 - x, 1.6) * a;
         float w = 0.0;
-        int hr = int(floor(head));
-        bool isHead = alive && r == hr;
         if (uContrast == 1) {
             if (isHead) { b = 0.4 + 0.6 * a; w = hw; }
             else if (alive) {
@@ -118,21 +142,15 @@ void main() {
             else if (alive && r == hr - 1) w = 0.22;
         }
 
-        // a sentence's space: this drop leaves the cell dark (another drop may still light it)
-        if (word >= 0 && r >= wr && r < wr + wl && wordGlyph(word, r - wr) == 254) continue;
-
         if (b > B) {
-            B = b; W = max(W, w); headCell = isHead; G = -1;
+            B = b; W = max(W, w); headCell = isHead;
             if (word >= 0 && r >= wr && r < wr + wl) {
-                G = wordGlyph(word, r - wr);
                 B = min(1.0, b * 1.15);
                 if (!isHead) W = max(W, 0.28 * b);
-            } else if (isHead) {
-                uint tick15 = uSec * 15u + uint(uFrac * 15.0);   // the leading glyph scrambles 15x a second
-                G = pickGlyph(H(cu, ru, tick15, 20u));
             }
         }
     }
+    G = LG;
 
     if (B > 0.0 && !headCell) {                                 // slow per-cell shimmer
         if (uContrast == 1) {
@@ -163,12 +181,7 @@ void main() {
         }
     }
 
-    if (B > 0.015 && G < 0) {                                   // resting glyph, re-rolled every 1.5 .. 6 s
-        uint tick4 = uSec * 4u + uint(uFrac * 4.0);
-        uint P = 6u + H(cu, ru, 0u, 50u) % 19u;
-        uint ph = H(cu, ru, 0u, 51u) % P;
-        G = pickGlyph(H(cu, ru, (tick4 + ph) / P, 52u));
-    }
+    if (B > 0.015 && G < 0) G = pickGlyph(H(cu, ru, 0u, 52u));   // no drop owns it: a fixed glyph, never re-rolled
 
     int g = max(G, 0);
     oState = vec4(B, W, float(g % 256) / 255.0, float(g / 256) / 255.0);
