@@ -53,6 +53,8 @@ void main() {
     // fades as is. Only another head passing over the cell changes it.
     float lastAge = 1.0e9;
     int LG = -1;
+    int ownI = -1, brightI = -1;      // the owning drop and the brightest, by spawn second back
+    float wordB = -1.0;               // the brightest drop's own brightness when it is a word's letter here
 
     // longest life: a word drop (7 rows/s at speed 1) crossing the screen plus its trail (34 rows, or
     // a 40-cell sentence's 50) and a few rows' start
@@ -113,7 +115,7 @@ void main() {
         if (word >= 0 && r >= wr && r < wr + wl && wordGlyph(word, r - wr) == 254) continue;
 
         if (age < lastAge) {
-            lastAge = age;
+            lastAge = age; ownI = i;
             if (word >= 0 && r >= wr && r < wr + wl) {
                 LG = wordGlyph(word, r - wr);
             } else if (isHead) {
@@ -121,7 +123,8 @@ void main() {
                 LG = pickGlyph(H(cu, ru, tick15, 20u));
             } else {
                 // the 15 Hz tick in which the head left this row (at row r + 1, or where it stopped),
-                // counted from the spawn second so it is exact on every GPU and the same every frame
+                // counted from the spawn second, so it is the same every frame; across GPUs only a
+                // tie within a few ULP of a tick's edge can differ (one cell in a fade, rarely)
                 float leave = U(H(cu, k, 0u, 2u)) + (min(fr + 1.0, r1) - r0) / v;
                 uint lockTick = k * 15u + uint(max(0.0, floor(leave * 15.0 - 1.0e-3)));
                 LG = pickGlyph(H(cu, ru, lockTick, 20u));
@@ -143,14 +146,17 @@ void main() {
         }
 
         if (b > B) {
-            B = b; W = max(W, w); headCell = isHead;
-            if (word >= 0 && r >= wr && r < wr + wl) {
-                B = min(1.0, b * 1.15);
-                if (!isHead) W = max(W, 0.28 * b);
-            }
+            B = b; W = max(W, w); headCell = isHead; brightI = i;
+            wordB = (word >= 0 && r >= wr && r < wr + wl) ? b : -1.0;
         }
     }
     G = LG;
+    // a word's letter is lit a little brighter and whiter, but only while the cell still shows it:
+    // a later head crossing the word writes its own symbol, and that one is drawn as rain
+    if (wordB >= 0.0 && ownI == brightI) {
+        B = min(1.0, wordB * 1.15);
+        if (!headCell) W = max(W, 0.28 * wordB);
+    }
 
     if (B > 0.0 && !headCell) {                                 // slow per-cell shimmer
         if (uContrast == 1) {

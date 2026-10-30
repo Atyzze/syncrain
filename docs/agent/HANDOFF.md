@@ -46,7 +46,7 @@ This page, `docs/agent/NEXT_BUILD.md`, `docs/agent/WORKING_WITH_THE_OPERATOR.md`
   a second factor, take an empty answer to a visible prompt and ignore clicks while hidden.
 * **Boot stays plain text** (the operator, 2026-10-15): never the bootloader, the initramfs or a
   boot splash.
-* **Stream**: `1021718d` since build 49 (a trail's symbol stays as the head left it, `state.frag`); `b8c95b5e` in 48 (the operator's config.json of 2026-10-21); `c5c869a0` in 47 (the default from config.json); `0aa22037` 44 to 46 (the id names what the code computes, not its text; the
+* **Stream**: `dc1b15b8` since build 49 (a trail's symbol stays as the head left it, `state.frag`); `b8c95b5e` in 48 (the operator's config.json of 2026-10-21); `c5c869a0` in 47 (the default from config.json); `0aa22037` 44 to 46 (the id names what the code computes, not its text; the
   same frame as 35 to 43 at a scale of 1); `1ad0a2dd` 35 to 43 (the new default, `composite.frag`
   to the spec, stricter colours and periods); `822ea58a` 29 to 34 (sentences' gaps and trails in `state.frag`); `85ace386` in
   28; `a9c058f3` 24 to 27; `f98ef1ca` in 23; `25b02556` in 22; `def5684f` 15 to 21; `c18f8be2` in 12

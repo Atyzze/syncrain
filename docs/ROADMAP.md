@@ -69,6 +69,8 @@ What the documents and the review of build 17 leave to a build that changes code
 | --- | --- |
 | The login and lock screens on NixOS (build 32): evaluated, built, the login screen run in a headless KWin; never booted, and no VM here (no KVM) | someone booting it, or the image's VM test |
 | Debian, Fedora and openSUSE: installed in roots, never booted; on Fedora, SELinux may still refuse greetd's domain the login screen (its files are labeled at install, `--diagnose` names the refusals, the text login asks meanwhile) | someone booting one, and the refusals `--diagnose` shows |
+| Build 49's lock tick is a float decision: two GPUs can lock a different symbol in a cell when the head leaves within a few ULP of a tick's edge (about one cell in 10 to 30 minutes, held for its fade) | an integer lock (`pickGlyph(H(cu, ru, k, 21u))`), if the cost (every cell changes once as the head leaves, not 1 in 8) is worth it |
+| Build 49: a slow head overtaken in its row, or a drop starting mid-row, can sit up to about 1/7 s on a still symbol; the symbol is picked for dark cells too | `state.frag`: a live head takes the cell; pick once after the loop, only for a lit cell |
 | Ubuntu 24.04 and openSUSE Leap 16.0: no gtk4-layer-shell (the native wallpaper draws), Qt below 6.5 (no lock screen) | nothing to do until they update |
 | A video's watts against the live rain's: not measured (no graphics card in the sandbox) | measure on their machine before claiming it uses less |
 | NVIDIA's 615 driver keeps about 16 bytes per sync object until `eglTerminate` (build 48 makes OpenGL anew at 32 MiB of growth); unseen on KWin and NVIDIA here | the operator's record after a day, and a driver release that fixes it (then the renewals stop coming by themselves) |
