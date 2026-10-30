@@ -8,6 +8,8 @@ None open.
 
 ## Decisions answered
 
+* **2026-10-30**: a symbol changes only while the falling head is on it; once locked in, it
+  fades as it is (no re-roll behind the head). Build 49, a stream change.
 * **2026-10-20**: the video's loop crossfade blurs its first seconds and goes; the lock screen's
   rest stays but off by default, as a setting on the page; config.json is the default settings
   file, in every build, what `install.sh` reads (generated when missing) and where the defaults are
